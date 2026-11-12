@@ -1,0 +1,88 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { AmStatisticNumber } from '../../types/statistic.uts'
+import { iconGlyph } from '../../utils/icons.uts'
+import { formatStatisticNumber, styleColor } from '../../utils/statistic.uts'
+
+// 统计数值（= antdv-next-mobile 的 Statistic）：title、value、precision、prefix、suffix、groupSeparator、
+// decimalSeparator、loading、valueStyle 同名同义；插槽 title、prefix、suffix、formatter（参数 value）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `value` 只能是数字（UTS 的属性不能是“数字或字符串”）；要显示文字时用 `formatter` 插槽；
+// - title / prefix / suffix 是字符串：prefix / suffix 是图标名（<am-icon> 的 name）时显示图标，否则显示文字；
+// - `formatter` 只有插槽（UTS 里函数不能返回节点）；`precision` 为 -1 表示不处理小数位；
+// - `valueStyle` 是 style 字符串（如 'color:#cf1322;'），写在数值、前后缀的 text 上（样式不继承）；
+// - App 端没有 align-items: baseline，数值与前后缀按底部对齐
+defineOptions({ name: 'AmStatistic' })
+
+const props = defineProps({
+	title: { type: String, default: '' },
+	value: { type: Number, default: 0 },
+	precision: { type: Number, default: -1 },
+	prefix: { type: String, default: '' },
+	suffix: { type: String, default: '' },
+	groupSeparator: { type: String, default: ',' },
+	decimalSeparator: { type: String, default: '.' },
+	loading: { type: Boolean, default: false },
+	valueStyle: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+const formatted = computed(() : AmStatisticNumber => formatStatisticNumber(props.value, props.precision, props.groupSeparator, props.decimalSeparator))
+
+const prefixIsIcon = computed(() : boolean => iconGlyph(props.prefix).length > 0)
+const suffixIsIcon = computed(() : boolean => iconGlyph(props.suffix).length > 0)
+const iconColor = computed(() : string => {
+	const color = styleColor(props.valueStyle)
+	return color.length > 0 ? color : theme().colorText
+})
+</script>
+
+<template>
+	<view :class="['am-statistic', rootClass]">
+		<text v-if="title.length > 0" class="am-statistic__title">{{ title }}</text>
+		<slot name="title"></slot>
+		<view v-if="loading" class="am-statistic__skeleton"></view>
+		<view v-else class="am-statistic__content">
+			<view v-if="prefixIsIcon" class="am-statistic__prefix-icon">
+				<am-icon :name="prefix" :size="22" :color="iconColor" />
+			</view>
+			<text v-else-if="prefix.length > 0" class="am-statistic__prefix" :style="valueStyle">{{ prefix }}</text>
+			<slot name="prefix"></slot>
+			<slot name="formatter" :value="value">
+				<text class="am-statistic__value" :style="valueStyle">{{ formatted.int }}</text>
+				<text v-if="formatted.decimal.length > 0" class="am-statistic__decimal" :style="valueStyle">{{ formatted.decimal }}</text>
+			</slot>
+			<view v-if="suffixIsIcon" class="am-statistic__suffix-icon">
+				<am-icon :name="suffix" :size="16" :color="iconColor" />
+			</view>
+			<text v-else-if="suffix.length > 0" class="am-statistic__suffix" :style="valueStyle">{{ suffix }}</text>
+			<slot name="suffix"></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-statistic__title {
+	margin-bottom: 4px;
+	font-size: var(--am-font-size, 14px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-statistic__content { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
+.am-statistic__value { font-size: 24px; line-height: 32px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-statistic__decimal { font-size: 18px; line-height: 28px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-statistic__prefix { margin-right: 4px; font-size: 24px; line-height: 32px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-statistic__prefix-icon { margin-right: 4px; height: 32px; justify-content: center; }
+.am-statistic__suffix { margin-left: 4px; font-size: 16px; line-height: 26px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-statistic__suffix-icon { margin-left: 4px; height: 26px; justify-content: center; }
+.am-statistic__skeleton {
+	width: 120px;
+	height: 16px;
+	margin-top: 8px;
+	margin-bottom: 8px;
+	border-radius: 4px;
+	background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06));
+}
+</style>

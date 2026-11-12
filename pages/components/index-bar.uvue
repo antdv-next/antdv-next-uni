@@ -1,0 +1,73 @@
+<script setup lang="uts">
+// 索引栏：按姓氏拼音首字母分组的通讯录；右侧索引点按或滑动跳转，当前分组的标题吸顶。
+// 这个页面在 pages.json 里要设 "disableScroll": true（索引栏自己是滚动区域）
+type DemoGroup = {
+	index : string
+	names : string[]
+}
+
+const groups : DemoGroup[] = [
+	{ index: 'A', names: ['安然', '敖雪'] },
+	{ index: 'B', names: ['白露', '包文', '毕青'] },
+	{ index: 'C', names: ['陈晨', '程远', '崔浩', '曹宇'] },
+	{ index: 'D', names: ['邓佳', '丁一', '董明'] },
+	{ index: 'F', names: ['方舟', '冯静', '傅雷'] },
+	{ index: 'G', names: ['高翔', '郭敏', '顾城'] },
+	{ index: 'H', names: ['韩梅', '何凡', '胡杨', '黄蕾'] },
+	{ index: 'J', names: ['江帆', '姜涛', '金玲'] },
+	{ index: 'L', names: ['李娜', '林夕', '刘洋', '陆远', '罗兰'] },
+	{ index: 'M', names: ['马丁', '孟然', '莫言'] },
+	{ index: 'P', names: ['潘越', '彭博'] },
+	{ index: 'Q', names: ['钱程', '秦川', '邱实'] },
+	{ index: 'S', names: ['沈星', '宋雨', '苏晴', '孙悦'] },
+	{ index: 'T', names: ['唐宁', '陶然', '田甜'] },
+	{ index: 'W', names: ['王芳', '韦一', '吴迪', '汪洋'] },
+	{ index: 'X', names: ['夏天', '肖遥', '谢安', '徐来'] },
+	{ index: 'Y', names: ['杨帆', '叶青', '于洋', '袁梦'] },
+	{ index: 'Z', names: ['张伟', '赵敏', '郑和', '周舟', '朱迪'] }
+]
+
+const current = ref('')
+const barRef = ref<AmIndexBarComponentPublicInstance | null>(null)
+
+function onChange(index : string) {
+	current.value = index
+}
+
+function call(name : string) {
+	uni.showToast({ title: '联系 ' + name, icon: 'none' })
+}
+
+function jump() {
+	barRef.value?.scrollTo('S')
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<view class="demo__bar">
+			<text class="demo__bar-text">当前分组：{{ current.length > 0 ? current : '—' }}　右侧索引可点按或上下滑动</text>
+			<am-button size="small" text="跳到 S" @click="jump" />
+		</view>
+		<am-index-bar ref="barRef" @change="onChange">
+			<view v-for="group in groups" :key="group.index">
+				<am-index-bar-anchor :index="group.index" />
+				<view v-for="name in group.names" :key="name" class="demo__contact" @click="call(name)">
+					<view class="demo__avatar">
+						<text class="demo__avatar-text">{{ name.substring(0, 1) }}</text>
+					</view>
+					<text class="demo__contact-name">{{ name }}</text>
+				</view>
+			</view>
+		</am-index-bar>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__bar { flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 16px; background-color: var(--am-color-bg-container, #ffffff); border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06)); }
+.demo__bar-text { flex: 1; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__contact { flex-direction: row; align-items: center; height: 52px; padding: 0 40px 0 16px; background-color: var(--am-color-bg-container, #ffffff); border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06)); }
+.demo__avatar { width: 32px; height: 32px; border-radius: 16px; align-items: center; justify-content: center; background-color: var(--am-color-primary-bg, #ecf4ff); }
+.demo__avatar-text { font-size: 14px; color: var(--am-color-primary, #1677ff); }
+.demo__contact-name { margin-left: 12px; font-size: 16px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

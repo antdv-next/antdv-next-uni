@@ -1,0 +1,81 @@
+<script setup lang="uts">
+// 值是字符串（valueFormat 的格式）：uni-app x 上没有 dayjs
+const date = ref('')
+const month = ref('2026-05')
+const year = ref('')
+const datetime = ref('')
+const minute = ref('')
+const ranged = ref('')
+const custom = ref('')
+const open = ref(false)
+const log = ref('')
+
+function onChange(value : string, text : string) {
+	log.value = 'change: ' + value + '（显示为 ' + text + '）'
+}
+
+function onSelect(value : string) {
+	log.value = 'select: ' + value
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-date-picker v-model:value="date" title="选择日期" allow-clear @change="onChange" @select="onSelect" />
+			<text class="demo__hint">当前值：{{ date }}</text>
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">年、月</text>
+		<view class="demo__card">
+			<am-date-picker class="demo__block" v-model:value="month" picker="month" placeholder="请选择月份" />
+			<am-date-picker v-model:value="year" picker="year" placeholder="请选择年份" />
+			<text class="demo__hint">月：{{ month }}　年：{{ year }}</text>
+		</view>
+
+		<text class="demo__title">日期时间</text>
+		<view class="demo__card">
+			<am-date-picker class="demo__block" v-model:value="datetime" show-time placeholder="精确到秒" />
+			<am-date-picker v-model:value="minute" show-time value-format="YYYY-MM-DD HH:mm" :minute-step="15" placeholder="精确到分，15 分钟一档" />
+			<text class="demo__hint">{{ datetime }}　{{ minute }}</text>
+		</view>
+
+		<text class="demo__title">范围与显示格式</text>
+		<view class="demo__card">
+			<am-date-picker v-model:value="ranged" min-date="2026-01-15" max-date="2026-12-20" default-picker-value="2026-06-01" format="YYYY年MM月DD日" placeholder="2026-01-15 至 2026-12-20" />
+			<text class="demo__hint">当前值：{{ ranged }}</text>
+		</view>
+
+		<text class="demo__title">变体与状态</text>
+		<view class="demo__card">
+			<am-date-picker class="demo__block" v-model:value="date" variant="filled" />
+			<am-date-picker class="demo__block" v-model:value="date" variant="borderless" />
+			<am-date-picker class="demo__block" v-model:value="date" status="error" />
+			<am-date-picker v-model:value="date" disabled />
+		</view>
+
+		<text class="demo__title">不用触发区</text>
+		<view class="demo__card">
+			<am-button block :text="custom.length > 0 ? custom : '选择日期'" @click="open = true" />
+			<am-date-picker v-model:value="custom" v-model:open="open" :trigger="false" title="v-model:open" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__panel { padding: 16px; }
+.demo__panel-text { font-size: 16px; line-height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+</style>

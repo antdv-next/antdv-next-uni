@@ -1,0 +1,91 @@
+<script setup lang="uts">
+import { AmDropdownOption } from '@/uni_modules/antdv-next-uni/types/dropdown.uts'
+
+const sorts : AmDropdownOption[] = [
+	{ label: '综合排序', value: 'default' },
+	{ label: '销量优先', value: 'sales' },
+	{ label: '价格从低到高', value: 'price-asc' },
+	{ label: '价格从高到低', value: 'price-desc' }
+]
+const categories : AmDropdownOption[] = [
+	{ label: '全部分类', value: 0 },
+	{ label: '手机数码', value: 1 },
+	{ label: '家用电器', value: 2 },
+	{ label: '食品生鲜', value: 3, disabled: true }
+]
+
+const activeKey = ref('')
+const sort = ref('default')
+const category = ref(0)
+const onlyStock = ref(false)
+const freeShipping = ref(false)
+const applied = ref(false)
+const log = ref('')
+
+const barRef = ref<AmDropdownComponentPublicInstance | null>(null)
+
+function onSort(value : any) {
+	log.value = '排序：' + value
+}
+
+function onReset() {
+	onlyStock.value = false
+	freeShipping.value = false
+}
+
+function onConfirm() {
+	applied.value = onlyStock.value || freeShipping.value
+	log.value = '筛选：' + (onlyStock.value ? '仅看有货 ' : '') + (freeShipping.value ? '包邮' : '')
+}
+
+function closeBar() {
+	barRef.value?.close()
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（标题为已选选项）</text>
+		<am-dropdown ref="barRef" v-model:activeKey="activeKey">
+			<am-dropdown-item item-key="sort" v-model:value="sort" :options="sorts" @change="onSort" />
+			<am-dropdown-item item-key="category" v-model:value="category" :options="categories" />
+			<am-dropdown-item item-key="filter" title="筛选" :highlight="applied" show-footer @reset="onReset" @confirm="onConfirm">
+				<view class="demo__panel">
+					<text class="demo__panel-title">自定义面板（默认插槽）+ 页脚</text>
+					<view class="demo__row">
+						<am-button class="demo__item" size="small" :type="onlyStock ? 'primary' : 'default'" text="仅看有货" @click="onlyStock = !onlyStock" />
+						<am-button class="demo__item" size="small" :type="freeShipping ? 'primary' : 'default'" text="包邮" @click="freeShipping = !freeShipping" />
+					</view>
+				</view>
+			</am-dropdown-item>
+		</am-dropdown>
+		<text class="demo__hint">activeKey = {{ activeKey.length > 0 ? activeKey : '（收起）' }}　sort = {{ sort }}　category = {{ category }}</text>
+		<text class="demo__hint">{{ log }}</text>
+
+		<text class="demo__title">非受控、禁用、选择后不收起</text>
+		<am-dropdown>
+			<am-dropdown-item :options="sorts" default-value="sales" />
+			<am-dropdown-item title="不收起" :options="categories" :default-value="1" :close-on-select="false" />
+			<am-dropdown-item title="禁用" :options="sorts" disabled />
+		</am-dropdown>
+
+		<text class="demo__title">用方法收起</text>
+		<view class="demo__card">
+			<am-button block text="打开“筛选”" @click="activeKey = 'filter'" />
+			<am-button class="demo__gap" block text="close()" @click="closeBar" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__hint { padding: 8px 16px 0 16px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card { margin: 0 12px; padding: 16px; background-color: var(--am-color-bg-container, #ffffff); border-radius: 12px; }
+.demo__gap { margin-top: 10px; }
+.demo__panel { padding: 16px; }
+.demo__panel-title { margin-bottom: 12px; font-size: 14px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 8px; margin-bottom: 4px; }
+.demo__footer { height: 400px; }
+</style>

@@ -1,0 +1,254 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
+
+// 多行输入（= antdv-next-mobile 的 TextArea）：v-model:value、placeholder、disabled、readOnly、maxlength、rows、
+// autoSize（随内容变高）、showCount、allowClear、size、status、variant、enterkeyhint、autofocus、name、id、align
+// 同名同义；事件 update:value、change、input、pressEnter、focus、blur、clear、resize；方法 focus()、blur()。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - change / input 的参数是当前的值（字符串），不是事件对象；resize 的参数是高度（像素数），不是 { height }；
+// - `autoSize` 只有布尔值（没有 minRows / maxRows：`rows` 就是最小行数）；
+// - 没有 defaultValue（用 v-model:value）、readonly（只保留 readOnly）、clearTrigger（有内容时一直显示清除按钮）、
+//   inputmode、autocomplete；没有 keydown / keyup / compositionstart / compositionend 事件；
+// - maxlength 为 -1 表示不限；placeholder 的颜色在 UTS 中取主题（placeholder-style 不支持 CSS 变量）
+defineOptions({ name: 'AmTextarea' })
+
+const props = defineProps({
+	value: { type: String, default: '' },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	readOnly: { type: Boolean, default: false },
+	maxlength: { type: Number, default: -1 },
+	rows: { type: Number, default: 2 },
+	autoSize: { type: Boolean, default: false },
+	showCount: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	status: { type: String, default: '' },
+	/** outlined / filled / borderless / underlined；空为表单的 variant，再没有则 outlined */
+	variant: { type: String, default: '' },
+	enterkeyhint: { type: String, default: 'return' },
+	autofocus: { type: Boolean, default: false },
+	/** 原生 textarea 的 name */
+	name: { type: String, default: '' },
+	/** 原生 textarea 的 id */
+	id: { type: String, default: '' },
+	align: { type: String, default: 'start' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'input', 'pressEnter', 'focus', 'blur', 'clear', 'resize'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const statusOf = useAmFieldStatus(() : string => props.status)
+const status = computed(() : string => statusOf())
+const variantOf = useAmFieldVariant(() : string => props.variant)
+const variant = computed(() : string => variantOf())
+const notifyChange = useAmFieldChange()
+const notifyBlur = useAmFieldBlur()
+
+const focused = ref(false)
+/** 要不要让输入框获得焦点（focus() / blur() 改它） */
+const wantFocus = ref(props.autofocus)
+
+const placeholderStyle = computed(() : string => 'color:' + theme().colorTextQuaternary + ';')
+const clearColor = computed(() : string => theme().colorTextQuaternary)
+const showClear = computed(() : boolean => props.allowClear && props.value.length > 0 && !disabled.value && !props.readOnly)
+
+/** 一行的高度：跟着字号走 */
+const lineHeight = computed(() : number => size.value == 'small' ? 22 : (size.value == 'large' ? 28 : 24))
+const controlStyle = computed(() : string => {
+	const height = props.rows * lineHeight.value
+	return (props.autoSize ? 'min-height:' : 'height:') + height + 'px;line-height:' + lineHeight.value + 'px;'
+})
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-textarea', 'am-textarea--' + variant.value]
+	if (variant.value != 'borderless') list.push('am-textarea--box-' + size.value)
+	if (focused.value) list.push('am-textarea--focused-' + variant.value)
+	if (status.value.length > 0) list.push('am-textarea--' + variant.value + '-' + status.value)
+	if (disabled.value) list.push('am-textarea--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const controlClasses = computed(() : string[] => {
+	const list : string[] = ['am-textarea__control', 'am-textarea__control--' + size.value]
+	if (props.align == 'end') list.push('am-textarea__control--end')
+	if (props.align == 'center') list.push('am-textarea__control--center')
+	return list
+})
+
+const countText = computed(() : string => props.maxlength > 0 ? props.value.length + ' / ' + props.maxlength : props.value.length.toString())
+
+function onInput(event : UniInputEvent) {
+	const value = event.detail.value
+	emit('update:value', value)
+	emit('input', value)
+	emit('change', value)
+	notifyChange()
+}
+
+function onFocus(event : UniTextareaFocusEvent) {
+	focused.value = true
+	emit('focus', event)
+}
+
+function onBlur(event : UniTextareaBlurEvent) {
+	focused.value = false
+	wantFocus.value = false
+	emit('blur', event)
+	notifyBlur()
+}
+
+function onConfirm() {
+	emit('pressEnter', props.value)
+}
+
+function onLineChange(event : UniTextareaLineChangeEvent) {
+	emit('resize', event.detail.height)
+}
+
+function clear() {
+	emit('update:value', '')
+	emit('input', '')
+	emit('change', '')
+	emit('clear')
+	notifyChange()
+}
+
+function focus() {
+	wantFocus.value = true
+}
+
+function blur() {
+	wantFocus.value = false
+}
+
+defineExpose({ focus, blur })
+</script>
+
+<template>
+	<view :class="classes">
+		<textarea
+			:id="id"
+			:name="name"
+			:class="controlClasses"
+			:style="controlStyle"
+			:value="value"
+			:placeholder="placeholder"
+			:placeholder-style="placeholderStyle"
+			:maxlength="maxlength"
+			:disabled="disabled || readOnly"
+			:auto-height="autoSize"
+			:focus="wantFocus"
+			:confirm-type="enterkeyhint"
+			@input="onInput"
+			@focus="onFocus"
+			@blur="onBlur"
+			@confirm="onConfirm"
+			@linechange="onLineChange"
+		/>
+		<view v-if="showCount || showClear" class="am-textarea__footer">
+			<view v-if="showClear" class="am-textarea__clear" @click="clear">
+				<slot name="clearIcon">
+					<am-icon name="error-fill" :size="16" :color="clearColor" />
+				</slot>
+			</view>
+			<text v-if="showCount" class="am-textarea__count">{{ countText }}</text>
+		</view>
+	</view>
+</template>
+
+<style>
+/* ---------- 尺寸：用到变量的属性要写展开的形式 ---------- */
+.am-textarea--box-middle {
+	padding-top: 8px;
+	padding-bottom: 8px;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-textarea--box-small {
+	padding-top: 4px;
+	padding-bottom: 4px;
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-textarea--box-large {
+	padding-top: 10px;
+	padding-bottom: 10px;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+
+/* ---------- 变体 ---------- */
+.am-textarea--outlined {
+	/* 聚焦时边框颜色的过渡 */
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+}
+.am-textarea--filled {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-textarea--underlined {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	padding-left: 0;
+	padding-right: 0;
+	border-radius: 0;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border, #d9d9d9);
+}
+
+.am-textarea--focused-outlined { border-color: var(--am-color-primary, #1677ff); }
+.am-textarea--focused-filled { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-bg-container, #ffffff); }
+.am-textarea--focused-underlined { border-bottom-color: var(--am-color-primary, #1677ff); }
+
+.am-textarea--outlined-error { border-color: var(--am-color-error, #ff4d4f); }
+.am-textarea--outlined-warning { border-color: var(--am-color-warning, #faad14); }
+.am-textarea--filled-error { background-color: var(--am-color-error-bg, #fff1f1); }
+.am-textarea--filled-warning { background-color: var(--am-color-warning-bg, #fff7e8); }
+.am-textarea--underlined-error { border-bottom-color: var(--am-color-error, #ff4d4f); }
+.am-textarea--underlined-warning { border-bottom-color: var(--am-color-warning, #faad14); }
+
+.am-textarea--disabled { opacity: 0.4; }
+
+/* ---------- 内部 ---------- */
+.am-textarea__control { width: 100%; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-textarea__control--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-textarea__control--small { font-size: var(--am-font-size, 14px); }
+.am-textarea__control--large { font-size: var(--am-font-size-xl, 18px); }
+.am-textarea__control--end { text-align: right; }
+.am-textarea__control--center { text-align: center; }
+.am-textarea__footer { flex-direction: row; justify-content: flex-end; align-items: center; margin-top: 4px; }
+.am-textarea__clear { padding: 2px; }
+.am-textarea__count { margin-left: 8px; font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+</style>

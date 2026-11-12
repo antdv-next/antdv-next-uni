@@ -1,0 +1,78 @@
+<script setup lang="uts">
+const types : string[] = ['', 'secondary', 'success', 'warning', 'danger']
+const levels : number[] = [1, 2, 3, 4, 5]
+const long = 'Antdv Next Uni 是 Antdv Next 家族的 uni-app x 组件库，一套代码编译到 Android、iOS、鸿蒙、Web 与微信小程序，组件名、属性、事件、主题 token 与移动端库保持一致。这段文字足够长，用来演示多行省略与展开。'
+const expanded = ref(false)
+const copies = ref(0)
+
+function onCopy() {
+	copies.value++
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">标题（level 1–5）</text>
+		<view class="demo__card">
+			<am-typography-title v-for="level in levels" :key="level" :level="level" :text="'h' + level + '. Antdv Next'" />
+		</view>
+
+		<text class="demo__title">文本的类型</text>
+		<view class="demo__card demo__row">
+			<am-typography-text v-for="item in types" :key="item" class="demo__item" :type="item" :text="item.length > 0 ? item : 'default'" />
+			<am-typography-text class="demo__item" disabled text="disabled" />
+		</view>
+
+		<text class="demo__title">修饰</text>
+		<view class="demo__card demo__row">
+			<am-typography-text class="demo__item" strong text="strong" />
+			<am-typography-text class="demo__item" italic text="italic" />
+			<am-typography-text class="demo__item" underline text="underline" />
+			<am-typography-text class="demo__item" delete text="delete" />
+			<am-typography-text class="demo__item" mark text="mark" />
+			<am-typography-text class="demo__item" code text="code" />
+			<am-typography-text class="demo__item" keyboard text="Ctrl" />
+		</view>
+
+		<text class="demo__title">段落</text>
+		<view class="demo__card">
+			<am-typography-paragraph :text="long" />
+			<am-typography-paragraph type="secondary" text="段落下方留一行字高的间距。" />
+		</view>
+
+		<text class="demo__title">省略</text>
+		<view class="demo__card">
+			<am-typography-paragraph ellipsis :text="long" />
+			<am-typography-paragraph ellipsis :rows="2" :text="long" />
+			<am-typography-title :level="4" ellipsis :text="long" />
+		</view>
+
+		<text class="demo__title">展开 / 收起（{{ expanded ? '已展开' : '已收起' }}）</text>
+		<view class="demo__card">
+			<am-typography-paragraph ellipsis :rows="2" expandable :text="long" />
+			<am-typography-paragraph v-model:expanded="expanded" ellipsis :rows="2" collapsible :text="long" />
+		</view>
+
+		<text class="demo__title">复制（已复制 {{ copies }} 次）</text>
+		<view class="demo__card">
+			<am-typography-paragraph copyable text="点右边的“复制”把这句话放进剪贴板。" @copy="onCopy" />
+			<am-typography-text copyable copy-text="antdv-next-uni" text="复制的内容可以和显示的不同" @copy="onCopy" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+</style>

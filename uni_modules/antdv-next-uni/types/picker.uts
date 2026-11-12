@@ -1,0 +1,15 @@
+import { AmOption } from './index.uts'
+
+// Picker / PickerView 的类型（= antdv-next-mobile 的 picker-view/interface.ts）。
+// 选项就是公共的 AmOption（label、value、disabled）；columns 是 AmOption[][]
+
+/** change / select / confirm 事件的第二个参数（= PickerChangeInfo） */
+export type AmPickerChangeInfo = {
+	/** 每一列选中的选项（空的列为 null） */
+	items : (AmOption | null)[]
+	/** 被拨动的那一列的下标；不是拨动引起的（确定、清除）为 -1 */
+	columnIndex : number
+}
+
+/** 触发区文字的格式化函数（= PickerProps.format）：参数是每一列选中的选项 */
+export type AmPickerFormat = (items : (AmOption | null)[]) => string

@@ -1,0 +1,313 @@
+<script setup lang="uts">
+import { AmFormItemEntry, AmFormRule } from '../../types/form.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { amUid } from '../../utils/motion.uts'
+
+// 表单项（= antdv-next-mobile 的 FormItem）：name、label、rules、required、help、extra、validateStatus、hasFeedback、
+// validateTrigger、validateFirst、hidden、layout、labelAlign、labelWidth、clickable、arrow、contentAlign 同名同义；
+// 事件 click；插槽 default（字段）、label、help、extra、arrow。
+// 它把校验状态交给里面的字段（amFormItemStatus），字段的值变化 / 失焦时通知它（amFormItemChange / amFormItemBlur，
+// 见 utils/form-field.uts），它再让 <am-form> 按 change / blur 校验；没有接入约定的字段靠“model 里的值变了”触发 change 校验。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - label / help / extra 是字符串；同名插槽的内容接在文字后面（拿不到“有没有传插槽”，不能用插槽替换文字）；
+//   只有写了 `label` 才有标签列；
+// - `name` 是字符串（嵌套用 'user.name'）；`rules` 是 AmFormRule[]（pattern 为字符串，validator 为同步函数）；
+// - `required` 只有布尔值：为 true 或规则里有 required 时显示星号；`arrow` 只有布尔值（clickable 时也显示）；
+// - `validateTrigger` 是字符串（'change' / 'blur' / 'change,blur' / 'none'，空为沿用表单的）；`labelWidth` 是像素数；
+// - `bordered`（多出的属性）：底部的分隔线。没有相邻选择器，最后一项的线要自己用 `:bordered="false"` 去掉；
+// - 没有 noStyle、validateDebounce、messageVariables、colon（冒号只在表单上设）、id
+defineOptions({ name: 'AmFormItem' })
+
+const props = defineProps({
+	/** 字段在 model 里的路径：'name' 或 'user.name' */
+	name: { type: String, default: '' },
+	label: { type: String, default: '' },
+	rules: { type: Array as PropType<AmFormRule[]>, default: () : AmFormRule[] => [] },
+	required: { type: Boolean, default: false },
+	/** 字段下方的说明；写了它就不再显示校验的提示 */
+	help: { type: String, default: '' },
+	extra: { type: String, default: '' },
+	validateStatus: { type: String, default: '' },
+	/** 在字段的末尾显示状态图标 */
+	hasFeedback: { type: Boolean, default: false },
+	validateTrigger: { type: String, default: '' },
+	/** 只显示第一条没通过的规则 */
+	validateFirst: { type: Boolean, default: false },
+	hidden: { type: Boolean, default: false },
+	layout: { type: String, default: '' },
+	labelAlign: { type: String, default: '' },
+	labelWidth: { type: Number, default: 0 },
+	/** 按下有反馈并发出 click（打开选择器的单元格） */
+	clickable: { type: Boolean, default: false },
+	arrow: { type: Boolean, default: false },
+	contentAlign: { type: String, default: '' },
+	/** 是否画底部的分隔线（表单的最后一项可以关掉） */
+	bordered: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+const uid = amUid('am-form-item')
+
+// ---------- 表单给的上下文 ----------
+const formLayout = inject<(() => string) | null>('amFormLayout', null)
+const formLabelAlign = inject<(() => string) | null>('amFormLabelAlign', null)
+const formLabelWidth = inject<(() => number) | null>('amFormLabelWidth', null)
+const formLabelWrap = inject<(() => boolean) | null>('amFormLabelWrap', null)
+const formColon = inject<(() => boolean) | null>('amFormColon', null)
+const formContentAlign = inject<(() => string) | null>('amFormContentAlign', null)
+const formRequiredMark = inject<(() => string) | null>('amFormRequiredMark', null)
+const formDisabled = inject<(() => boolean) | null>('amFormDisabled', null)
+const formRules = inject<((name : string) => AmFormRule[]) | null>('amFormRules', null)
+const formValue = inject<((name : string) => any | null) | null>('amFormValue', null)
+const formErrors = inject<((id : string) => string[]) | null>('amFormErrors', null)
+const formWarnings = inject<((id : string) => string[]) | null>('amFormWarnings', null)
+const formRegister = inject<((entry : AmFormItemEntry) => void) | null>('amFormRegister', null)
+const formUnregister = inject<((id : string) => void) | null>('amFormUnregister', null)
+const formTrigger = inject<((id : string, trigger : string, fromControl : boolean) => void) | null>('amFormTrigger', null)
+
+const layout = computed(() : string => {
+	if (props.layout.length > 0) return props.layout
+	return formLayout != null ? formLayout() : 'horizontal'
+})
+const labelAlign = computed(() : string => {
+	const align = props.labelAlign.length > 0 ? props.labelAlign : (formLabelAlign != null ? formLabelAlign() : 'start')
+	return align == 'end' || align == 'right' ? 'end' : 'start'
+})
+const labelWidth = computed(() : number => {
+	if (props.labelWidth > 0) return props.labelWidth
+	const width = formLabelWidth != null ? formLabelWidth() : 0
+	return width > 0 ? width : 90
+})
+const labelWrap = computed(() : boolean => formLabelWrap != null ? formLabelWrap() : false)
+const colon = computed(() : boolean => formColon != null ? formColon() : false)
+const contentAlign = computed(() : string => {
+	if (props.contentAlign.length > 0) return props.contentAlign
+	return formContentAlign != null ? formContentAlign() : 'start'
+})
+const requiredMark = computed(() : string => formRequiredMark != null ? formRequiredMark() : 'true')
+const disabled = computed(() : boolean => formDisabled != null ? formDisabled() : false)
+
+// ---------- 规则与校验结果 ----------
+const isRequired = computed(() : boolean => {
+	if (props.required) return true
+	for (let i = 0; i < props.rules.length; i++) if (props.rules[i].required == true) return true
+	if (formRules != null && props.name.length > 0) {
+		const list = formRules(props.name)
+		for (let i = 0; i < list.length; i++) if (list[i].required == true) return true
+	}
+	return false
+})
+
+const errors = computed(() : string[] => {
+	const list = formErrors != null ? formErrors(uid) : ([] as string[])
+	return props.validateFirst && list.length > 1 ? [list[0]] : list
+})
+const warnings = computed(() : string[] => formWarnings != null ? formWarnings(uid) : ([] as string[]))
+
+/** 校验状态：自己的 validateStatus > 校验结果 */
+const status = computed(() : string => {
+	if (props.validateStatus.length > 0) return props.validateStatus
+	if (errors.value.length > 0) return 'error'
+	if (warnings.value.length > 0) return 'warning'
+	return ''
+})
+
+const showRequired = computed(() : boolean => isRequired.value && requiredMark.value == 'true')
+const showOptional = computed(() : boolean => !isRequired.value && requiredMark.value == 'optional')
+const optionalText = computed(() : string => locale().Form.optional)
+const labelText = computed(() : string => props.label + (colon.value ? ':' : ''))
+const showArrow = computed(() : boolean => props.arrow || props.clickable)
+const canClick = computed(() : boolean => props.clickable && !disabled.value)
+const hoverClass = computed(() : string => canClick.value ? 'am-form-item--active' : 'none')
+const arrowColor = computed(() : string => theme().colorTextQuaternary)
+
+const feedbackIcon = computed(() : string => {
+	if (!props.hasFeedback) return ''
+	if (status.value == 'error') return 'error-fill'
+	if (status.value == 'warning') return 'warning-fill'
+	if (status.value == 'success') return 'success-fill'
+	return ''
+})
+const feedbackColor = computed(() : string => {
+	const current = theme()
+	if (status.value == 'error') return current.colorError
+	if (status.value == 'warning') return current.colorWarning
+	return current.colorSuccess
+})
+
+// ---------- 给字段的上下文 ----------
+provide('amFormItemStatus', () : string => status.value)
+
+let changeScheduled = false
+let fromControl = false
+let unmounted = false
+
+/** 等这一轮的 v-model 更新完，再用最新的值校验一次（字段的通知与 model 的变化合并成一次） */
+function scheduleChange(byControl : boolean) {
+	if (byControl) fromControl = true
+	if (changeScheduled || formTrigger == null) return
+	changeScheduled = true
+	nextTick(() => {
+		changeScheduled = false
+		const notify = fromControl
+		fromControl = false
+		if (unmounted || formTrigger == null) return
+		formTrigger(uid, 'change', notify)
+	})
+}
+
+provide('amFormItemChange', () => {
+	scheduleChange(true)
+})
+provide('amFormItemBlur', () => {
+	if (formTrigger != null) formTrigger(uid, 'blur', false)
+})
+
+// 没有接入约定的字段（原生组件、自己写的组件）、代码里直接改 model：值变了也按 change 校验
+watch(
+	() : string => formValue != null ? (JSON.stringify(formValue(props.name)) ?? '') : '',
+	() => {
+		scheduleChange(false)
+	}
+)
+
+// ---------- 登记到表单 ----------
+function register() {
+	if (formRegister == null) return
+	const entry : AmFormItemEntry = {
+		id: uid,
+		name: props.name,
+		label: props.label,
+		rules: props.rules,
+		required: props.required,
+		trigger: props.validateTrigger
+	}
+	formRegister(entry)
+}
+
+register()
+watch(() : string => props.name + '|' + props.label + '|' + props.validateTrigger + '|' + (props.required ? '1' : '0'), () => {
+	register()
+})
+watch(() : AmFormRule[] => props.rules, () => {
+	register()
+})
+
+onUnmounted(() => {
+	unmounted = true
+	if (formUnregister != null) formUnregister(uid)
+})
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-form-item', 'am-form-item--' + layout.value]
+	if (props.bordered) list.push('am-form-item--bordered')
+	if (props.hidden) list.push('am-form-item--hidden')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const labelClasses = computed(() : string[] => {
+	const list : string[] = ['am-form-item__label', 'am-form-item__label--' + layout.value]
+	if (layout.value == 'horizontal' && labelAlign.value == 'end') list.push('am-form-item__label--end')
+	return list
+})
+
+const labelStyle = computed(() : string => layout.value == 'horizontal' ? 'width:' + labelWidth.value + 'px;' : '')
+
+const labelTextClasses = computed(() : string[] => {
+	const list : string[] = ['am-form-item__label-text', 'am-form-item__label-text--' + layout.value]
+	if (!labelWrap.value) list.push('am-form-item__label-text--nowrap')
+	return list
+})
+
+const explainAlign = computed(() : string => contentAlign.value == 'end' ? 'am-form-item__explain--end' : '')
+
+function onClick(event : UniPointerEvent) {
+	if (canClick.value) emit('click', event)
+}
+</script>
+
+<template>
+	<view :id="uid" :class="classes" :hover-class="hoverClass" @click="onClick">
+		<view v-if="label.length > 0" :class="labelClasses" :style="labelStyle">
+			<text v-if="showRequired" class="am-form-item__required">*</text>
+			<text :class="labelTextClasses">{{ labelText }}</text>
+			<slot name="label"></slot>
+			<text v-if="showOptional" class="am-form-item__optional">{{ optionalText }}</text>
+		</view>
+		<view class="am-form-item__control">
+			<view class="am-form-item__control-input">
+				<view :class="['am-form-item__content', contentAlign == 'end' ? 'am-form-item__content--end' : '']">
+					<slot></slot>
+				</view>
+				<am-icon v-if="feedbackIcon.length > 0" :name="feedbackIcon" :size="16" :color="feedbackColor" class="am-form-item__feedback" />
+				<slot name="arrow"></slot>
+				<am-icon v-if="showArrow" name="right" :size="14" :color="arrowColor" class="am-form-item__arrow" />
+			</view>
+			<text v-if="help.length > 0" :class="['am-form-item__explain', 'am-form-item__explain--' + (status.length > 0 ? status : 'default'), explainAlign]">{{ help }}</text>
+			<template v-else>
+				<text v-for="(message, index) in errors" :key="'e' + index" :class="['am-form-item__explain', 'am-form-item__explain--error', explainAlign]">{{ message }}</text>
+				<text v-for="(message, index) in warnings" :key="'w' + index" :class="['am-form-item__explain', 'am-form-item__explain--warning', explainAlign]">{{ message }}</text>
+			</template>
+			<slot name="help"></slot>
+			<text v-if="extra.length > 0" :class="['am-form-item__explain', 'am-form-item__explain--default', explainAlign]">{{ extra }}</text>
+			<slot name="extra"></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-form-item {
+	flex-direction: row;
+	align-items: flex-start;
+	padding-top: 9px;
+	padding-bottom: 9px;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	background-color: var(--am-color-bg-container, #ffffff);
+	transition-property: background-color;
+	transition-duration: 200ms;
+}
+.am-form-item--vertical { flex-direction: column; align-items: stretch; }
+.am-form-item--bordered {
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-form-item--hidden { display: none; }
+.am-form-item--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+
+/* ---------- 标签 ---------- */
+.am-form-item__label { flex-direction: row; align-items: center; }
+.am-form-item__label--horizontal { min-height: 30px; margin-right: var(--am-padding-sm, 12px); }
+.am-form-item__label--vertical { margin-bottom: 4px; }
+.am-form-item__label--end { justify-content: flex-end; }
+.am-form-item__label-text { flex-shrink: 1; }
+.am-form-item__label-text--horizontal { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-form-item__label-text--vertical { font-size: var(--am-font-size, 14px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-form-item__label-text--nowrap { white-space: nowrap; text-overflow: ellipsis; }
+.am-form-item__required { margin-right: 4px; font-size: var(--am-font-size-lg, 16px); color: var(--am-color-error, #ff4d4f); }
+.am-form-item__optional { margin-left: 2px; font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+
+/* ---------- 字段 ---------- */
+.am-form-item__control { flex: 1; }
+/* 这一层没有内边距：App 端的 min-height 不含内边距，在这里用是一致的 */
+.am-form-item__control-input { flex-direction: row; align-items: center; min-height: 30px; }
+.am-form-item__content { flex: 1; }
+.am-form-item__content--end { align-items: flex-end; }
+.am-form-item__feedback { margin-left: 8px; }
+.am-form-item__arrow { margin-left: 8px; }
+.am-form-item__explain { margin-top: 4px; font-size: var(--am-font-size-sm, 12px); line-height: 18px; }
+.am-form-item__explain--end { text-align: right; }
+.am-form-item__explain--default { color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-form-item__explain--success { color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-form-item__explain--validating { color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-form-item__explain--error { color: var(--am-color-error, #ff4d4f); }
+.am-form-item__explain--warning { color: var(--am-color-warning, #faad14); }
+</style>

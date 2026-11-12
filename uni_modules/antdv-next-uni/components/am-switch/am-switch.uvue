@@ -1,0 +1,100 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+
+// 开关（= antdv-next-mobile 的 Switch）：v-model:checked（或 v-model:value，两者同义）、checkedChildren / unCheckedChildren、
+// disabled、loading、size（small / middle）同名同义；事件 update:checked、update:value、change（值、事件）、click（当前值、事件）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - checkedChildren / unCheckedChildren 是字符串（开关按字数变宽）；同名插槽里的内容不会撑开开关（量不到宽度）；
+// - `checked` / `value` 只有布尔值：没有 checkedValue / unCheckedValue、defaultChecked / defaultValue；
+// - 没有 beforeChange：要在切换前确认时不用 v-model，自己在 change 里决定要不要改值（配合 loading）；
+// - 没有原生 button：没有 autoFocus、title、tabIndex、id，没有 focus / blur 事件。
+//
+// 底色、滑块的位置都写在内联 style 上（Android 上只切换类名不会过渡）
+defineOptions({ name: 'AmSwitch' })
+
+const props = defineProps({
+	checked: { type: Boolean, default: false },
+	/** checked 的别名（v-model:value） */
+	value: { type: Boolean, default: false },
+	checkedChildren: { type: String, default: '' },
+	unCheckedChildren: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	loading: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:checked', 'update:value', 'change', 'click'])
+
+const theme = useAmTheme()
+const notifyChange = useAmFieldChange()
+const sizeOf = useAmSize(() : string => props.size)
+const small = computed(() : boolean => sizeOf() == 'small')
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const on = computed(() : boolean => props.checked || props.value)
+const label = computed(() : string => on.value ? props.checkedChildren : props.unCheckedChildren)
+
+const height = computed(() : number => small.value ? 22 : 30)
+const knob = computed(() : number => height.value - 4)
+/** 开关的宽度：最小宽度，有文字时按字数加宽（每个字按 12px 算） */
+const width = computed(() : number => {
+	const longest = Math.max(props.checkedChildren.length, props.unCheckedChildren.length)
+	return Math.max(small.value ? 36 : 50, longest * 12 + knob.value + 16)
+})
+
+const trackStyle = computed(() : string => {
+	const current = theme()
+	return 'width:' + width.value + 'px;height:' + height.value + 'px;border-radius:' + height.value / 2 + 'px;background-color:' +
+		(on.value ? current.colorPrimary : current.colorTextQuaternary) + ';' + amTransition('background-color', AM_DURATION_MID)
+})
+
+const knobStyle = computed(() : string => {
+	return 'width:' + knob.value + 'px;height:' + knob.value + 'px;border-radius:' + knob.value / 2 + 'px;transform:translateX(' +
+		(on.value ? width.value - knob.value - 4 : 0) + 'px);' + amTransition('transform', AM_DURATION_MID)
+})
+
+const spinnerStyle = computed(() : string => {
+	const side = small.value ? 10 : 14
+	return 'width:' + side + 'px;height:' + side + 'px;border-color:' + (on.value ? theme().colorPrimary : theme().colorTextQuaternary) + ';'
+})
+
+function onClick(event : UniPointerEvent) {
+	emit('click', on.value, event)
+	if (disabled.value || props.loading) return
+	const next = !on.value
+	emit('update:checked', next)
+	emit('update:value', next)
+	emit('change', next, event)
+	notifyChange()
+}
+</script>
+
+<template>
+	<view :class="['am-switch', disabled || loading ? 'am-switch--disabled' : '', rootClass]" :style="trackStyle" @click="onClick">
+		<view :class="['am-switch__inner', on ? 'am-switch__inner--checked' : 'am-switch__inner--unchecked']" :style="'height:' + height + 'px;'">
+			<text v-if="label.length > 0" class="am-switch__text">{{ label }}</text>
+			<slot v-if="on" name="checkedChildren"></slot>
+			<slot v-else name="unCheckedChildren"></slot>
+		</view>
+		<view class="am-switch__knob" :style="knobStyle">
+			<loading v-if="loading" :style="spinnerStyle"></loading>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-switch { position: relative; background-color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.am-switch--disabled { opacity: 0.4; }
+.am-switch__inner { flex-direction: row; align-items: center; }
+/* 文字让开滑块：开着时滑块在右边，关着时在左边 */
+.am-switch__inner--checked { justify-content: flex-start; padding-left: 8px; }
+.am-switch__inner--unchecked { justify-content: flex-end; padding-right: 8px; }
+.am-switch__text { font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-light-solid, #ffffff); }
+.am-switch__knob { position: absolute; left: 2px; top: 2px; align-items: center; justify-content: center; background-color: #ffffff; }
+</style>

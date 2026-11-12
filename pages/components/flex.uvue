@@ -1,0 +1,83 @@
+<script setup lang="uts">
+const justifies : string[] = ['flex-start', 'center', 'flex-end', 'space-between', 'space-around']
+const aligns : string[] = ['flex-start', 'center', 'flex-end']
+const justify = ref('flex-start')
+const align = ref('center')
+const blocks : number[] = [1, 2, 3, 4, 5, 6, 7, 8]
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">水平与垂直</text>
+		<view class="demo__card">
+			<am-flex>
+				<view class="demo__block demo__block--gap"><text class="demo__block-text">1</text></view>
+				<view class="demo__block demo__block--gap"><text class="demo__block-text">2</text></view>
+				<view class="demo__block"><text class="demo__block-text">3</text></view>
+			</am-flex>
+			<am-flex vertical root-class="demo__space">
+				<view class="demo__bar demo__bar--gap"><text class="demo__block-text">1</text></view>
+				<view class="demo__bar demo__bar--gap"><text class="demo__block-text">2</text></view>
+				<view class="demo__bar"><text class="demo__block-text">3</text></view>
+			</am-flex>
+		</view>
+
+		<text class="demo__title">对齐（justify / align）</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in justifies" :key="item" class="demo__item" size="small" :type="justify == item ? 'primary' : 'default'" :text="item" @click="justify = item" />
+			</view>
+			<view class="demo__row">
+				<am-button v-for="item in aligns" :key="item" class="demo__item" size="small" :type="align == item ? 'primary' : 'default'" :text="item" @click="align = item" />
+			</view>
+			<am-flex :justify="justify" :align="align" root-class="demo__stage">
+				<view class="demo__block"><text class="demo__block-text">1</text></view>
+				<view class="demo__block demo__block--tall"><text class="demo__block-text">2</text></view>
+				<view class="demo__block"><text class="demo__block-text">3</text></view>
+			</am-flex>
+		</view>
+
+		<text class="demo__title">换行（wrap）</text>
+		<view class="demo__card">
+			<am-flex wrap>
+				<view v-for="n in blocks" :key="n" class="demo__block demo__block--wrap"><text class="demo__block-text">{{ n }}</text></view>
+			</am-flex>
+		</view>
+
+		<text class="demo__title">占满剩余空间（flex）</text>
+		<view class="demo__card">
+			<am-flex align="center">
+				<view class="demo__block demo__block--gap"><text class="demo__block-text">固定</text></view>
+				<am-flex flex="1" justify="center" root-class="demo__fill">
+					<text class="demo__block-text">flex="1"</text>
+				</am-flex>
+			</am-flex>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__space { margin-top: 12px; }
+.demo__stage { height: 96px; margin-top: 4px; background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); border-radius: 8px; }
+.demo__block { width: 64px; height: 40px; align-items: center; justify-content: center; background-color: var(--am-color-primary, #1677ff); border-radius: 6px; }
+.demo__block--gap { margin-right: 8px; }
+.demo__block--tall { height: 64px; }
+.demo__block--wrap { margin-right: 8px; margin-bottom: 8px; }
+.demo__bar { height: 32px; align-items: center; justify-content: center; background-color: var(--am-color-primary, #1677ff); border-radius: 6px; }
+.demo__bar--gap { margin-bottom: 8px; }
+.demo__fill { height: 40px; background-color: var(--am-color-success, #52c41a); border-radius: 6px; }
+.demo__block-text { font-size: 14px; color: #ffffff; }
+</style>

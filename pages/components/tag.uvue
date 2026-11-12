@@ -1,0 +1,117 @@
+<script setup lang="uts">
+const presets : string[] = ['magenta', 'red', 'volcano', 'orange', 'gold', 'lime', 'green', 'cyan', 'blue', 'geekblue', 'purple']
+const statuses : string[] = ['success', 'processing', 'error', 'warning', 'default']
+const variants : string[] = ['filled', 'solid', 'outlined']
+const sizes : string[] = ['small', 'middle', 'large']
+const tags = ref<string[]>(['标签一', '标签二', '标签三'])
+const hot = ref(true)
+const picked = ref<string[]>(['电影'])
+const topics : string[] = ['电影', '读书', '音乐', '运动']
+const clicks = ref(0)
+
+function remove(tag : string) {
+	tags.value = tags.value.filter((item : string) : boolean => item != tag)
+}
+
+function reset() {
+	tags.value = ['标签一', '标签二', '标签三']
+}
+
+function onPick(topic : string, value : any) {
+	const checked = value as boolean
+	if (checked) {
+		if (!picked.value.includes(topic)) picked.value = picked.value.concat([topic])
+	} else {
+		picked.value = picked.value.filter((item : string) : boolean => item != topic)
+	}
+}
+
+function onClick() {
+	clicks.value++
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（点击了 {{ clicks }} 次）</text>
+		<view class="demo__card demo__row">
+			<am-tag class="demo__item" text="默认" @click="onClick" />
+			<am-tag class="demo__item" text="带图标" icon="tag" @click="onClick" />
+			<am-tag class="demo__item" text="圆角" round />
+			<am-tag class="demo__item" text="禁用" disabled closable />
+			<am-tag class="demo__item" color="blue">
+				<am-icon name="star-fill" :size="12" color="#1677ff" />
+			</am-tag>
+		</view>
+
+		<text class="demo__title">变体（filled / solid / outlined）</text>
+		<view class="demo__card">
+			<view v-for="variant in variants" :key="variant" class="demo__row">
+				<am-tag class="demo__item" :variant="variant" :text="variant" />
+				<am-tag v-for="status in statuses" :key="status" class="demo__item" :variant="variant" :color="status" :text="status" />
+			</view>
+			<view class="demo__row">
+				<am-tag class="demo__item" variant="outlined" :bordered="false" color="processing" text="无边框" />
+				<am-tag class="demo__item" variant="outlined" :bordered="false" text="无边框" />
+			</view>
+		</view>
+
+		<text class="demo__title">预设色与自定义颜色</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-tag v-for="color in presets" :key="color" class="demo__item" :color="color" :text="color" />
+			</view>
+			<view class="demo__row">
+				<am-tag v-for="color in presets" :key="color" class="demo__item" variant="solid" :color="color" :text="color" />
+			</view>
+			<view class="demo__row">
+				<am-tag class="demo__item" color="#f50" text="#f50" />
+				<am-tag class="demo__item" color="#2db7f5" variant="outlined" text="#2db7f5" />
+				<am-tag class="demo__item" color="#87d068" variant="solid" text="#87d068" />
+			</view>
+		</view>
+
+		<text class="demo__title">尺寸</text>
+		<view class="demo__card demo__row">
+			<am-tag v-for="size in sizes" :key="size" class="demo__item" :size="size" color="processing" :text="size" />
+			<am-tag v-for="size in sizes" :key="size" class="demo__item" :size="size" round closable :text="size" />
+		</view>
+
+		<text class="demo__title">可关闭</text>
+		<view class="demo__card demo__row">
+			<am-tag v-for="tag in tags" :key="tag" class="demo__item" closable color="blue" :text="tag" @close="remove(tag)" />
+			<am-tag class="demo__item" closable close-icon="delete" color="error" text="自定义图标" />
+			<am-button class="demo__item" size="small" text="重置" @click="reset" />
+		</view>
+
+		<text class="demo__title">可选中（已选：{{ picked.join('、') }}）</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-checkable-tag v-for="topic in topics" :key="topic" class="demo__item" :checked="picked.includes(topic)" :text="topic" @change="onPick(topic, $event)" />
+			</view>
+			<view class="demo__row">
+				<am-checkable-tag v-model:checked="hot" class="demo__item" icon="fire" round :text="hot ? '热门' : '冷门'" />
+				<am-checkable-tag class="demo__item" size="small" default-checked text="small" />
+				<am-checkable-tag class="demo__item" size="large" text="large" />
+				<am-checkable-tag class="demo__item" disabled text="禁用" />
+				<am-checkable-tag class="demo__item" disabled default-checked text="禁用" />
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+</style>

@@ -1,0 +1,215 @@
+<script setup lang="uts">
+import { AmDescriptionsItem, AmDescriptionsNode } from '../../types/descriptions.uts'
+import { useAmSize } from '../../utils/config.uts'
+
+// 描述列表（= antdv-next-mobile 的 Descriptions）：title、extra、items（label、content、span）、column（每行几项，默认 1）、
+// layout（horizontal 标签在左 / vertical 标签在上）、bordered、size、colon（带边框时不显示）、
+// contentAlign（end：内容靠右，像列表的单元格）同名同义；插槽 title、extra、labelRender、contentRender
+// （后两个的参数是 item、index、value）。每一行都会被占满：一行放不下的项换行，上一行最后一项补齐剩下的列。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / extra 以及 items 里的 label / content 是文字（UTS 里不能把节点放进数据），自定义内容用同名插槽；
+//   labelRender / contentRender 只有插槽，没有同名的函数属性；
+// - items 的 `span: 'filled'` 写成 `filled: true`；项没有 class / style / classes / styles；
+// - 没有 grid：用换行的 flex + 百分比宽度排列，带边框时边框画在每一项的右、下两边
+defineOptions({ name: 'AmDescriptions' })
+
+const props = defineProps({
+	title: { type: String, default: '' },
+	extra: { type: String, default: '' },
+	items: { type: Array as PropType<AmDescriptionsItem[]>, default: () : AmDescriptionsItem[] => [] },
+	column: { type: Number, default: 1 },
+	layout: { type: String, default: 'horizontal' },
+	bordered: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	colon: { type: Boolean, default: true },
+	contentAlign: { type: String, default: 'start' },
+	rootClass: { type: String, default: '' }
+})
+
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+
+const columns = computed(() : number => Math.max(1, Math.floor(props.column)))
+
+/** 算出每一项占几列，保证每一行都占满（带边框时才不会缺一块） */
+const nodes = computed(() : AmDescriptionsNode[] => {
+	const list : AmDescriptionsNode[] = []
+	const column = columns.value
+	let rest = column
+	for (let i = 0; i < props.items.length; i++) {
+		const item = props.items[i]
+		let span = rest
+		if (item.filled != true) {
+			span = Math.max(1, Math.min(column, Math.floor(item.span ?? 1)))
+			if (span > rest) {
+				// 这一行放不下：上一项补齐这一行，自己换到下一行
+				const previous = list[list.length - 1]
+				previous.span += rest
+				previous.rowEnd = true
+				rest = column
+			}
+		}
+		const node : AmDescriptionsNode = { key: item.key ?? ('' + i), item: item, index: i, span: span, rowEnd: false }
+		list.push(node)
+		rest -= span
+		if (rest <= 0) {
+			node.rowEnd = true
+			rest = column
+		}
+	}
+	if (list.length > 0 && rest != column) {
+		const last = list[list.length - 1]
+		last.span += rest
+		last.rowEnd = true
+	}
+	return list
+})
+
+const hasColon = computed(() : boolean => props.colon && !props.bordered)
+
+function itemStyle(node : AmDescriptionsNode) : string {
+	return 'width:' + (node.span / columns.value) * 100 + '%;'
+}
+
+function itemClass(node : AmDescriptionsNode) : string[] {
+	const list : string[] = ['am-descriptions__item', 'am-descriptions__item--' + props.layout]
+	if (props.bordered) list.push('am-descriptions__item--bordered')
+	else {
+		list.push('am-descriptions__item--' + size.value)
+		if (!node.rowEnd) list.push('am-descriptions__item--gap')
+	}
+	return list
+}
+
+const labelClass = computed(() : string[] => {
+	const list : string[] = ['am-descriptions__label']
+	if (props.bordered) {
+		list.push('am-descriptions__cell--' + size.value, 'am-descriptions__label--bordered')
+		list.push(props.layout == 'vertical' ? 'am-descriptions__label--bordered-vertical' : 'am-descriptions__label--bordered-horizontal')
+	} else if (props.layout == 'vertical') {
+		list.push('am-descriptions__label--vertical')
+	} else {
+		list.push('am-descriptions__label--horizontal')
+	}
+	return list
+})
+
+const contentClass = computed(() : string[] => {
+	const list : string[] = ['am-descriptions__content']
+	if (props.layout != 'vertical') list.push('am-descriptions__content--horizontal')
+	if (props.bordered) list.push('am-descriptions__cell--' + size.value)
+	return list
+})
+
+const contentTextClass = computed(() : string[] => {
+	const list : string[] = ['am-descriptions__content-text']
+	if (props.contentAlign == 'end') list.push('am-descriptions__content-text--end')
+	return list
+})
+</script>
+
+<template>
+	<view :class="['am-descriptions', rootClass]">
+		<view v-if="title.length > 0 || extra.length > 0 || $slots['title'] != null || $slots['extra'] != null" class="am-descriptions__header">
+			<view class="am-descriptions__title">
+				<text v-if="title.length > 0" class="am-descriptions__title-text">{{ title }}</text>
+				<slot name="title"></slot>
+			</view>
+			<text v-if="extra.length > 0" class="am-descriptions__extra-text">{{ extra }}</text>
+			<slot name="extra"></slot>
+		</view>
+		<view :class="['am-descriptions__view', bordered ? 'am-descriptions__view--bordered' : '']">
+			<view v-for="node in nodes" :key="node.key" :class="itemClass(node)" :style="itemStyle(node)">
+				<view :class="labelClass">
+					<slot name="labelRender" :item="node.item" :index="node.index" :value="node.item.label">
+						<text class="am-descriptions__label-text">{{ node.item.label + (hasColon ? ':' : '') }}</text>
+					</slot>
+				</view>
+				<view :class="contentClass">
+					<slot name="contentRender" :item="node.item" :index="node.index" :value="node.item.content">
+						<text :class="contentTextClass">{{ node.item.content }}</text>
+					</slot>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-descriptions__header { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.am-descriptions__title { flex: 1; }
+.am-descriptions__title-text {
+	font-size: var(--am-font-size-lg, 16px);
+	font-weight: bold;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+}
+.am-descriptions__extra-text { margin-left: 8px; font-size: var(--am-font-size, 14px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-descriptions__view { flex-direction: row; flex-wrap: wrap; }
+.am-descriptions__view--bordered {
+	overflow: hidden;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-border-secondary, #f0f0f0);
+	border-left-width: 1px;
+	border-left-style: solid;
+	border-left-color: var(--am-color-border-secondary, #f0f0f0);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-descriptions__item--horizontal { flex-direction: row; }
+.am-descriptions__item--vertical { flex-direction: column; }
+.am-descriptions__item--small { padding-bottom: var(--am-padding-xs, 8px); }
+.am-descriptions__item--middle { padding-bottom: var(--am-padding-sm, 12px); }
+.am-descriptions__item--large { padding-bottom: var(--am-padding, 16px); }
+/* 列与列之间的间距（一行的最后一项没有） */
+.am-descriptions__item--gap { padding-right: 16px; }
+.am-descriptions__item--bordered {
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-right-width: 1px;
+	border-right-style: solid;
+	border-right-color: var(--am-color-border-secondary, #f0f0f0);
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border-secondary, #f0f0f0);
+}
+.am-descriptions__label--horizontal { max-width: 50%; margin-right: 8px; }
+.am-descriptions__label--vertical { padding-bottom: var(--am-padding-xxs, 4px); }
+.am-descriptions__label--bordered { background-color: var(--am-color-fill-quaternary, rgba(0, 0, 0, 0.02)); }
+.am-descriptions__label--bordered-horizontal {
+	width: 30%;
+	border-right-width: 1px;
+	border-right-style: solid;
+	border-right-color: var(--am-color-border-secondary, #f0f0f0);
+}
+.am-descriptions__label--bordered-vertical {
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border-secondary, #f0f0f0);
+}
+.am-descriptions__label-text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-descriptions__content--horizontal { flex: 1; }
+.am-descriptions__content-text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-descriptions__content-text--end { text-align: right; }
+/* 带边框时单元格的内边距 */
+.am-descriptions__cell--small {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-descriptions__cell--middle {
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-descriptions__cell--large {
+	padding-top: var(--am-padding, 16px);
+	padding-bottom: var(--am-padding, 16px);
+	padding-left: var(--am-padding-lg, 24px);
+	padding-right: var(--am-padding-lg, 24px);
+}
+</style>

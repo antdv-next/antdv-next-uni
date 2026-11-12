@@ -1,0 +1,133 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 骨架屏（= antdv-next-mobile 的 Skeleton）：loading（为 false 时显示默认插槽）、active（闪烁）、avatar、title、
+// paragraph、round 同名同义；段落行数、标题宽度的默认值同 Antdv Next（有头像时 2 行、标题 50%；否则 3 行、标题 38%，
+// 最后一行 61%）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - avatar / title / paragraph 只有布尔值（UTS 的属性不能是“布尔或对象”）：对象里的配置拆成
+//   `avatarSize`（small / middle / large 或像素数字的字符串）、`avatarShape`、`titleWidth`、`rows`、`rowWidth`；
+// - App 端没有 @keyframes，`active` 不是扫光，而是整体的透明度来回过渡（定时器 + transition）；
+// - 没有 Skeleton.Button / Avatar / Input / Image 子组件
+defineOptions({ name: 'AmSkeleton' })
+
+const props = defineProps({
+	loading: { type: Boolean, default: true },
+	active: { type: Boolean, default: false },
+	avatar: { type: Boolean, default: false },
+	title: { type: Boolean, default: true },
+	paragraph: { type: Boolean, default: true },
+	round: { type: Boolean, default: false },
+	/** 头像的尺寸：small / middle / large，或像素（如 '56'） */
+	avatarSize: { type: String, default: 'middle' },
+	/** 头像的形状：circle / square */
+	avatarShape: { type: String, default: 'circle' },
+	/** 标题的宽度（如 '50%'、'120px'）；空为默认 */
+	titleWidth: { type: String, default: '' },
+	/** 段落的行数；0 为默认（有头像时 2 行，否则 3 行） */
+	rows: { type: Number, default: 0 },
+	/** 段落最后一行的宽度（如 '61%'）；空为默认 */
+	rowWidth: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+const dim = ref(false)
+let timer = 0
+
+function start() {
+	clearInterval(timer)
+	dim.value = false
+	if (props.active && props.loading) timer = setInterval(() => { dim.value = !dim.value }, 700)
+}
+
+watch(() : string => props.active + ':' + props.loading, () => start())
+onMounted(() => start())
+onUnmounted(() => clearInterval(timer))
+
+const rowCount = computed(() : number => {
+	if (props.rows > 0) return props.rows
+	return !props.avatar && props.title ? 3 : 2
+})
+
+const rowList = computed(() : number[] => {
+	const list : number[] = []
+	for (let i = 0; i < rowCount.value; i++) list.push(i)
+	return list
+})
+
+/** 要动的值写在 style 上：Android 上只切换类名没有过渡 */
+const rootStyle = computed(() : string => 'opacity:' + (dim.value ? 0.45 : 1) + ';')
+
+const avatarStyle = computed(() : string => {
+	const current = theme()
+	let side = current.controlHeight
+	if (props.avatarSize == 'small') side = current.controlHeightSM
+	else if (props.avatarSize == 'large') side = current.controlHeightLG
+	else {
+		const n = parseInt(props.avatarSize)
+		if (!isNaN(n) && n > 0) side = n
+	}
+	const radius = props.avatarShape == 'square' ? current.borderRadiusSM : side / 2
+	return 'width:' + side + 'px;height:' + side + 'px;border-radius:' + radius + 'px;'
+})
+
+const titleStyle = computed(() : string => {
+	if (props.titleWidth.length > 0) return 'width:' + props.titleWidth + ';'
+	if (!props.paragraph) return 'width:100%;'
+	return props.avatar ? 'width:50%;' : 'width:38%;'
+})
+
+function rowStyle(index : number) : string {
+	if (index != rowCount.value - 1) return ''
+	if (props.rowWidth.length > 0) return 'width:' + props.rowWidth + ';'
+	return !props.avatar || !props.title ? 'width:61%;' : ''
+}
+
+function rowClass(index : number) : string[] {
+	const list : string[] = ['am-skeleton__row']
+	if (props.round) list.push('am-skeleton__block--round')
+	if (index > 0 || props.title) list.push('am-skeleton__row--gap')
+	return list
+}
+</script>
+
+<template>
+	<view v-if="loading" :class="['am-skeleton', rootClass]" :style="rootStyle">
+		<view v-if="avatar" class="am-skeleton__avatar" :style="avatarStyle"></view>
+		<view class="am-skeleton__section">
+			<view v-if="title" :class="['am-skeleton__title', round ? 'am-skeleton__block--round' : '', avatar ? 'am-skeleton__title--avatar' : '']" :style="titleStyle"></view>
+			<template v-if="paragraph">
+				<view v-for="index in rowList" :key="index" :class="rowClass(index)" :style="rowStyle(index)"></view>
+			</template>
+		</view>
+	</view>
+	<slot v-else></slot>
+</template>
+
+<style>
+.am-skeleton { flex-direction: row; transition-property: opacity; transition-duration: 700ms; }
+.am-skeleton__avatar { margin-right: var(--am-padding, 16px); background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06)); }
+.am-skeleton__section { flex: 1; }
+.am-skeleton__title {
+	height: 16px;
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+	background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06));
+}
+.am-skeleton__title--avatar { margin-top: 6px; }
+.am-skeleton__row {
+	height: 16px;
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+	background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06));
+}
+.am-skeleton__row--gap { margin-top: 12px; }
+.am-skeleton__block--round { border-radius: 999px; }
+</style>

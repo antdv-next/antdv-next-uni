@@ -1,0 +1,22 @@
+// Descriptions 的类型（= antdv-next-mobile descriptions/interface.ts）
+
+/** 描述列表的项（= DescriptionsItemType）：label / content 是文字，自定义内容用 labelRender / contentRender 插槽 */
+export type AmDescriptionsItem = {
+	key ?: string
+	label : string
+	content : string
+	/** 占几列 */
+	span ?: number
+	/** 占满这一行剩下的列（= 移动端库的 span: 'filled'；UTS 的字段不能是“数字或字符串”） */
+	filled ?: boolean
+}
+
+/** 内部用：算好列数的项 */
+export type AmDescriptionsNode = {
+	key : string
+	item : AmDescriptionsItem
+	index : number
+	span : number
+	/** 是这一行的最后一项 */
+	rowEnd : boolean
+}

@@ -1,0 +1,10 @@
+{
+  "missingProps": {
+    "footer": "底部通常是按钮，没有字符串的写法：只提供 footer 插槽",
+    "keyboard": "手机上没有 ESC；Android 的返回键会先关掉最上面的弹出层",
+    "forceRender": "am-popup 还没有 forceRender",
+    "lockScroll": "fixed 的遮罩已经拦住了页面的滚动",
+    "swipeToClose": "下滑关闭需要手势与面板位移联动，am-popup 还不支持，待实现",
+    "rootStyle": "根节点是 am-popup，样式不能透传到子组件内部；用 rootClass"
+  }
+}

@@ -1,0 +1,310 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { AmCollapseItem } from '../../types/collapse.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { AM_DURATION_SLOW, amTransition, amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 折叠面板（= antdv-next-mobile 的 Collapse）：items（key、label、content、extra、showArrow、collapsible、forceRender）、
+// v-model:activeKey、defaultActiveKey、accordion、bordered（四周与面板之间的细线）、ghost（透明、没有线）、size、
+// expandIconPlacement（start / end；expandIconPosition 为旧名）、collapsible（header / icon / disabled）、
+// destroyOnHidden 同名同义；事件 update:activeKey、change；插槽 expandIcon（参数 panelKey、isActive）、
+// labelRender、contentRender（参数 item、index）。
+// 展开 / 收起有高度动画：内容的高度是 auto，过渡不了，所以先量出内容的高度，在 0 与这个像素值之间过渡，
+// 展开完成后换回 auto（内容之后变高也跟着变）；量不到高度的平台直接展开、收起。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 只有 items 的写法，没有 <am-collapse-panel> 子组件（默认插槽）；
+// - activeKey / defaultActiveKey 只能是字符串数组（accordion 时是只有一个 key 的数组），不能是单个 key 或数字；
+//   UTS 里分不出“没传”和空数组：activeKey 为空数组时初始值取 defaultActiveKey，之后以 activeKey 的变化为准；
+// - items 里的 label / content / extra 是文字，自定义内容用 labelRender / contentRender 插槽；
+//   `expandIcon` 只有插槽（UTS 里函数不能返回节点）；项没有 class / style / classes / styles
+defineOptions({ name: 'AmCollapse' })
+
+const props = defineProps({
+	items: { type: Array as PropType<AmCollapseItem[]>, default: () : AmCollapseItem[] => [] },
+	activeKey: { type: Array as PropType<string[]>, default: () : string[] => [] },
+	defaultActiveKey: { type: Array as PropType<string[]>, default: () : string[] => [] },
+	accordion: { type: Boolean, default: false },
+	bordered: { type: Boolean, default: true },
+	ghost: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	expandIconPlacement: { type: String, default: '' },
+	expandIconPosition: { type: String, default: '' },
+	collapsible: { type: String, default: '' },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:activeKey', 'change'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+
+const uid = amUid('am-collapse')
+
+/** 展开的 key（组件自己记一份：没有绑定 activeKey 时也能用） */
+const active = ref<string[]>([...(props.activeKey.length > 0 ? props.activeKey : props.defaultActiveKey)])
+/** 渲染过内容的面板（收起后保留，再展开时不用重新渲染；destroyOnHidden 时收起后移除） */
+const mounted = ref<string[]>([...active.value])
+/** 面板内容外层的高度：没有记录时，展开的为 auto、收起的为 0 */
+const heights = ref(new Map<string, string>())
+
+const iconEnd = computed(() : boolean => {
+	const placement = props.expandIconPlacement.length > 0 ? props.expandIconPlacement : props.expandIconPosition
+	return placement == 'end'
+})
+const iconColor = computed(() : string => theme().colorTextTertiary)
+const iconSize = computed(() : number => size.value == 'small' ? 12 : 14)
+
+function keyOf(item : AmCollapseItem, index : number) : string {
+	return item.key ?? ('' + index)
+}
+
+function isActive(key : string) : boolean {
+	return active.value.indexOf(key) >= 0
+}
+
+function setHeight(key : string, height : string | null) {
+	const next = new Map<string, string>(heights.value)
+	if (height == null) next.delete(key)
+	else next.set(key, height)
+	heights.value = next
+}
+
+function contentId(key : string) : string {
+	return uid + '-' + key
+}
+
+function expand(key : string) {
+	if (mounted.value.indexOf(key) < 0) mounted.value = [...mounted.value, key]
+	setHeight(key, '0px')
+	setTimeout(() => {
+		measureById(contentId(key)).then((rect : AmRect | null) => {
+			if (rect == null || !isActive(key)) {
+				setHeight(key, null)
+				return
+			}
+			setHeight(key, rect.height + 'px')
+			setTimeout(() => { if (isActive(key)) setHeight(key, null) }, AM_DURATION_SLOW + 30)
+		})
+	}, 20)
+}
+
+function collapse(key : string) {
+	measureById(contentId(key)).then((rect : AmRect | null) => {
+		if (rect == null) {
+			setHeight(key, null)
+			return
+		}
+		// 先把 auto 定成当前的像素值，下一帧再到 0，过渡才有起点
+		setHeight(key, rect.height + 'px')
+		setTimeout(() => { if (!isActive(key)) setHeight(key, '0px') }, 20)
+	})
+	if (props.destroyOnHidden) {
+		setTimeout(() => {
+			if (!isActive(key)) mounted.value = mounted.value.filter((item : string) : boolean => item != key)
+		}, AM_DURATION_SLOW + 60)
+	}
+}
+
+/** 换成新的一组 key：新展开的、新收起的各自做动画 */
+function apply(next : string[]) {
+	const previous = active.value
+	active.value = [...next]
+	for (let i = 0; i < next.length; i++) if (previous.indexOf(next[i]) < 0) expand(next[i])
+	for (let i = 0; i < previous.length; i++) if (next.indexOf(previous[i]) < 0) collapse(previous[i])
+}
+
+watch(() : string[] => props.activeKey, (next : string[]) => apply(next))
+
+function bodyStyle(key : string) : string {
+	const height = heights.value.get(key)
+	let text = amTransition('height', AM_DURATION_SLOW)
+	if (height != null) text += 'height:' + height + ';'
+	else if (!isActive(key)) text += 'height:0px;'
+	return text
+}
+
+function arrowStyle(key : string) : string {
+	return 'transform:rotate(' + (isActive(key) ? 90 : 0) + 'deg);' + amTransition('transform', AM_DURATION_SLOW)
+}
+
+/** 点哪里展开：all（整个标题栏）/ header（标题文字）/ icon（箭头）/ disabled */
+function triggerOf(item : AmCollapseItem) : string {
+	const collapsible = item.collapsible ?? props.collapsible
+	if (collapsible == 'header' || collapsible == 'icon' || collapsible == 'disabled') return collapsible
+	return 'all'
+}
+
+function toggle(item : AmCollapseItem, index : number) {
+	const key = keyOf(item, index)
+	let next : string[]
+	if (isActive(key)) next = active.value.filter((current : string) : boolean => current != key)
+	else next = props.accordion ? [key] : [...active.value, key]
+	apply(next)
+	emit('update:activeKey', next)
+	emit('change', next)
+}
+
+function onClick(part : string, item : AmCollapseItem, index : number) {
+	if (triggerOf(item) == part) toggle(item, index)
+}
+
+function itemClass(index : number) : string[] {
+	const list : string[] = ['am-collapse__item']
+	if (index > 0 && props.bordered && !props.ghost) list.push('am-collapse__item--line')
+	return list
+}
+
+function headerClass(item : AmCollapseItem) : string[] {
+	const list : string[] = ['am-collapse__header', 'am-collapse__header--' + size.value]
+	if (!props.ghost) list.push('am-collapse__header--solid')
+	if (triggerOf(item) == 'disabled') list.push('am-collapse__header--disabled')
+	return list
+}
+
+function bodyClass() : string[] {
+	const list : string[] = ['am-collapse__body']
+	if (!props.ghost) list.push('am-collapse__body--solid')
+	return list
+}
+
+function contentClass() : string[] {
+	const list : string[] = ['am-collapse__content', 'am-collapse__content--' + size.value]
+	if (props.bordered && !props.ghost) list.push('am-collapse__content--line')
+	return list
+}
+
+const rootClasses = computed(() : string[] => {
+	const list : string[] = ['am-collapse']
+	if (props.bordered && !props.ghost) list.push('am-collapse--bordered')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+</script>
+
+<template>
+	<view :class="rootClasses">
+		<view v-for="(item, index) in items" :key="keyOf(item, index)" :class="itemClass(index)">
+			<view
+				:class="headerClass(item)"
+				:hover-class="triggerOf(item) == 'all' ? 'am-collapse__header--active' : 'none'"
+				@click="onClick('all', item, index)"
+			>
+				<view v-if="item.showArrow != false && !iconEnd" class="am-collapse__icon am-collapse__icon--start" @click="onClick('icon', item, index)">
+					<slot name="expandIcon" :panelKey="keyOf(item, index)" :isActive="isActive(keyOf(item, index))">
+						<view :style="arrowStyle(keyOf(item, index))">
+							<am-icon name="right" :size="iconSize" :color="iconColor" />
+						</view>
+					</slot>
+				</view>
+				<view :class="triggerOf(item) == 'header' ? 'am-collapse__title--fit' : 'am-collapse__title'" @click="onClick('header', item, index)">
+					<slot name="labelRender" :item="item" :index="index">
+						<text :class="['am-collapse__label', 'am-collapse__label--' + size]">{{ item.label }}</text>
+					</slot>
+				</view>
+				<view v-if="triggerOf(item) == 'header'" class="am-collapse__title"></view>
+				<text v-if="(item.extra ?? '').length > 0" class="am-collapse__extra">{{ item.extra }}</text>
+				<view v-if="item.showArrow != false && iconEnd" class="am-collapse__icon am-collapse__icon--end" @click="onClick('icon', item, index)">
+					<slot name="expandIcon" :panelKey="keyOf(item, index)" :isActive="isActive(keyOf(item, index))">
+						<view :style="arrowStyle(keyOf(item, index))">
+							<am-icon name="right" :size="iconSize" :color="iconColor" />
+						</view>
+					</slot>
+				</view>
+			</view>
+			<view v-if="mounted.indexOf(keyOf(item, index)) >= 0 || item.forceRender == true" :class="bodyClass()" :style="bodyStyle(keyOf(item, index))">
+				<view :id="contentId(keyOf(item, index))" :class="contentClass()">
+					<slot name="contentRender" :item="item" :index="index">
+						<text :class="['am-collapse__text', size == 'large' ? 'am-collapse__text--large' : '']">{{ item.content ?? '' }}</text>
+					</slot>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-collapse--bordered {
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-collapse__item--line {
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-collapse__header {
+	flex-direction: row;
+	align-items: center;
+	transition-property: background-color;
+	transition-duration: 200ms;
+}
+.am-collapse__header--solid { background-color: var(--am-color-bg-container, #ffffff); }
+.am-collapse__header--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-collapse__header--disabled { opacity: 0.4; }
+/* 不靠 min-height 定高度（App 端的 min-height 不含内边距）：高度 = 行高 + 内边距 */
+.am-collapse__header--small {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-collapse__header--middle {
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-collapse__header--large {
+	padding-top: var(--am-padding, 16px);
+	padding-bottom: var(--am-padding, 16px);
+	padding-left: var(--am-padding-md, 20px);
+	padding-right: var(--am-padding-md, 20px);
+}
+.am-collapse__icon { align-items: center; justify-content: center; }
+.am-collapse__icon--start { margin-right: var(--am-padding-xs, 8px); }
+.am-collapse__icon--end { margin-left: var(--am-padding-xs, 8px); }
+.am-collapse__title { flex: 1; }
+/* collapsible="header"：只有标题文字可点，标题不撑满 */
+.am-collapse__title--fit { flex-shrink: 1; }
+.am-collapse__label { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-collapse__label--small { font-size: var(--am-font-size, 14px); line-height: 24px; }
+.am-collapse__label--middle { font-size: var(--am-font-size-lg, 16px); line-height: 24px; }
+.am-collapse__label--large { font-size: var(--am-font-size-xl, 18px); line-height: 24px; }
+.am-collapse__extra { margin-left: var(--am-padding-xs, 8px); font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-collapse__body { overflow: hidden; }
+.am-collapse__body--solid { background-color: var(--am-color-bg-container, #ffffff); }
+/* 不随外层收缩：外层高度为 0 时也要量出内容本来的高度 */
+.am-collapse__content { flex-shrink: 0; }
+.am-collapse__content--line {
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-collapse__content--small {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-collapse__content--middle {
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-collapse__content--large {
+	padding-top: var(--am-padding, 16px);
+	padding-bottom: var(--am-padding, 16px);
+	padding-left: var(--am-padding-md, 20px);
+	padding-right: var(--am-padding-md, 20px);
+}
+.am-collapse__text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-collapse__text--large { font-size: var(--am-font-size-lg, 16px); line-height: 24px; }
+</style>

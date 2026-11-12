@@ -1,0 +1,68 @@
+<script setup lang="uts">
+const basic = ref(3)
+const half = ref(2.5)
+const keep = ref(4)
+const heart = ref(3)
+const letter = ref(2)
+const log = ref('')
+
+function onChange(value : number) {
+	log.value = 'change：' + value
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-rate v-model:value="basic" @change="onChange" />
+			<text class="demo__hint">value：{{ basic }}（再点一次当前的星清零）　{{ log }}</text>
+		</view>
+
+		<text class="demo__title">半星（allowHalf）</text>
+		<view class="demo__card">
+			<am-rate v-model:value="half" allow-half />
+			<text class="demo__hint">value：{{ half }}（点星星的左半边为半星）</text>
+		</view>
+
+		<text class="demo__title">不允许清零、数量</text>
+		<view class="demo__card">
+			<am-rate class="demo__block" v-model:value="keep" :allow-clear="false" />
+			<am-rate v-model:value="keep" :count="8" />
+		</view>
+
+		<text class="demo__title">自定义字符（图标名或文字）</text>
+		<view class="demo__card">
+			<am-rate class="demo__block" v-model:value="heart" character="heart-fill" />
+			<am-rate v-model:value="letter" character="好" />
+		</view>
+
+		<text class="demo__title">尺寸</text>
+		<view class="demo__card">
+			<am-rate class="demo__block" v-model:value="basic" size="large" />
+			<am-rate class="demo__block" v-model:value="basic" />
+			<am-rate v-model:value="basic" size="small" />
+		</view>
+
+		<text class="demo__title">只读（disabled）</text>
+		<view class="demo__card">
+			<am-rate :value="3.5" allow-half disabled />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__row { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.demo__label { width: 96px; font-size: 14px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__footer { height: 40px; }
+</style>

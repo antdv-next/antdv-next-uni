@@ -1,0 +1,10 @@
+// Progress 的类型（= antdv-next-mobile progress/interface.ts）
+
+/** 已完成的分段（= ProgressSuccessConfig） */
+export type AmProgressSuccess = {
+	percent ?: number
+	strokeColor ?: string
+}
+
+/** `success` 的默认值：没有已完成的分段 */
+export const AM_PROGRESS_NO_SUCCESS : AmProgressSuccess = {}

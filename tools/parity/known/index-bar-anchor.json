@@ -1,0 +1,5 @@
+{
+  "extraProps": {
+    "title": "吸顶的标题由 am-index-bar 另画一份（App 端没有 position: sticky），插槽的内容复制不过去，锚点的文字不是 index 时写在 title 上"
+  }
+}

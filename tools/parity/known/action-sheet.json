@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "keyboard": "手机上没有 ESC；Android 的返回键会先关掉最上面的弹出层",
+    "forceRender": "am-popup 还没有 forceRender"
+  }
+}

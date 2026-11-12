@@ -1,0 +1,66 @@
+<script setup lang="uts">
+const insets = uni.getWindowInfo().safeAreaInsets
+const top = insets.top
+const bottom = insets.bottom
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">当前设备的安全区域：上 {{ top }}px，下 {{ bottom }}px</text>
+		<view class="demo__card">
+			<text class="demo__text">在刘海、底部横条的位置留出空白。有原生导航栏的页面，顶部已经由导航栏避开；没有安全区域的设备（或浏览器）上高度为 0。</text>
+		</view>
+
+		<text class="demo__title">position="top"</text>
+		<view class="demo__card">
+			<view class="demo__bar">
+				<am-safe-area position="top" root-class="demo__area" />
+				<text class="demo__bar-text">自定义导航栏</text>
+			</view>
+		</view>
+
+		<text class="demo__title">position="bottom"（默认）</text>
+		<view class="demo__card">
+			<view class="demo__bar">
+				<text class="demo__bar-text">吸底的操作栏</text>
+				<am-safe-area root-class="demo__area" />
+			</view>
+		</view>
+
+		<text class="demo__title">内容写在插槽里</text>
+		<view class="demo__card">
+			<am-safe-area position="bottom" root-class="demo__bar">
+				<text class="demo__bar-text">空白加在内容的下方</text>
+			</am-safe-area>
+		</view>
+
+		<view class="demo__fixed">
+			<view class="demo__fixed-row">
+				<am-button type="primary" block text="吸底按钮：下方留出了安全区域" />
+			</view>
+			<am-safe-area />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__bar { background-color: var(--am-color-primary, #1677ff); border-radius: 8px; }
+.demo__bar-text { height: 44px; line-height: 44px; text-align: center; font-size: 16px; color: #ffffff; }
+.demo__area { background-color: rgba(255, 255, 255, 0.3); }
+.demo__fixed { position: fixed; left: 0; right: 0; bottom: 0; background-color: var(--am-color-bg-container, #ffffff); }
+.demo__fixed-row { padding: 8px 16px; }
+.demo__footer { height: 120px; }
+</style>

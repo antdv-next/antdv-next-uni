@@ -1,0 +1,276 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmPickerField } from '../../utils/picker-field.uts'
+import {
+	AmDateParts,
+	clampDateParts,
+	copyDateParts,
+	daysInMonth,
+	defaultDateFormat,
+	defaultMaxDateParts,
+	defaultMinDateParts,
+	formatDateParts,
+	nowDateParts,
+	numberRange,
+	padDatePart,
+	parseDateParts
+} from '../../utils/picker-date.uts'
+
+// 日期选择（= antdv-next-mobile 的 DatePicker）：触发区 + 底部弹层 + 滚轮，点“确定”才提交。
+// v-model:value、v-model:open、picker（date / month / year）、showTime、format（显示的格式）、valueFormat（值的格式）、
+// minDate / maxDate、defaultPickerValue、hourStep / minuteStep / secondStep、itemHeight、visibleItemCount，以及选择类字段
+// 共有的 placeholder、disabled、allowClear、status、variant、size、trigger、suffixIcon、title、okText、cancelText、zIndex、
+// maskClosable、destroyOnHidden 同名同义；事件 update:value、update:open、openChange、change（值、显示的文字）、
+// select（拨动滚轮，尚未提交）、confirm、cancel、clear；插槽 header（头部与滚轮之间）、footer（滚轮下方）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - **值是字符串**（uni-app x 上没有 dayjs）：格式为 valueFormat，不传时按 picker 与 showTime 取
+//   YYYY / YYYY-MM / YYYY-MM-DD / YYYY-MM-DD HH:mm:ss；minDate / maxDate / defaultPickerValue 也是这个格式的字符串；
+//   空字符串表示没有值；格式只认 YYYY MM DD HH mm ss 六个占位符；
+// - picker 只有 date / month / year（没有 quarter / week；time 请用 am-time-picker）；
+// - showTime 只有布尔值（要不要秒看 valueFormat 里有没有 ss，步长用 hourStep / minuteStep / secondStep）；format 只能是字符串；
+// - 没有 disabledDate / disabledTime / filter / renderLabel（函数属性）、use12Hours、virtual、defaultValue / defaultOpen、id；
+// - 自定义触发区用 `:trigger="false"` + `v-model:open`；title、suffixIcon 是字符串，没有同名插槽
+defineOptions({ name: 'AmDatePicker' })
+
+const props = defineProps({
+	value: { type: String, default: '' },
+	open: { type: Boolean, default: false },
+	picker: { type: String, default: 'date' },
+	showTime: { type: Boolean, default: false },
+	format: { type: String, default: '' },
+	valueFormat: { type: String, default: '' },
+	minDate: { type: String, default: '' },
+	maxDate: { type: String, default: '' },
+	defaultPickerValue: { type: String, default: '' },
+	hourStep: { type: Number, default: 1 },
+	minuteStep: { type: Number, default: 1 },
+	secondStep: { type: Number, default: 1 },
+	itemHeight: { type: Number, default: 44 },
+	visibleItemCount: { type: Number, default: 5 },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	trigger: { type: Boolean, default: true },
+	suffixIcon: { type: String, default: '' },
+	title: { type: String, default: '' },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'update:open', 'openChange', 'change', 'select', 'confirm', 'cancel', 'clear'])
+
+const locale = useAmLocale()
+const field = useAmPickerField()
+
+const valueFormat = computed(() : string => props.valueFormat.length > 0 ? props.valueFormat : defaultDateFormat(props.picker, props.showTime))
+const displayFormat = computed(() : string => props.format.length > 0 ? props.format : valueFormat.value)
+const withTime = computed(() : boolean => props.picker == 'date' && props.showTime)
+const withSeconds = computed(() : boolean => withTime.value && valueFormat.value.indexOf('ss') >= 0)
+
+const minParts = computed(() : AmDateParts => parseDateParts(props.minDate, valueFormat.value) ?? defaultMinDateParts())
+const maxParts = computed(() : AmDateParts => parseDateParts(props.maxDate, valueFormat.value) ?? defaultMaxDateParts())
+
+/** 按步长取整，再夹回可选范围 */
+function normalize(parts : AmDateParts) : AmDateParts {
+	const next = clampDateParts(parts, minParts.value, maxParts.value)
+	if (withTime.value) {
+		if (props.hourStep > 1) next.hour -= next.hour % props.hourStep
+		if (props.minuteStep > 1) next.minute -= next.minute % props.minuteStep
+		if (props.secondStep > 1) next.second -= next.second % props.secondStep
+	}
+	return next
+}
+
+/** 打开时滚轮上的日期：已有的值 > defaultPickerValue > 现在 */
+function initial() : AmDateParts {
+	const parts = parseDateParts(props.value, valueFormat.value) ?? parseDateParts(props.defaultPickerValue, valueFormat.value) ?? nowDateParts()
+	return normalize(parts)
+}
+
+/** 弹层的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+/** 弹层里滚轮上的日期，确定时才提交 */
+const draft = ref<AmDateParts>(initial())
+
+watch(() : boolean => props.open, (open : boolean) => {
+	opened.value = open
+})
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	if (open) draft.value = initial()
+	else field.blur()
+})
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().DatePicker.placeholder)
+
+const label = computed(() : string => {
+	const parts = parseDateParts(props.value, valueFormat.value)
+	return parts == null ? '' : formatDateParts(parts, displayFormat.value)
+})
+
+/** 滚轮的列：year / month / day / hour / minute / second 中的前几个 */
+const keys = computed(() : string[] => {
+	const list : string[] = ['year']
+	if (props.picker == 'year') return list
+	list.push('month')
+	if (props.picker == 'month') return list
+	list.push('day')
+	if (withTime.value) {
+		list.push('hour')
+		list.push('minute')
+		if (withSeconds.value) list.push('second')
+	}
+	return list
+})
+
+function partOf(parts : AmDateParts, key : string) : number {
+	if (key == 'year') return parts.year
+	if (key == 'month') return parts.month
+	if (key == 'day') return parts.day
+	if (key == 'hour') return parts.hour
+	if (key == 'minute') return parts.minute
+	return parts.second
+}
+
+function optionsOf(values : number[], unit : string, pad : boolean) : AmOption[] {
+	const list : AmOption[] = []
+	for (let i = 0; i < values.length; i++) {
+		const option : AmOption = { label: (pad ? padDatePart(values[i]) : '' + values[i]) + unit, value: values[i] }
+		list.push(option)
+	}
+	return list
+}
+
+const columns = computed(() : AmOption[][] => {
+	const units = locale().DatePicker
+	const current = draft.value
+	const min = minParts.value
+	const max = maxParts.value
+	const list : AmOption[][] = []
+	const names = keys.value
+	for (let i = 0; i < names.length; i++) {
+		const key = names[i]
+		if (key == 'year') {
+			list.push(optionsOf(numberRange(min.year, max.year, 1), units.year, false))
+		} else if (key == 'month') {
+			// 在最早 / 最晚的那一年里，月份只列到范围内的
+			const from = current.year == min.year ? min.month : 1
+			const to = current.year == max.year ? max.month : 12
+			list.push(optionsOf(numberRange(from, to, 1), units.month, true))
+		} else if (key == 'day') {
+			const from = current.year == min.year && current.month == min.month ? min.day : 1
+			const to = current.year == max.year && current.month == max.month ? max.day : daysInMonth(current.year, current.month)
+			list.push(optionsOf(numberRange(from, to, 1), units.day, true))
+		} else if (key == 'hour') {
+			list.push(optionsOf(numberRange(0, 23, props.hourStep), units.hour, true))
+		} else if (key == 'minute') {
+			list.push(optionsOf(numberRange(0, 59, props.minuteStep), units.minute, true))
+		} else {
+			list.push(optionsOf(numberRange(0, 59, props.secondStep), units.second, true))
+		}
+	}
+	return list
+})
+
+const wheelValue = computed(() : any[] => {
+	const list : any[] = []
+	const names = keys.value
+	for (let i = 0; i < names.length; i++) list.push(partOf(draft.value, names[i]))
+	return list
+})
+
+function onWheel(value : any[]) {
+	const next = copyDateParts(draft.value)
+	const names = keys.value
+	for (let i = 0; i < names.length && i < value.length; i++) {
+		const key = names[i]
+		const part = value[i] as number
+		if (key == 'year') next.year = part
+		else if (key == 'month') next.month = part
+		else if (key == 'day') next.day = part
+		else if (key == 'hour') next.hour = part
+		else if (key == 'minute') next.minute = part
+		else next.second = part
+	}
+	const parts = normalize(next)
+	draft.value = parts
+	emit('select', formatDateParts(parts, valueFormat.value), formatDateParts(parts, displayFormat.value))
+}
+
+function onTrigger() {
+	setOpen(!opened.value)
+}
+
+function onOk() {
+	const value = formatDateParts(draft.value, valueFormat.value)
+	const text = formatDateParts(draft.value, displayFormat.value)
+	if (value != props.value) {
+		emit('update:value', value)
+		emit('change', value, text)
+		field.change()
+	}
+	emit('confirm', value, text)
+	setOpen(false)
+}
+
+function onCancel() {
+	emit('cancel')
+	setOpen(false)
+}
+
+function onClear() {
+	emit('update:value', '')
+	emit('change', '', '')
+	emit('clear')
+	field.change()
+}
+</script>
+
+<template>
+	<am-picker-trigger
+		v-if="trigger"
+		:label="label"
+		:placeholder="placeholderText"
+		:open="opened"
+		:disabled="disabled"
+		:allow-clear="allowClear"
+		:status="status"
+		:variant="variant"
+		:size="size"
+		:suffix-icon="suffixIcon"
+		:root-class="rootClass"
+		@click="onTrigger"
+		@clear="onClear"
+	/>
+	<am-picker-popup
+		:open="opened"
+		:title="title"
+		:ok-text="okText"
+		:cancel-text="cancelText"
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		@ok="onOk"
+		@cancel="onCancel"
+	>
+		<slot name="header"></slot>
+		<am-picker-view :columns="columns" :value="wheelValue" :item-height="itemHeight" :visible-item-count="visibleItemCount" @change="onWheel" />
+		<slot name="footer"></slot>
+	</am-picker-popup>
+</template>

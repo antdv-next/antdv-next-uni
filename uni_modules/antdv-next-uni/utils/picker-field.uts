@@ -1,0 +1,20 @@
+// 选择类字段（Picker / DatePicker / TimePicker / Select / Cascader）与表单的约定，集中在这一处：
+// - 值提交后（确定、清除）调用 change()，让外层的 FormItem 重新校验；
+// - 弹层关闭算作失焦，调用 blur()。
+// = antdv-next-mobile 的 usePickerField 里的 formItem.onFieldChange() / onFieldBlur()。
+// 现在是空实现：表单的 utils/form-field.uts 就绪后，在 useAmPickerField() 里接上即可，各个选择器不用改。
+// 禁用 / 状态 / 变体与表单上下文的合并在 am-picker-trigger 里（所有选择器共用它）
+
+export type AmPickerFieldHooks = {
+	change : () => void
+	blur : () => void
+}
+
+/** 在选择器的 setup 中调用 */
+export function useAmPickerField() : AmPickerFieldHooks {
+	const hooks : AmPickerFieldHooks = {
+		change: () => {},
+		blur: () => {}
+	}
+	return hooks
+}

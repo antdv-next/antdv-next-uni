@@ -1,0 +1,114 @@
+// 业务字段的格式校验：与 PC 组件库（@antdv-pro/components 的 pro-field/validators.ts）、
+// 表单包（@antdv-pro/form 的 schema/formats.ts）同样的规则，修改时三处同步
+
+const MOBILE = /^(?:\+?86)?1[3-9]\d{9}$/
+const LANDLINE = /^0\d{2,3}-?\d{7,8}(?:-\d{1,6})?$/
+const INTERNATIONAL = /^\+\d{6,15}$/
+
+/** 电话：kind 为 mobile（默认）/ landline / any */
+export function isPhone(value : string, kind : string) : boolean {
+	const text = value.replace(/[\s()]/g, '')
+	const mobile = MOBILE.test(text.replace(/-/g, ''))
+	if (kind == 'mobile') return mobile
+	const landline = LANDLINE.test(text)
+	if (kind == 'landline') return landline
+	return mobile || landline || INTERNATIONAL.test(text.replace(/-/g, ''))
+}
+
+const ID_WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+const ID_CHECK = '10X98765432'
+
+/** 18 位居民身份证号：格式、出生日期与校验位（GB 11643） */
+export function isIdCard(value : string) : boolean {
+	const text = value.trim().toUpperCase()
+	if (!/^\d{17}[\dX]$/.test(text)) return false
+	const year = parseInt(text.substring(6, 10))
+	const month = parseInt(text.substring(10, 12))
+	const day = parseInt(text.substring(12, 14))
+	const date = new Date(year, month - 1, day)
+	if (year < 1900 || date.getMonth() != month - 1 || date.getDate() != day || date.getTime() > Date.now()) return false
+	let sum = 0
+	for (let i = 0; i < 17; i++) sum += ID_WEIGHTS[i] * parseInt(text.charAt(i))
+	return ID_CHECK.charAt(sum % 11) == text.charAt(17)
+}
+
+/** 去掉银行卡号、信用代码中常见的分隔（空格、连字符） */
+export function stripSeparators(value : string) : string {
+	return value.replace(/[\s-]/g, '')
+}
+
+function luhn(digits : string) : boolean {
+	let sum = 0
+	for (let i = 0; i < digits.length; i++) {
+		let digit = parseInt(digits.charAt(digits.length - 1 - i))
+		if (i % 2 == 1) {
+			digit *= 2
+			if (digit > 9) digit -= 9
+		}
+		sum += digit
+	}
+	return sum % 10 == 0
+}
+
+/** 银行卡号：12~19 位数字；strict 时另做 Luhn 校验 */
+export function isBankCard(value : string, strict : boolean) : boolean {
+	const digits = stripSeparators(value)
+	return /^\d{12,19}$/.test(digits) && (!strict || luhn(digits))
+}
+
+/** 每 4 位一组：6222 0212 3456 7890 */
+export function formatBankCard(value : string) : string {
+	const digits = stripSeparators(value)
+	const groups : string[] = []
+	for (let i = 0; i < digits.length; i += 4) groups.push(digits.substring(i, Math.min(i + 4, digits.length)))
+	return groups.join(' ')
+}
+
+const CREDIT_CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY'
+const CREDIT_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28]
+
+/** 18 位统一社会信用代码（GB 32100） */
+export function isCreditCode(value : string) : boolean {
+	const text = stripSeparators(value).toUpperCase()
+	if (!/^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$/.test(text)) return false
+	let sum = 0
+	for (let i = 0; i < 17; i++) sum += CREDIT_WEIGHTS[i] * CREDIT_CHARS.indexOf(text.charAt(i))
+	const check = (31 - (sum % 31)) % 31
+	return CREDIT_CHARS.charAt(check) == text.charAt(17)
+}
+
+export function isEmail(value : string) : boolean {
+	return /^[\w.%+-]+@[a-z\d-]+(?:\.[a-z\d-]+)*\.[a-z]{2,}$/i.test(value.trim())
+}
+
+/** 网址：只接受 http / https，主机名要有域名后缀或是 localhost（App 端没有 URL 类，按正则判断） */
+export function isUrl(value : string) : boolean {
+	const text = value.trim()
+	if (/\s/.test(text)) return false
+	const match = text.match(/^https?:\/\/([^/?#:]+)(:\d+)?([/?#].*)?$/i)
+	if (match == null) return false
+	const host = match[1] ?? ''
+	return host.indexOf('.') > 0 || host == 'localhost'
+}
+
+/** 只读展示时遮住中间部分：手机号 138****5678 */
+export function maskMiddle(value : string, head : number, tail : number) : string {
+	if (value.length <= head + tail) return value
+	let stars = ''
+	for (let i = 0; i < value.length - head - tail; i++) stars += '*'
+	return value.substring(0, head) + stars + value.substring(value.length - tail)
+}
+
+const PLATE = /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-HJ-NP-Z](?:[A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳]|[DABCEFGHJK][A-HJ-NP-Z0-9]\d{4}|\d{5}[DABCEFGHJK])$/
+
+/** 车牌号：普通车牌与新能源车牌（不含空格与点） */
+export function isPlate(value : string) : boolean {
+	return PLATE.test(value.replace(/[\s·.]/g, '').toUpperCase())
+}
+
+/** 附件地址是否安全（同表单包的 url.ts）：http(s)、以 / 开头的站内地址（不含 // 与 /\）、blob: */
+export function isSafeFileUrl(url : string) : boolean {
+	if (url.length == 0 || /[\u0000-\u001F\u007F]/.test(url) || url != url.trim()) return false
+	if (url.startsWith('/')) return !/^\/[/\\]/.test(url)
+	return /^https?:\/\/[^/\\]/i.test(url) || /^blob:/i.test(url)
+}

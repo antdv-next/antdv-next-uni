@@ -1,0 +1,8 @@
+{
+  "missingProps": {
+    "actions": "节点数组放不进数据（UTS 里不能存 VNode）：操作写在 actions 插槽里"
+  },
+  "extraEmits": {
+    "click": "uvue 里组件上没声明的事件不会落到根节点，要显式声明（移动端库靠 attrs 透传）"
+  }
+}

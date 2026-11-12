@@ -1,0 +1,68 @@
+<script setup lang="uts">
+import { AmActionSheetAction } from '@/uni_modules/antdv-next-uni/types/action-sheet.uts'
+
+const basic = ref(false)
+const described = ref(false)
+const keep = ref(false)
+const log = ref('')
+
+const actions : AmActionSheetAction[] = [
+	{ key: 'camera', text: '拍照' },
+	{ key: 'album', text: '从相册选择' },
+	{ key: 'file', text: '选择文件', disabled: true }
+]
+const more : AmActionSheetAction[] = [
+	{ key: 'share', text: '分享给朋友', icon: 'share', bold: true },
+	{ key: 'edit', text: '编辑', icon: 'edit', description: '修改标题与内容' },
+	{ key: 'delete', text: '删除', icon: 'delete', danger: true, description: '删除后不能恢复' }
+]
+
+function onAction(action : AmActionSheetAction, index : number) {
+	log.value = 'action: ' + action.key + '（第 ' + index + ' 个）'
+}
+
+function onCancel() {
+	log.value = 'cancel'
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-button block text="打开动作面板" @click="basic = true" />
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">标题、说明、图标与危险操作</text>
+		<view class="demo__card">
+			<am-button block text="title + extra + description" @click="described = true" />
+		</view>
+
+		<text class="demo__title">点了不关闭、没有取消按钮</text>
+		<view class="demo__card">
+			<am-button block text="closeOnAction = false" @click="keep = true" />
+		</view>
+		<view class="demo__footer"></view>
+
+		<am-action-sheet v-model:open="basic" :actions="actions" @action="onAction" @cancel="onCancel" />
+		<am-action-sheet v-model:open="described" :actions="more" title="文章操作" extra="操作对所有协作者生效" cancel-text="再想想" @action="onAction" />
+		<am-action-sheet v-model:open="keep" :actions="actions" :close-on-action="false" :show-cancel="false" title="点遮罩关闭" @action="onAction" />
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__panel { padding: 16px; }
+.demo__panel-text { font-size: 16px; line-height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__panel-footer { padding: 8px 16px; }
+.demo__footer { height: 40px; }
+</style>

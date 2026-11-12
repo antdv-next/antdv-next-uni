@@ -1,0 +1,211 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { sameValue } from '../../utils/value.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+
+// 单选框（= antdv-next-mobile 的 Radio）：v-model:checked、disabled、value（在 <am-radio-group> 里用）、
+// optionType（default / button）、block（整行：文字在前、圆圈在后）同名同义；事件 update:checked、change、click；
+// 插槽 default（文字处的自定义内容）、icon（参数 checked、disabled）。
+// 放在 <am-radio-group> 里时，选中与否由组的 value 决定，点击交给组处理。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `label` 属性（多出的属性）：uvue 的样式不继承，默认插槽里的文字拿不到字号与颜色；
+// - 自定义图标只有 `icon` 插槽，没有 `icon` 属性（渲染函数）；
+// - change 的参数是选中与否（布尔），不是事件对象；没有 defaultChecked；
+// - 没有原生 input：没有 name、id、title、tabIndex、autoFocus、required，没有 focus / blur 事件。
+//
+// 选中时圆点缩放出现、边框变色：要过渡的值写在内联 style 上（Android 上只切换类名不会过渡）
+defineOptions({ name: 'AmRadio' })
+
+const props = defineProps({
+	checked: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	/** 在 <am-radio-group> 里代表的值 */
+	value: { type: [String, Number, Boolean] as PropType<any | null>, default: null },
+	optionType: { type: String, default: '' },
+	block: { type: Boolean, default: false },
+	/** 文字 */
+	label: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:checked', 'change', 'click'])
+
+const theme = useAmTheme()
+const notifyChange = useAmFieldChange()
+
+// ---------- 所在的单选组 ----------
+const groupValue = inject<(() => any | null) | null>('amRadioGroupValue', null)
+const groupSelect = inject<((value : any | null) => void) | null>('amRadioGroupSelect', null)
+const groupDisabled = inject<(() => boolean) | null>('amRadioGroupDisabled', null)
+const groupOptionType = inject<(() => string) | null>('amRadioGroupOptionType', null)
+const groupButtonStyle = inject<(() => string) | null>('amRadioGroupButtonStyle', null)
+const groupBlock = inject<(() => boolean) | null>('amRadioGroupBlock', null)
+const groupVertical = inject<(() => boolean) | null>('amRadioGroupVertical', null)
+const groupSize = inject<(() => string) | null>('amRadioGroupSize', null)
+const inGroup = groupValue != null
+
+const checked = computed(() : boolean => groupValue != null ? sameValue(groupValue(), props.value) : props.checked)
+
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf() || (groupDisabled != null && groupDisabled()))
+
+// 按钮样式的尺寸：组的 size > ConfigProvider / 表单的尺寸
+const sizeOf = useAmSize(() : string => groupSize != null ? groupSize() : '')
+const size = computed(() : string => sizeOf())
+
+const isButton = computed(() : boolean => {
+	if (props.optionType.length > 0) return props.optionType == 'button'
+	return groupOptionType != null && groupOptionType() == 'button'
+})
+const buttonStyle = computed(() : string => groupButtonStyle != null ? groupButtonStyle() : 'outline')
+const groupIsBlock = computed(() : boolean => groupBlock != null && groupBlock())
+const vertical = computed(() : boolean => groupVertical != null && groupVertical())
+const block = computed(() : boolean => props.block || (groupIsBlock.value && !isButton.value))
+
+const classes = computed(() : string[] => {
+	const list : string[] = []
+	if (isButton.value) {
+		list.push('am-radio-button', 'am-radio-button--' + size.value)
+		// 组占满宽度时按钮平分一行；竖排时每个按钮占一行
+		if (groupIsBlock.value && !vertical.value) list.push('am-radio-button--fill')
+		if (inGroup) list.push(vertical.value ? 'am-radio-button--stack' : 'am-radio-button--in-group')
+	} else {
+		list.push('am-radio')
+		if (block.value) list.push('am-radio--block')
+		else if (inGroup && !vertical.value) list.push('am-radio--in-group')
+	}
+	if (disabled.value) list.push('am-radio--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const markStyle = computed(() : string => {
+	const current = theme()
+	return 'border-color:' + (checked.value ? current.colorPrimary : current.colorBorder) + ';' + amTransition('border-color', AM_DURATION_MID)
+})
+const dotStyle = computed(() : string => 'transform:scale(' + (checked.value ? 1 : 0) + ');' + amTransition('transform', AM_DURATION_MID))
+
+/** 按钮样式：边框与底色（过渡的值写在 style 上） */
+const buttonBoxStyle = computed(() : string => {
+	const current = theme()
+	let border = current.colorBorder
+	let background = current.colorBgContainer
+	if (checked.value) {
+		border = current.colorPrimary
+		background = buttonStyle.value == 'solid' ? current.colorPrimary : current.colorPrimaryBg
+	}
+	return 'border-color:' + border + ';background-color:' + background + ';' + amTransition('background-color, border-color', AM_DURATION_MID)
+})
+
+const buttonTextClasses = computed(() : string[] => {
+	const list : string[] = ['am-radio-button__text', 'am-radio-button__text--' + size.value]
+	if (checked.value) list.push(buttonStyle.value == 'solid' ? 'am-radio-button__text--solid' : 'am-radio-button__text--checked')
+	return list
+})
+
+function onClick(event : UniPointerEvent) {
+	emit('click', event)
+	if (disabled.value || checked.value) return
+	if (groupSelect != null) {
+		groupSelect(props.value)
+		return
+	}
+	emit('update:checked', true)
+	emit('change', true)
+	notifyChange()
+}
+</script>
+
+<template>
+	<view v-if="isButton" :class="classes" :style="buttonBoxStyle" @click="onClick">
+		<text v-if="label.length > 0" :class="buttonTextClasses">{{ label }}</text>
+		<slot></slot>
+	</view>
+	<view v-else :class="classes" @click="onClick">
+		<slot name="icon" :checked="checked" :disabled="disabled">
+			<view class="am-radio__mark" :style="markStyle">
+				<!-- 圆点一直在，选中时从 0 缩放出现 -->
+				<view class="am-radio__dot" :style="dotStyle"></view>
+			</view>
+		</slot>
+		<!-- 整行（block）时根节点是 row-reverse：文字在前、圆圈在后 -->
+		<view :class="['am-radio__body', block ? 'am-radio__body--block' : '']">
+			<text v-if="label.length > 0" :class="['am-radio__label', block ? '' : 'am-radio__label--inline']">{{ label }}</text>
+			<slot></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-radio { flex-direction: row; align-items: center; height: 32px; }
+/* 横排的组里：选项之间的间距（没有 gap，写在每一项的右边） */
+.am-radio--in-group { margin-right: var(--am-padding, 16px); }
+.am-radio--block { flex-direction: row-reverse; height: 48px; }
+.am-radio--disabled { opacity: 0.4; }
+.am-radio__mark {
+	width: 20px;
+	height: 20px;
+	border-radius: 10px;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+	align-items: center;
+	justify-content: center;
+}
+.am-radio__dot { width: 10px; height: 10px; border-radius: 5px; background-color: var(--am-color-primary, #1677ff); }
+.am-radio__label { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-radio__label--inline { margin-left: var(--am-padding-xs, 8px); }
+.am-radio__body { flex-direction: row; align-items: center; }
+.am-radio__body--block { flex: 1; }
+
+/* ---------- 按钮样式 ---------- */
+.am-radio-button {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+}
+.am-radio-button--middle {
+	height: var(--am-control-height, 40px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-radio-button--small {
+	height: var(--am-control-height-sm, 30px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-radio-button--large {
+	height: var(--am-control-height-lg, 48px);
+	padding-left: var(--am-padding-lg, 24px);
+	padding-right: var(--am-padding-lg, 24px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+.am-radio-button--in-group { margin-right: var(--am-padding-xs, 8px); margin-bottom: var(--am-padding-xs, 8px); }
+.am-radio-button--stack { margin-bottom: var(--am-padding-xs, 8px); }
+.am-radio-button--fill { flex: 1; padding-left: 0; padding-right: 0; }
+.am-radio-button__text { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-radio-button__text--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-radio-button__text--small { font-size: var(--am-font-size, 14px); }
+.am-radio-button__text--large { font-size: var(--am-font-size-xl, 18px); }
+.am-radio-button__text--checked { color: var(--am-color-primary, #1677ff); }
+.am-radio-button__text--solid { color: var(--am-color-text-light-solid, #ffffff); }
+</style>

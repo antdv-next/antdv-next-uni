@@ -1,0 +1,8 @@
+{
+  "missingProps": {
+    "duration": "用 scroll-view 原生的下拉，回弹动画是原生的，时长不可调"
+  },
+  "extraEmits": {
+    "reachBottom": "它自己是滚动区域、页面不滚，页面的 onReachBottom 不会触发，滚到底由它发出"
+  }
+}

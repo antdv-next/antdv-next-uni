@@ -1,0 +1,17 @@
+// am-tabs 的 items（= antdv-next-mobile 的 TabsItem）。
+// label 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据），自定义内容用插槽 labelRender / contentRender
+
+export type AmTabsItem = {
+	/** 唯一标识（字符串） */
+	key : string
+	label ?: string | null
+	/** 标签页的内容（文字）；复杂内容用 contentRender 或默认插槽 */
+	content ?: string | null
+	/** 图标名（<am-icon> 的 name） */
+	icon ?: string | null
+	disabled ?: boolean | null
+	/** 没有激活过也渲染内容 */
+	forceRender ?: boolean | null
+	/** 隐藏时销毁内容，优先于 am-tabs 的 destroyOnHidden */
+	destroyOnHidden ?: boolean | null
+}

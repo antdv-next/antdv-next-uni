@@ -1,0 +1,57 @@
+<script setup lang="uts">
+// 无限滚动：页面自己滚动（用页面的 onReachBottom，组件里已经登记，页面不用再写）。
+// 每页 10 条，第 2 页故意失败一次（点击“重新加载”），共 5 页
+const rows = ref<number[]>([])
+const loading = ref(false)
+const error = ref(false)
+const hasMore = ref(true)
+let page = 0
+let failedOnce = false
+
+function load() {
+	setTimeout(() => {
+		if (page == 1 && !failedOnce) {
+			failedOnce = true
+			error.value = true
+			loading.value = false
+			return
+		}
+		const list = [...rows.value]
+		for (let i = 0; i < 10; i++) list.push(page * 10 + i + 1)
+		rows.value = list
+		page++
+		loading.value = false
+		hasMore.value = page < 5
+	}, 800)
+}
+
+function reset() {
+	rows.value = []
+	page = 0
+	failedOnce = false
+	error.value = false
+	hasMore.value = true
+	// 清空后列表没有铺满屏幕，组件会自己再发出 load
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<view class="demo__bar">
+			<text class="demo__bar-text">已加载 {{ rows.length }} 条{{ hasMore ? '' : '，没有更多了' }}</text>
+			<am-button size="small" text="重置" @click="reset" />
+		</view>
+		<am-infinite-scroll v-model:loading="loading" v-model:error="error" :has-more="hasMore" @load="load">
+			<view v-for="row in rows" :key="row" class="demo__row">
+				<text class="demo__row-text">第 {{ row }} 条</text>
+			</view>
+		</am-infinite-scroll>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__bar { flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 16px; background-color: var(--am-color-bg-container, #ffffff); border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06)); }
+.demo__bar-text { font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__row { height: 52px; padding: 0 16px; justify-content: center; background-color: var(--am-color-bg-container, #ffffff); border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06)); }
+.demo__row-text { font-size: 14px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

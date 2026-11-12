@@ -1,0 +1,102 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+
+// 加载中（= antdv-next-mobile 的 Spin）：spinning、size（small / middle / large）、description（tip 为旧名）、
+// delay（毫秒，延迟显示以免一闪而过）、fullscreen（盖住整个窗口）同名同义；插槽 default（被盖住的内容）、
+// indicator、description。有默认插槽时盖在内容上（内容变淡、不可点），否则单独显示。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 指示器是 <am-loading>（内置 loading，App 端没有 @keyframes，图标转不起来）：`indicator` 只有插槽，没有属性；
+// - 没有 `percent`（内置 loading 画不了进度）；
+// - description / tip 是字符串，自定义内容用 `description` 插槽
+defineOptions({ name: 'AmSpin' })
+
+const props = defineProps({
+	spinning: { type: Boolean, default: true },
+	size: { type: String, default: '' },
+	description: { type: String, default: '' },
+	tip: { type: String, default: '' },
+	delay: { type: Number, default: 0 },
+	fullscreen: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+
+/** 实际是否在转：有 delay 时晚一点才变成 true */
+const active = ref(props.spinning && props.delay <= 0)
+let timer = 0
+
+function sync() {
+	clearTimeout(timer)
+	if (props.spinning && props.delay > 0) {
+		timer = setTimeout(() => { active.value = true }, props.delay)
+	} else {
+		active.value = props.spinning
+	}
+}
+
+watch(() : string => props.spinning + ':' + props.delay, () => sync())
+onMounted(() => sync())
+onUnmounted(() => clearTimeout(timer))
+
+const text = computed(() : string => props.description.length > 0 ? props.description : props.tip)
+const spinnerSize = computed(() : number => size.value == 'small' ? 20 : (size.value == 'large' ? 40 : 28))
+const spinnerColor = computed(() : string => props.fullscreen ? theme().colorTextLightSolid : theme().colorPrimary)
+
+const textClasses = computed(() : string[] => {
+	const list : string[] = ['am-spin__description', 'am-spin__description--' + size.value]
+	if (props.fullscreen) list.push('am-spin__description--fullscreen')
+	return list
+})
+
+function noop() {}
+</script>
+
+<template>
+	<view v-if="!fullscreen && $slots['default'] != null" :class="['am-spin', 'am-spin--nested', rootClass]">
+		<view class="am-spin__container" :style="'opacity:' + (active ? 0.4 : 1) + ';'">
+			<slot></slot>
+		</view>
+		<view v-if="active" class="am-spin__section" @click.stop="noop">
+			<slot name="indicator">
+				<am-loading :size="spinnerSize" :color="spinnerColor" />
+			</slot>
+			<text v-if="text.length > 0" :class="textClasses">{{ text }}</text>
+			<slot name="description"></slot>
+		</view>
+	</view>
+	<view v-else-if="active" :class="['am-spin', fullscreen ? 'am-spin--fullscreen' : 'am-spin--alone', rootClass]" @click.stop="noop">
+		<slot name="indicator">
+			<am-loading :size="spinnerSize" :color="spinnerColor" />
+		</slot>
+		<text v-if="text.length > 0" :class="textClasses">{{ text }}</text>
+		<slot name="description"></slot>
+	</view>
+</template>
+
+<style>
+.am-spin--alone { align-items: center; justify-content: center; align-self: flex-start; }
+.am-spin--nested { position: relative; }
+.am-spin--fullscreen {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 1000;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+}
+.am-spin__container { transition-property: opacity; transition-duration: 300ms; }
+.am-spin__section { position: absolute; left: 0; right: 0; top: 0; bottom: 0; align-items: center; justify-content: center; }
+.am-spin__description { margin-top: 8px; text-align: center; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-spin__description--small { margin-top: 4px; font-size: var(--am-font-size-sm, 12px); }
+.am-spin__description--middle { font-size: var(--am-font-size, 14px); }
+.am-spin__description--large { font-size: var(--am-font-size-lg, 16px); }
+.am-spin__description--fullscreen { color: var(--am-color-text-light-solid, #ffffff); }
+</style>

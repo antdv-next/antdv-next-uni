@@ -1,0 +1,158 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 无限滚动（= antdv-next-mobile 的 InfiniteScroll）：列表内容放在默认插槽，组件在下面画加载状态，滚到离底部不到 threshold 时发出 load。
+// v-model:loading（发出 load 前组件已经设为 true，数据回来后使用方改回 false）、hasMore / finished（任一表示没有更多）、
+// v-model:error（加载失败，点击重试）、threshold、disabled、immediateCheck、loadingText / finishedText / errorText 同名同义；
+// 事件 update:loading、update:error、load；插槽 default、loading、finished、error；方法 check()。
+// 每次加载完、挂载时检查一次：列表还没铺满屏幕（第一页条数少、屏幕高）时接着加载。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 滚到哪了从两处知道：放在 <am-pull-to-refresh> 里时用它的滚动区域；否则用页面的 onReachBottom（页面自己滚动，
+//   这时 threshold 只在“铺满检查”里生效，触底的距离由 pages.json 的 onReachBottomDistance 决定）。
+//   放在自己写的 scroll-view 里时，在它的 scrolltolower 里调用 check()；
+// - 各状态的文字是字符串（默认取语言包），自定义内容用同名插槽；
+// - 没有 direction="up"（向上加载聊天记录）
+defineOptions({ name: 'AmInfiniteScroll' })
+
+const props = defineProps({
+	loading: { type: Boolean, default: false },
+	hasMore: { type: Boolean, default: true },
+	finished: { type: Boolean, default: false },
+	error: { type: Boolean, default: false },
+	/** 列表底部离可视区域底部不到这个距离时加载（像素） */
+	threshold: { type: Number, default: 250 },
+	disabled: { type: Boolean, default: false },
+	/** 挂载、加载完成后检查是否铺满屏幕，没铺满时接着加载 */
+	immediateCheck: { type: Boolean, default: true },
+	/** 加载中的文字，空为语言包的 InfiniteScroll.loading */
+	loadingText: { type: String, default: '' },
+	finishedText: { type: String, default: '' },
+	/** 加载失败的文字，空为语言包的“加载失败 重新加载” */
+	errorText: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:loading', 'update:error', 'load'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+const uid = amUid('am-infinite-scroll')
+
+// 所在的滚动区域（am-pull-to-refresh）：订阅它的滚动，铺满检查按它的下边缘算
+const subscribe = inject<((listener : (distance : number) => void) => number) | null>('amScrollSubscribe', null)
+const unsubscribe = inject<((id : number) => void) | null>('amScrollUnsubscribe', null)
+const hostId = inject<(() => string) | null>('amScrollHost', null)
+
+const done = computed(() : boolean => props.finished || !props.hasMore)
+
+function idle() : boolean {
+	return !props.loading && !done.value && !props.error && !props.disabled
+}
+
+function trigger() {
+	if (!idle()) return
+	emit('update:loading', true)
+	emit('load')
+}
+
+/** 列表的底部在不在可视区域里（或离底部不到 threshold），在就加载 */
+function check() {
+	if (!idle()) return
+	measureById(uid + '-indicator').then((foot : AmRect | null) => {
+		if (foot == null) return
+		const info = uni.getWindowInfo()
+		const windowBottom = info.windowHeight + info.windowTop
+		if (hostId == null) {
+			if (foot.top - props.threshold <= windowBottom) trigger()
+			return
+		}
+		measureById(hostId()).then((host : AmRect | null) => {
+			const bottom = host == null ? windowBottom : host.top + host.height
+			if (foot.top - props.threshold <= bottom) trigger()
+		})
+	})
+}
+
+let checkTimer = 0
+
+function scheduleCheck() {
+	if (!props.immediateCheck) return
+	// 等新的一页渲染出来再量
+	clearTimeout(checkTimer)
+	checkTimer = setTimeout(() => { check() }, 60)
+}
+
+let subscription = -1
+
+onMounted(() => {
+	if (subscribe != null) subscription = subscribe((distance : number) => { if (distance <= props.threshold) trigger() })
+	scheduleCheck()
+})
+
+onUnmounted(() => {
+	clearTimeout(checkTimer)
+	if (subscription >= 0 && unsubscribe != null) unsubscribe(subscription)
+})
+
+// 页面自己滚动时：页面滚到底（放在 am-pull-to-refresh 里时页面不滚，不会触发）
+onReachBottom(() => {
+	if (subscribe == null) trigger()
+})
+
+watch(() : boolean => props.loading, (value : boolean) => { if (!value) scheduleCheck() })
+watch(() : boolean => done.value, (value : boolean) => { if (!value) scheduleCheck() })
+watch(() : boolean => props.error, (value : boolean) => { if (!value) scheduleCheck() })
+
+function retry() {
+	emit('update:error', false)
+	emit('update:loading', true)
+	emit('load')
+}
+
+const spinnerStyle = computed(() : string => 'width:16px;height:16px;border-color:' + theme().colorTextTertiary + ';')
+const loadingLabel = computed(() : string => props.loadingText.length > 0 ? props.loadingText : locale().InfiniteScroll.loading)
+const finishedLabel = computed(() : string => props.finishedText.length > 0 ? props.finishedText : locale().InfiniteScroll.noMore)
+
+defineExpose({
+	/** 检查一次位置，离底部不到 threshold 时发出 load（列表放在自己写的滚动区域里、内容高度变化后调用） */
+	check: () => { check() }
+})
+</script>
+
+<template>
+	<view :class="['am-infinite-scroll', rootClass]">
+		<slot></slot>
+		<view :id="uid + '-indicator'" class="am-infinite-scroll__indicator">
+			<view v-if="loading" class="am-infinite-scroll__status">
+				<slot name="loading">
+					<loading class="am-infinite-scroll__spinner" :style="spinnerStyle"></loading>
+					<text class="am-infinite-scroll__text">{{ loadingLabel }}</text>
+				</slot>
+			</view>
+			<view v-else-if="error" class="am-infinite-scroll__status" @click="retry">
+				<slot name="error">
+					<text v-if="errorText.length > 0" class="am-infinite-scroll__text">{{ errorText }}</text>
+					<text v-if="errorText.length == 0" class="am-infinite-scroll__text">{{ locale().InfiniteScroll.failed }}</text>
+					<text v-if="errorText.length == 0" class="am-infinite-scroll__text am-infinite-scroll__text--retry">{{ locale().InfiniteScroll.retry }}</text>
+				</slot>
+			</view>
+			<view v-else-if="done" class="am-infinite-scroll__status">
+				<slot name="finished">
+					<text class="am-infinite-scroll__text">{{ finishedLabel }}</text>
+				</slot>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+/* 没有状态时也留 1px：量它的位置来判断离底部多远 */
+.am-infinite-scroll__indicator { min-height: 1px; }
+.am-infinite-scroll__status { flex-direction: row; align-items: center; justify-content: center; height: 48px; }
+.am-infinite-scroll__spinner { margin-right: 6px; }
+.am-infinite-scroll__text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-infinite-scroll__text--retry { margin-left: 6px; color: var(--am-color-primary, #1677ff); }
+</style>

@@ -1,0 +1,154 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { AmTimelineItem, AmTimelineNode } from '../../types/timeline.uts'
+import { presetColor } from '../../utils/color.uts'
+
+// 时间轴（= antdv-next-mobile 的 Timeline）：items（color、placement、loading、title、content、icon）、
+// mode（start / end / alternate；left / right 为旧名）、reverse、pending、pendingDot、variant（outlined / filled）、
+// titleSpan 同名同义；插槽 pending、pendingDot、dotRender、labelRender、contentRender（后三个的参数是 item、index）。
+// title 显示在内容的对侧，有 title（或 mode 为 alternate）时多出标题一栏。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - items 里的 title / content 是文字、icon 是图标名（UTS 里不能把节点放进数据），自定义内容用
+//   labelRender / contentRender / dotRender 插槽；这三个只有插槽，没有同名的函数属性；
+// - `pending` 是字符串（只要加载中的圆点、不要文字时用 `pending` 插槽）；`pendingDot` 是图标名；
+// - `titleSpan` 是字符串：24 栅格的份数（如 '6'）或宽度（如 '80px'、'30%'）；
+// - 没有伪元素：通向 pending 节点的那段轴线是实线，不是虚线；
+// - items 的项没有 class / style
+defineOptions({ name: 'AmTimeline' })
+
+const props = defineProps({
+	items: { type: Array as PropType<AmTimelineItem[]>, default: () : AmTimelineItem[] => [] },
+	mode: { type: String, default: 'start' },
+	reverse: { type: Boolean, default: false },
+	pending: { type: String, default: '' },
+	pendingDot: { type: String, default: '' },
+	variant: { type: String, default: 'outlined' },
+	titleSpan: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+const mergedMode = computed(() : string => {
+	if (props.mode == 'left') return 'start'
+	if (props.mode == 'right') return 'end'
+	return props.mode == 'alternate' || props.mode == 'end' ? props.mode : 'start'
+})
+
+/** 全部节点：最后带一个 pending 节点（要不要显示由模板按属性 / 插槽决定） */
+const nodes = computed(() : AmTimelineNode[] => {
+	const list : AmTimelineNode[] = []
+	const mode = mergedMode.value
+	for (let i = 0; i < props.items.length; i++) {
+		const item = props.items[i]
+		let placement = item.placement ?? ''
+		if (placement != 'start' && placement != 'end') {
+			placement = mode == 'alternate' ? (i % 2 == 0 ? 'start' : 'end') : mode
+		}
+		const node : AmTimelineNode = { key: item.key ?? ('' + i), item: item, index: i, pending: false, placement: placement }
+		list.push(node)
+	}
+	const ghost : AmTimelineItem = { content: props.pending, icon: props.pendingDot }
+	const last : AmTimelineNode = { key: '__pending__', item: ghost, index: props.items.length, pending: true, placement: mode == 'end' ? 'end' : 'start' }
+	list.push(last)
+	return props.reverse ? list.reverse() : list
+})
+
+/** 标题单独占一栏（在内容的对侧） */
+const withTitle = computed(() : boolean => {
+	if (mergedMode.value == 'alternate') return true
+	for (let i = 0; i < props.items.length; i++) {
+		if ((props.items[i].title ?? '').length > 0) return true
+	}
+	return false
+})
+
+const titleStyle = computed(() : string => {
+	if (mergedMode.value == 'alternate') return 'flex:1;'
+	if (props.titleSpan.length == 0) return 'width:25%;'
+	// 纯数字是 24 栅格的份数
+	if (/^[0-9.]+$/.test(props.titleSpan)) return 'width:' + (parseFloat(props.titleSpan) / 24) * 100 + '%;'
+	return 'width:' + props.titleSpan + ';'
+})
+
+function nodeColor(item : AmTimelineItem) : string {
+	const color = item.color ?? 'blue'
+	const current = theme()
+	if (color == 'blue' || color.length == 0) return current.colorPrimary
+	if (color == 'red') return current.colorError
+	if (color == 'green') return current.colorSuccess
+	if (color == 'gray') return current.colorTextQuaternary
+	return presetColor(color)
+}
+
+function dotStyle(item : AmTimelineItem) : string {
+	const color = nodeColor(item)
+	return 'border-color:' + color + ';background-color:' + (props.variant == 'filled' ? color : theme().colorBgContainer) + ';'
+}
+
+/** 下面还有显示出来的节点时才画轴线 */
+function hasTail(position : number, showPending : boolean) : boolean {
+	const list = nodes.value
+	if (position >= list.length - 1) return false
+	return showPending || !list[position + 1].pending
+}
+
+function itemClass(node : AmTimelineNode) : string[] {
+	return ['am-timeline__item', node.placement == 'end' ? 'am-timeline__item--end' : '']
+}
+</script>
+
+<template>
+	<view :class="['am-timeline', rootClass]">
+		<template v-for="(node, position) in nodes" :key="node.key">
+			<view v-if="!node.pending || pending.length > 0 || $slots['pending'] != null" :class="itemClass(node)">
+				<view v-if="withTitle || $slots['labelRender'] != null" :class="['am-timeline__title', node.placement == 'end' ? 'am-timeline__title--end' : '']" :style="titleStyle">
+					<slot v-if="!node.pending" name="labelRender" :item="node.item" :index="node.index">
+						<text :class="['am-timeline__title-text', node.placement == 'end' ? '' : 'am-timeline__title-text--right']">{{ node.item.title ?? '' }}</text>
+					</slot>
+				</view>
+				<view class="am-timeline__rail">
+					<view class="am-timeline__icon">
+						<slot v-if="node.pending" name="pendingDot">
+							<am-icon v-if="(node.item.icon ?? '').length > 0" :name="node.item.icon ?? ''" :size="16" :color="nodeColor(node.item)" />
+							<am-loading v-else :size="14" :color="nodeColor(node.item)" />
+						</slot>
+						<slot v-else name="dotRender" :item="node.item" :index="node.index">
+							<am-icon v-if="(node.item.icon ?? '').length > 0" :name="node.item.icon ?? ''" :size="16" :color="nodeColor(node.item)" />
+							<am-loading v-else-if="node.item.loading == true" :size="14" :color="nodeColor(node.item)" />
+							<view v-else class="am-timeline__dot" :style="dotStyle(node.item)"></view>
+						</slot>
+					</view>
+					<view v-if="hasTail(position, pending.length > 0 || $slots['pending'] != null)" class="am-timeline__tail"></view>
+				</view>
+				<view :class="['am-timeline__content', node.placement == 'end' ? 'am-timeline__content--end' : '']">
+					<slot v-if="node.pending" name="pending">
+						<text class="am-timeline__content-text">{{ node.item.content }}</text>
+					</slot>
+					<slot v-else name="contentRender" :item="node.item" :index="node.index">
+						<text :class="['am-timeline__content-text', node.placement == 'end' ? 'am-timeline__content-text--right' : '']">{{ node.item.content }}</text>
+					</slot>
+				</view>
+			</view>
+		</template>
+	</view>
+</template>
+
+<style>
+.am-timeline__item { flex-direction: row; }
+.am-timeline__item--end { flex-direction: row-reverse; }
+.am-timeline__title { margin-right: 12px; }
+.am-timeline__title--end { margin-right: 0; margin-left: 12px; }
+.am-timeline__title-text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-timeline__title-text--right { text-align: right; }
+.am-timeline__rail { width: 20px; align-items: center; }
+/* 与一行文字同高，圆点 / 图标在里面居中，对齐内容的第一行 */
+.am-timeline__icon { height: 22px; align-items: center; justify-content: center; }
+.am-timeline__dot { width: 10px; height: 10px; border-radius: 5px; border-width: 2px; border-style: solid; }
+.am-timeline__tail { flex: 1; width: 2px; border-radius: 1px; background-color: var(--am-color-border, #d9d9d9); }
+.am-timeline__content { flex: 1; margin-left: 12px; padding-bottom: var(--am-padding-md, 20px); }
+.am-timeline__content--end { margin-left: 0; margin-right: 12px; }
+.am-timeline__content-text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-timeline__content-text--right { text-align: right; }
+</style>

@@ -1,0 +1,17 @@
+// Collapse 的类型（= antdv-next-mobile collapse/interface.ts）
+
+/** 折叠面板的项（= CollapseItemType）：label / content / extra 是文字，自定义内容用 labelRender / contentRender 插槽 */
+export type AmCollapseItem = {
+	/** 不写时用序号（'0'、'1'…） */
+	key ?: string
+	label : string
+	content ?: string
+	/** 标题右侧的文字 */
+	extra ?: string
+	/** 是否显示箭头，默认显示 */
+	showArrow ?: boolean
+	/** 点哪里展开：header（只有标题文字）/ icon（只有箭头）/ disabled（禁用）；不写时跟随 Collapse 的 collapsible */
+	collapsible ?: string
+	/** 收起时也渲染内容 */
+	forceRender ?: boolean
+}

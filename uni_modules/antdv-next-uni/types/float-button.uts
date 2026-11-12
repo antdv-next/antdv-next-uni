@@ -1,0 +1,24 @@
+// <am-float-button> 的类型（= antdv-next-mobile 的 FloatButtonBadgeProps / FloatButtonOffset）
+
+/** 右上角的徽标 */
+export type AmFloatButtonBadge = {
+	count ?: number
+	/** 只显示小红点 */
+	dot ?: boolean
+	/** 超过时显示 `${overflowCount}+`，默认 99 */
+	overflowCount ?: number
+	showZero ?: boolean
+	/** 预设色名或颜色值 */
+	color ?: string
+}
+
+/** 按钮左上角的位置（像素，相对页面内容区的左上角） */
+export type AmFloatButtonOffset = {
+	x : number
+	y : number
+}
+
+/** `badge` 的默认值：没有徽标 */
+export const AM_FLOAT_BUTTON_NO_BADGE : AmFloatButtonBadge = {}
+/** `offset` 的默认值：没有指定位置（右下角的默认位置） */
+export const AM_FLOAT_BUTTON_NO_OFFSET : AmFloatButtonOffset = { x: -1, y: -1 }

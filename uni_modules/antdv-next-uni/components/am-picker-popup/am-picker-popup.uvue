@@ -1,0 +1,115 @@
+<script setup lang="uts">
+import { useAmLocale } from '../../locale/locale.uts'
+
+// 选择类字段的弹层（= antdv-next-mobile 内部的 PickerPopup，各个选择器共用）：底部圆角的 am-popup +
+// 头部“取消 · 标题 · 确定”。open、title、okText、cancelText、showConfirm、showCancel、confirmDisabled、
+// zIndex、maskClosable、destroyOnHidden 同名同义；文字默认取语言包的 Picker.okText / cancelText；
+// 事件 ok（点了确定）、cancel（点了取消 / 遮罩 / Android 返回键）、afterOpenChange；插槽 default、title。
+//
+// 与 antdv-next-mobile 的差异：
+// - 确定的事件叫 ok（与 Modal 一致）；title 是字符串，自定义内容用 title 插槽；
+// - 没有 getContainer、popupClass / popupStyle（没有 Teleport；传给子组件内部节点的类在 App 端不生效）；
+// - 多了 height（面板的高度，像素，0 为按内容）。
+// 只负责显示：open 由使用它的选择器控制，这里不发 update:open
+defineOptions({ name: 'AmPickerPopup' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	title: { type: String, default: '' },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	showConfirm: { type: Boolean, default: true },
+	showCancel: { type: Boolean, default: true },
+	confirmDisabled: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	height: { type: Number, default: 0 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['ok', 'cancel', 'afterOpenChange'])
+
+const locale = useAmLocale()
+const okLabel = computed(() : string => props.okText.length > 0 ? props.okText : locale().Picker.okText)
+const cancelLabel = computed(() : string => props.cancelText.length > 0 ? props.cancelText : locale().Picker.cancelText)
+
+function onOpen(open : boolean) {
+	if (!open) emit('cancel')
+}
+
+function onOk() {
+	if (!props.confirmDisabled) emit('ok')
+}
+
+function onCancel() {
+	emit('cancel')
+}
+
+function onAfterOpenChange(open : boolean) {
+	emit('afterOpenChange', open)
+}
+</script>
+
+<template>
+	<am-popup
+		:open="open"
+		placement="bottom"
+		round
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		:height="height"
+		:root-class="rootClass"
+		@update:open="onOpen"
+		@after-open-change="onAfterOpenChange"
+	>
+		<view class="am-picker-popup__header">
+			<view class="am-picker-popup__side" @click="onCancel">
+				<text v-if="showCancel" class="am-picker-popup__cancel">{{ cancelLabel }}</text>
+			</view>
+			<view class="am-picker-popup__title">
+				<slot name="title">
+					<text class="am-picker-popup__title-text">{{ title }}</text>
+				</slot>
+			</view>
+			<view class="am-picker-popup__side am-picker-popup__side--end" @click="onOk">
+				<text v-if="showConfirm" :class="['am-picker-popup__ok', confirmDisabled ? 'am-picker-popup__ok--disabled' : '']">{{ okLabel }}</text>
+			</view>
+		</view>
+		<slot></slot>
+	</am-popup>
+</template>
+
+<style>
+.am-picker-popup__header {
+	flex-direction: row;
+	align-items: center;
+	height: 48px;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+/* 两侧等宽，标题才在正中间 */
+.am-picker-popup__side {
+	min-width: 72px;
+	height: 48px;
+	flex-direction: row;
+	align-items: center;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-picker-popup__side--end { justify-content: flex-end; }
+.am-picker-popup__title { flex: 1; flex-direction: row; align-items: center; justify-content: center; }
+.am-picker-popup__title-text {
+	font-size: var(--am-font-size-lg, 16px);
+	font-weight: bold;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-picker-popup__cancel { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-picker-popup__ok { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-primary, #1677ff); }
+.am-picker-popup__ok--disabled { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+</style>

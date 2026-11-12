@@ -1,0 +1,5 @@
+{
+  "missingProps": {
+    "extra": "操作区是按钮等节点，放不进数据（UTS 里不能存 VNode）：只有 extra 插槽"
+  }
+}

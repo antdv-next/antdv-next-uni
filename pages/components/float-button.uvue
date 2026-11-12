@@ -1,0 +1,60 @@
+<script setup lang="uts">
+import { AmFloatButtonBadge, AmFloatButtonOffset } from '@/uni_modules/antdv-next-uni/types/float-button.uts'
+
+const kinds : string[] = ['基础', '主按钮', '方形 + 文字', '徽标', '可拖动', '吸边', '指定位置']
+const kind = ref('基础')
+const clicks = ref(0)
+
+const countBadge : AmFloatButtonBadge = { count: 12 }
+const dotBadge : AmFloatButtonBadge = { dot: true }
+const offset = ref<AmFloatButtonOffset>({ x: 24, y: 320 })
+const dragged = ref('还没有拖动')
+
+function onClick() {
+	clicks.value++
+}
+
+function onOffsetChange(value : AmFloatButtonOffset) {
+	dragged.value = 'x: ' + Math.round(value.x) + '，y: ' + Math.round(value.y)
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">悬浮按钮固定在页面右下角（点击了 {{ clicks }} 次）</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in kinds" :key="item" class="demo__item" size="small" :type="kind == item ? 'primary' : 'default'" :text="item" @click="kind = item" />
+			</view>
+			<text v-if="kind == '可拖动' || kind == '吸边'" class="demo__text">拖动后的位置：{{ dragged }}</text>
+			<text v-if="kind == '指定位置'" class="demo__text">v-model:offset：x {{ Math.round(offset.x) }}，y {{ Math.round(offset.y) }}</text>
+		</view>
+
+		<am-float-button v-if="kind == '基础'" icon="question" @click="onClick" />
+		<am-float-button v-if="kind == '主按钮'" type="primary" icon="plus" @click="onClick" />
+		<am-float-button v-if="kind == '方形 + 文字'" shape="square" icon="service" content="客服" @click="onClick" />
+		<am-float-button v-if="kind == '徽标'" icon="message" :badge="countBadge" @click="onClick" />
+		<am-float-button v-if="kind == '徽标'" root-class="demo__second" shape="square" icon="bell" :badge="dotBadge" @click="onClick" />
+		<am-float-button v-if="kind == '可拖动'" type="primary" icon="cart" draggable @click="onClick" @offset-change="onOffsetChange" />
+		<am-float-button v-if="kind == '吸边'" icon="service" draggable magnetic="x" @click="onClick" @offset-change="onOffsetChange" />
+		<am-float-button v-if="kind == '指定位置'" v-model:offset="offset" type="primary" icon="location" draggable @click="onClick" />
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+/* 第二个按钮往上挪一格（锚点贴着底部，用 margin 抬高） */
+.demo__second { margin-bottom: 64px; }
+</style>

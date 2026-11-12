@@ -1,0 +1,107 @@
+<script setup lang="uts">
+import { AmStatisticTimeData } from '@/uni_modules/antdv-next-uni/types/statistic.uts'
+
+const loading = ref(true)
+const deadline = ref(Date.now() + 1000 * 60 * 60 * 24 * 2 + 1000 * 30)
+const shortDeadline = ref(Date.now() + 1000 * 10)
+const startedAt = ref(Date.now() - 1000 * 75)
+const finished = ref(false)
+
+function restart() {
+	finished.value = false
+	shortDeadline.value = Date.now() + 1000 * 10
+}
+
+function two(value : number) : string {
+	return value < 10 ? '0' + value : '' + value
+}
+
+function clock(time : AmStatisticTimeData) : string[] {
+	return [two(time.hours + time.days * 24), two(time.minutes), two(time.seconds)]
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card demo__row">
+			<am-statistic class="demo__half" title="活跃用户" :value="112893" />
+			<am-statistic class="demo__half" title="账户余额 (CNY)" :value="112893" :precision="2" />
+		</view>
+
+		<text class="demo__title">前缀、后缀与颜色</text>
+		<view class="demo__card demo__row">
+			<am-statistic class="demo__half" title="反馈" :value="1128" prefix="heart" />
+			<am-statistic class="demo__half" title="进度" :value="93" suffix="/ 100" />
+			<am-statistic class="demo__half demo__top" title="上涨" :value="11.28" :precision="2" prefix="up" suffix="%" value-style="color:#3f8600;" />
+			<am-statistic class="demo__half demo__top" title="下跌" :value="9.3" :precision="2" prefix="down" suffix="%" value-style="color:#cf1322;" />
+		</view>
+
+		<text class="demo__title">分隔符与自定义显示（formatter 插槽）</text>
+		<view class="demo__card demo__row">
+			<am-statistic class="demo__half" title="欧式写法" :value="1234567.891" group-separator="." decimal-separator="," />
+			<am-statistic class="demo__half" title="自定义" :value="42">
+				<template #formatter="{ value }">
+					<text class="demo__custom">第 {{ value }} 名</text>
+				</template>
+			</am-statistic>
+		</view>
+
+		<text class="demo__title">加载中</text>
+		<view class="demo__card">
+			<am-statistic title="活跃用户" :value="112893" :loading="loading" />
+			<am-button class="demo__top" size="small" :text="loading ? '加载完成' : '重新加载'" @click="loading = !loading" />
+		</view>
+
+		<text class="demo__title">倒计时</text>
+		<view class="demo__card demo__row">
+			<am-statistic-timer class="demo__half" title="倒计时" :value="deadline" />
+			<am-statistic-timer class="demo__half" title="天时分秒" :value="deadline" format="D 天 H 时 m 分 s 秒" />
+			<am-statistic-timer class="demo__half demo__top" title="毫秒" :value="deadline" format="HH:mm:ss.SSS" />
+			<am-statistic-timer class="demo__half demo__top" :title="finished ? '已结束' : '10 秒后结束'" :value="shortDeadline" format="s.S [秒]" @finish="finished = true" />
+			<am-button class="demo__top" size="small" text="重新开始 10 秒倒计时" @click="restart" />
+		</view>
+
+		<text class="demo__title">正计时</text>
+		<view class="demo__card demo__row">
+			<am-statistic-timer class="demo__half" type="countup" title="已用时" :value="startedAt" />
+			<am-statistic-timer class="demo__half" type="countup" title="已用时" :value="startedAt" format="m [分] s [秒]" />
+		</view>
+
+		<text class="demo__title">自定义显示（formatter 插槽）</text>
+		<view class="demo__card">
+			<am-statistic-timer title="距离活动结束" :value="deadline">
+				<template #formatter="{ time }">
+					<view class="demo__row">
+						<template v-for="(part, index) in clock(time as AmStatisticTimeData)" :key="index">
+							<text v-if="index > 0" class="demo__colon">:</text>
+							<text class="demo__digit">{{ part }}</text>
+						</template>
+					</view>
+				</template>
+			</am-statistic-timer>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__half { width: 50%; }
+.demo__top { margin-top: 16px; }
+.demo__custom { font-size: 24px; line-height: 32px; color: var(--am-color-primary, #1677ff); }
+.demo__digit { padding: 2px 6px; border-radius: 4px; font-size: 16px; color: #ffffff; background-color: var(--am-color-error, #ff4d4f); }
+.demo__colon { margin: 0 4px; font-size: 16px; color: var(--am-color-error, #ff4d4f); }
+</style>

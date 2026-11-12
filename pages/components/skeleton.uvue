@@ -1,0 +1,57 @@
+<script setup lang="uts">
+const loading = ref(true)
+const active = ref(true)
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-skeleton />
+		</view>
+
+		<text class="demo__title">带头像</text>
+		<view class="demo__card">
+			<am-skeleton avatar />
+		</view>
+
+		<text class="demo__title">闪烁（active）与圆角（round）</text>
+		<view class="demo__card">
+			<am-skeleton avatar avatar-shape="square" avatar-size="large" round :active="active" :rows="3" />
+			<am-button class="demo__top" size="small" :text="active ? '停止闪烁' : '开始闪烁'" @click="active = !active" />
+		</view>
+
+		<text class="demo__title">只有标题 / 只有段落</text>
+		<view class="demo__card">
+			<am-skeleton root-class="demo__block" :paragraph="false" title-width="60%" />
+			<am-skeleton :title="false" :rows="2" row-width="40%" />
+		</view>
+
+		<text class="demo__title">加载完成后显示内容</text>
+		<view class="demo__card">
+			<am-skeleton :loading="loading" avatar active>
+				<text class="demo__text">Antdv Next Uni</text>
+				<text class="demo__text">loading 为 false 时显示默认插槽里的内容。</text>
+			</am-skeleton>
+			<am-button class="demo__top" size="small" type="primary" :text="loading ? '显示内容' : '显示骨架'" @click="loading = !loading" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__top { margin-top: 16px; }
+</style>

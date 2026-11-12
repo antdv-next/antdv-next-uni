@@ -1,0 +1,288 @@
+<script setup lang="uts">
+import { AmDropdownOption } from '../../types/dropdown.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { hasAmKey, sameAmKey } from '../../utils/key.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+import { addAmOverlay, removeAmOverlay } from '../../utils/overlay.uts'
+
+// 下拉菜单的一项（= antdv-next-mobile 的 DropdownItem）：菜单栏上的一个标题 + 点开后在栏下方展开的面板。
+// title、options（label、value、disabled）、v-model:value、defaultValue、highlight、disabled、closeOnSelect、showFooter、
+// confirmText、resetText、arrowIcon、forceRender、destroyOnHidden 同名同义；
+// 事件 update:value、change（value, option）、confirm、reset、afterOpenChange；
+// 插槽 default（自定义面板，参数 close）、title、arrowIcon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 多一个 `itemKey`：组件里拿不到 vnode 的 key，不写时按顺序为 '0'、'1'……；
+// - title、选项的 label、confirmText / resetText 是文字，arrowIcon 是图标名；自定义内容用插槽；
+// - 写了默认插槽就不再渲染选项列表：要用 options 时不要写默认插槽；
+// - 面板是 fixed 的一层（没有 Teleport），rootClass 加在这一层上；面板的最大高度是菜单栏下方可用高度的 70%（算成像素）；
+// - Android 的返回键会先收起面板
+defineOptions({ name: 'AmDropdownItem' })
+
+const props = defineProps({
+	/** 这一项的 key（对应 am-dropdown 的 activeKey）；不写时按顺序为 '0'、'1'…… */
+	itemKey: { type: String, default: '' },
+	/** 菜单栏上的标题；空时显示已选选项的 label */
+	title: { type: String, default: '' },
+	options: { type: Array as PropType<AmDropdownOption[]>, default: () : AmDropdownOption[] => [] },
+	value: { type: [String, Number], default: '' },
+	defaultValue: { type: [String, Number], default: '' },
+	/** 高亮标题（比如已经应用了筛选条件） */
+	highlight: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	closeOnSelect: { type: Boolean, default: true },
+	/** 显示“重置 / 确定”页脚（自定义面板用） */
+	showFooter: { type: Boolean, default: false },
+	/** 确定按钮的文字，空为语言包的 Dropdown.confirm */
+	confirmText: { type: String, default: '' },
+	resetText: { type: String, default: '' },
+	/** 箭头的图标名，优先于 am-dropdown 的 arrowIcon */
+	arrowIcon: { type: String, default: '' },
+	forceRender: { type: Boolean, default: false },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'confirm', 'reset', 'afterOpenChange'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+
+const nextKey = inject<(() => string) | null>('amDropdownNextKey', null)
+const activeOf = inject<(() => string) | null>('amDropdownActive', null)
+const toggle = inject<((key : string) => void) | null>('amDropdownToggle', null)
+const closeAll = inject<(() => void) | null>('amDropdownClose', null)
+const barTopOf = inject<(() => number) | null>('amDropdownBarTop', null)
+const barBottomOf = inject<(() => number) | null>('amDropdownBarBottom', null)
+const maskClosableOf = inject<(() => boolean) | null>('amDropdownMaskClosable', null)
+const clickAwayOf = inject<(() => boolean) | null>('amDropdownClickAway', null)
+const parentArrowOf = inject<(() => string) | null>('amDropdownArrowIcon', null)
+const zIndexOf = inject<(() => number) | null>('amDropdownZIndex', null)
+
+/** 没有写 item-key 时的顺序号（只取一次） */
+const autoKey = nextKey != null ? nextKey() : '0'
+const key = computed(() : string => props.itemKey.length > 0 ? props.itemKey : autoKey)
+const open = computed(() : boolean => activeOf != null && activeOf() == key.value)
+
+/** 非受控时的值 */
+const inner = ref<any | null>(hasAmKey(props.defaultValue) ? props.defaultValue : null)
+const current = computed(() : any | null => hasAmKey(props.value) ? props.value : inner.value)
+
+const selectedOption = computed(() : AmDropdownOption | null => {
+	const value = current.value
+	if (value == null) return null
+	for (let i = 0; i < props.options.length; i++) {
+		if (sameAmKey(props.options[i].value, value)) return props.options[i]
+	}
+	return null
+})
+
+const titleText = computed(() : string => {
+	if (props.title.length > 0) return props.title
+	const option = selectedOption.value
+	return option == null ? '' : option.label
+})
+
+const active = computed(() : boolean => open.value || props.highlight)
+const arrowName = computed(() : string => {
+	if (props.arrowIcon.length > 0) return props.arrowIcon
+	const parent = parentArrowOf != null ? parentArrowOf() : ''
+	return parent.length > 0 ? parent : 'down'
+})
+const arrowColor = computed(() : string => active.value ? theme().colorPrimary : theme().colorTextQuaternary)
+const arrowStyle = computed(() : string => 'transform:rotate(' + (open.value ? 180 : 0) + 'deg);' + amTransition('transform', AM_DURATION_MID))
+const checkColor = computed(() : string => theme().colorPrimary)
+
+// 面板：打开时先渲染再加“展开”的样式，关闭时先去掉、等过渡结束再隐藏
+const rendered = ref(props.forceRender)
+const visible = ref(false)
+const shown = ref(false)
+let timer = 0
+let overlayId = 0
+
+function unregister() {
+	if (overlayId > 0) removeAmOverlay(overlayId)
+	overlayId = 0
+}
+
+function close() {
+	if (closeAll != null && open.value) closeAll()
+}
+
+watch(() : boolean => open.value, (value : boolean) => {
+	clearTimeout(timer)
+	unregister()
+	if (value) {
+		overlayId = addAmOverlay(() => { close() })
+		rendered.value = true
+		visible.value = true
+		// 先以收起的状态渲染一帧，再切到展开，过渡才会生效
+		timer = setTimeout(() => {
+			shown.value = true
+			timer = setTimeout(() => { emit('afterOpenChange', true) }, AM_DURATION_MID)
+		}, 20)
+	} else if (visible.value) {
+		shown.value = false
+		timer = setTimeout(() => {
+			visible.value = false
+			if (props.destroyOnHidden) rendered.value = false
+			emit('afterOpenChange', false)
+		}, AM_DURATION_MID + 20)
+	}
+}, { immediate: true })
+
+onUnmounted(() => {
+	clearTimeout(timer)
+	unregister()
+})
+
+const barBottom = computed(() : number => barBottomOf != null ? barBottomOf() : 0)
+const zIndex = computed(() : number => zIndexOf != null ? zIndexOf() : 1000)
+
+const layerStyle = computed(() : string => 'top:' + barBottom.value + 'px;z-index:' + zIndex.value + ';')
+/** 菜单栏上方的透明遮罩（closeOnClickAway） */
+const awayStyle = computed(() : string => 'height:' + (barTopOf != null ? barTopOf() : 0) + 'px;z-index:' + zIndex.value + ';')
+const awayVisible = computed(() : boolean => visible.value && clickAwayOf != null && clickAwayOf() && barTopOf != null && barTopOf() > 0)
+const maskStyle = computed(() : string => 'opacity:' + (shown.value ? 1 : 0) + ';')
+const panelStyle = computed(() : string => 'transform:translateY(' + (shown.value ? '0' : '-100%') + ');')
+// max-height 不支持百分比：按菜单栏下方的可用高度算成像素
+const bodyStyle = computed(() : string => {
+	const info = uni.getWindowInfo()
+	const available = info.windowHeight + info.windowTop - barBottom.value
+	return 'max-height:' + Math.max(120, Math.round(available * 0.7)) + 'px;'
+})
+
+function onTitle() {
+	if (props.disabled || toggle == null) return
+	toggle(key.value)
+}
+
+function onMask() {
+	if (maskClosableOf == null || maskClosableOf()) close()
+}
+
+function select(option : AmDropdownOption) {
+	if (option.disabled == true) return
+	if (!sameAmKey(option.value, current.value)) {
+		inner.value = option.value
+		emit('update:value', option.value)
+		emit('change', option.value, option)
+	}
+	if (props.closeOnSelect) close()
+}
+
+function onConfirm() {
+	emit('confirm')
+	close()
+}
+
+function onReset() {
+	emit('reset')
+}
+
+const confirmLabel = computed(() : string => props.confirmText.length > 0 ? props.confirmText : locale().Dropdown.confirm)
+const resetLabel = computed(() : string => props.resetText.length > 0 ? props.resetText : locale().Dropdown.reset)
+</script>
+
+<template>
+	<view :class="['am-dropdown-item', disabled ? 'am-dropdown-item--disabled' : '']" @click="onTitle">
+		<slot name="title">
+			<text :class="['am-dropdown-item__title', active ? 'am-dropdown-item__title--active' : '']">{{ titleText }}</text>
+		</slot>
+		<view class="am-dropdown-item__arrow" :style="arrowStyle">
+			<slot name="arrowIcon">
+				<am-icon :name="arrowName" :size="10" :color="arrowColor" />
+			</slot>
+		</view>
+	</view>
+	<view v-if="awayVisible" class="am-dropdown-item__away" :style="awayStyle" @click="close"></view>
+	<view v-if="rendered" v-show="visible" :class="['am-dropdown-item__layer', rootClass]" :style="layerStyle">
+		<view class="am-dropdown-item__mask" :style="maskStyle" @click="onMask"></view>
+		<view class="am-dropdown-item__panel" :style="panelStyle">
+			<scroll-view class="am-dropdown-item__body" direction="vertical" :style="bodyStyle">
+				<slot :close="close">
+					<view
+						v-for="(option, index) in options"
+						:key="index"
+						:class="['am-dropdown-item__option', option.disabled == true ? 'am-dropdown-item__option--disabled' : '']"
+						:hover-class="option.disabled == true ? 'none' : 'am-dropdown-item__option--hover'"
+						@click="select(option)"
+					>
+						<text :class="['am-dropdown-item__label', sameAmKey(option.value, current) ? 'am-dropdown-item__label--active' : '']">{{ option.label }}</text>
+						<am-icon v-if="sameAmKey(option.value, current)" name="check" :size="16" :color="checkColor" />
+					</view>
+				</slot>
+			</scroll-view>
+			<view v-if="showFooter" class="am-dropdown-item__footer">
+				<am-button class="am-dropdown-item__button" block :text="resetLabel" @click="onReset" />
+				<view class="am-dropdown-item__gap"></view>
+				<am-button class="am-dropdown-item__button" type="primary" block :text="confirmLabel" @click="onConfirm" />
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+/* 菜单栏上的标题：平分宽度 */
+.am-dropdown-item { flex: 1; flex-direction: row; align-items: center; justify-content: center; padding-left: 8px; padding-right: 8px; }
+.am-dropdown-item--disabled { opacity: 0.4; }
+.am-dropdown-item__title {
+	font-size: var(--am-font-size, 14px);
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-dropdown-item__title--active { color: var(--am-color-primary, #1677ff); }
+.am-dropdown-item__arrow { margin-left: 4px; }
+.am-dropdown-item__away { position: fixed; left: 0; right: 0; top: 0; }
+/* 面板层：从菜单栏的下边缘到屏幕底部，面板从上边缘滑下来（被这一层裁掉上面的部分） */
+.am-dropdown-item__layer { position: fixed; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.am-dropdown-item__mask {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+	transition-property: opacity;
+	transition-duration: 200ms;
+}
+.am-dropdown-item__panel {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	background-color: var(--am-color-bg-elevated, #ffffff);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+	transition-property: transform;
+	transition-duration: 200ms;
+	transition-timing-function: cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+.am-dropdown-item__option {
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	height: 48px;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-dropdown-item__option--hover { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-dropdown-item__option--disabled { opacity: 0.4; }
+.am-dropdown-item__label { flex: 1; font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-dropdown-item__label--active { color: var(--am-color-primary, #1677ff); }
+.am-dropdown-item__footer {
+	flex-direction: row;
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-dropdown-item__button { flex: 1; }
+.am-dropdown-item__gap { width: 12px; }
+</style>

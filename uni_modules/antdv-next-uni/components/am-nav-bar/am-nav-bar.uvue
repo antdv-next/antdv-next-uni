@@ -1,0 +1,149 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 导航栏（= antdv-next-mobile 的 NavBar）：title、subTitle、back（返回箭头旁的文字）、backIcon、left、right、
+// fixed、placeholder、safeArea、bordered、zIndex 同名同义；事件 back；
+// 插槽 default / title、subTitle、back、backIcon、left、right。
+// 用于 pages.json 里设置了 navigationStyle: custom 的页面；safeArea 时顶部留出状态栏的高度。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / subTitle / back / left / right 是文字，backIcon 是图标名（默认 left）；自定义内容用同名插槽；
+// - 没有 null / false：`back-icon=""` 只隐藏箭头；箭头和 back 文字都为空（且没有 back / backIcon 插槽）时隐藏整个返回区域；
+// - 只发出 back 事件，不自动返回（同移动端库）：在事件里调用 uni.navigateBack()
+defineOptions({ name: 'AmNavBar' })
+
+const props = defineProps({
+	title: { type: String, default: '' },
+	subTitle: { type: String, default: '' },
+	/** 返回箭头旁的文字 */
+	back: { type: String, default: '' },
+	/** 返回箭头的图标名；空字符串为不显示箭头 */
+	backIcon: { type: String, default: 'left' },
+	/** 左侧（返回区域之后）的文字 */
+	left: { type: String, default: '' },
+	/** 右侧的文字 */
+	right: { type: String, default: '' },
+	fixed: { type: Boolean, default: false },
+	/** 固定时在文档流中保留等高的占位 */
+	placeholder: { type: Boolean, default: false },
+	/** 顶部留出状态栏的高度 */
+	safeArea: { type: Boolean, default: false },
+	bordered: { type: Boolean, default: true },
+	zIndex: { type: Number, default: 100 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['back'])
+
+const theme = useAmTheme()
+const iconColor = computed(() : string => theme().colorText)
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-nav-bar']
+	if (props.fixed) list.push('am-nav-bar--fixed')
+	if (props.bordered) list.push('am-nav-bar--bordered')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+const rootStyle = computed(() : string => props.fixed ? 'z-index:' + props.zIndex + ';' : '')
+
+function onBack(event : UniPointerEvent) {
+	emit('back', event)
+}
+</script>
+
+<template>
+	<view v-if="fixed && placeholder" class="am-nav-bar__placeholder">
+		<view v-if="safeArea" class="am-nav-bar__status"></view>
+		<view class="am-nav-bar__placeholder-bar"></view>
+	</view>
+	<view :class="classes" :style="rootStyle">
+		<view v-if="safeArea" class="am-nav-bar__status"></view>
+		<view class="am-nav-bar__content">
+			<view class="am-nav-bar__title-box">
+				<slot>
+					<slot name="title">
+						<text v-if="title.length > 0" class="am-nav-bar__title">{{ title }}</text>
+					</slot>
+				</slot>
+				<slot name="subTitle">
+					<text v-if="subTitle.length > 0" class="am-nav-bar__sub-title">{{ subTitle }}</text>
+				</slot>
+			</view>
+			<view class="am-nav-bar__left">
+				<view
+					v-if="backIcon.length > 0 || back.length > 0 || $slots['back'] != null || $slots['backIcon'] != null"
+					class="am-nav-bar__back"
+					hover-class="am-nav-bar__back--active"
+					@click="onBack"
+				>
+					<slot name="backIcon">
+						<am-icon v-if="backIcon.length > 0" :name="backIcon" :size="20" :color="iconColor" />
+					</slot>
+					<slot name="back">
+						<text v-if="back.length > 0" class="am-nav-bar__text">{{ back }}</text>
+					</slot>
+				</view>
+				<slot name="left">
+					<text v-if="left.length > 0" class="am-nav-bar__text">{{ left }}</text>
+				</slot>
+			</view>
+			<view class="am-nav-bar__right">
+				<slot name="right">
+					<text v-if="right.length > 0" class="am-nav-bar__text">{{ right }}</text>
+				</slot>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-nav-bar { background-color: var(--am-color-bg-container, #ffffff); }
+.am-nav-bar--fixed { position: fixed; left: 0; right: 0; top: 0; }
+.am-nav-bar--bordered {
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-nav-bar__status { height: var(--status-bar-height, 0px); }
+.am-nav-bar__placeholder-bar { height: 46px; }
+.am-nav-bar__content { height: 46px; flex-direction: row; align-items: center; justify-content: center; }
+/* 标题居中，两侧各留出 96px 给左右区域 */
+.am-nav-bar__title-box { flex: 1; margin-left: 96px; margin-right: 96px; align-items: center; justify-content: center; }
+.am-nav-bar__title {
+	font-size: var(--am-font-size-lg, 16px);
+	font-weight: bold;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-nav-bar__sub-title {
+	font-size: var(--am-font-size-sm, 12px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-nav-bar__left {
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 46px;
+	flex-direction: row;
+	align-items: center;
+	padding-left: var(--am-padding-sm, 12px);
+}
+.am-nav-bar__back { height: 46px; flex-direction: row; align-items: center; margin-right: 8px; }
+.am-nav-bar__back--active { opacity: 0.6; }
+.am-nav-bar__right {
+	position: absolute;
+	right: 0;
+	top: 0;
+	height: 46px;
+	flex-direction: row;
+	align-items: center;
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-nav-bar__text { font-size: var(--am-font-size, 14px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

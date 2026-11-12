@@ -1,0 +1,122 @@
+<script setup lang="uts">
+const loading = ref(true)
+const clicks = ref(0)
+
+function toggle() {
+	loading.value = !loading.value
+}
+
+function onClick() {
+	clicks.value++
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__wrap">
+			<am-card title="卡片标题" extra="更多">
+				<text class="demo__text">卡片的内容写在默认插槽里。</text>
+				<text class="demo__text">默认带一圈细边框。</text>
+			</am-card>
+		</view>
+
+		<text class="demo__title">无边框（放在灰色背景上）</text>
+		<view class="demo__wrap">
+			<am-card title="无边框" :bordered="false">
+				<text class="demo__text">bordered 为 false，或 variant="borderless"。</text>
+			</am-card>
+		</view>
+
+		<text class="demo__title">小尺寸</text>
+		<view class="demo__wrap">
+			<am-card title="小卡片" extra="更多" size="small">
+				<text class="demo__text">头部与内边距都小一号。</text>
+			</am-card>
+		</view>
+
+		<text class="demo__title">只有内容</text>
+		<view class="demo__wrap">
+			<am-card>
+				<text class="demo__text">没有标题时不显示头部。</text>
+			</am-card>
+		</view>
+
+		<text class="demo__title">封面、页脚与操作</text>
+		<view class="demo__wrap">
+			<am-card cover="/static/logo.png" footer="页脚：补充说明的文字">
+				<text class="demo__heading">Antdv Next Uni</text>
+				<text class="demo__desc">uni-app x 组件库</text>
+				<template #actions>
+					<view class="demo__action"><am-icon name="setting" :size="18" color="rgba(0, 0, 0, 0.45)" /></view>
+					<view class="demo__action"><am-icon name="edit" :size="18" color="rgba(0, 0, 0, 0.45)" /></view>
+					<view class="demo__action"><am-icon name="more" :size="18" color="rgba(0, 0, 0, 0.45)" /></view>
+				</template>
+			</am-card>
+		</view>
+
+		<text class="demo__title">自定义头部（title / extra 插槽）</text>
+		<view class="demo__wrap">
+			<am-card>
+				<template #title>
+					<am-icon name="fire" :size="18" color="#ff4d4f" />
+					<text class="demo__heading demo__heading--gap">热门</text>
+				</template>
+				<template #extra>
+					<am-button type="link" size="small" text="查看全部" />
+				</template>
+				<text class="demo__text">标题和右上角都可以放自定义内容。</text>
+			</am-card>
+		</view>
+
+		<text class="demo__title">加载中</text>
+		<view class="demo__wrap">
+			<am-card title="加载中" :loading="loading">
+				<text class="demo__text">加载完成后显示的内容。</text>
+			</am-card>
+			<am-button class="demo__button" size="small" :text="loading ? '加载完成' : '重新加载'" @click="toggle" />
+		</view>
+
+		<text class="demo__title">可点击（点击了 {{ clicks }} 次）</text>
+		<view class="demo__wrap">
+			<am-card title="可点击的卡片" clickable @click="onClick">
+				<text class="demo__text">按下时整张卡片有反馈。</text>
+			</am-card>
+		</view>
+
+		<text class="demo__title">内嵌卡片（type="inner"）</text>
+		<view class="demo__wrap">
+			<am-card title="外层卡片">
+				<am-card type="inner" title="内嵌卡片" extra="更多" root-class="demo__inner">
+					<text class="demo__text">内嵌卡片的头部带浅色底。</text>
+				</am-card>
+				<am-card type="inner" title="内嵌卡片">
+					<text class="demo__text">第二张。</text>
+				</am-card>
+			</am-card>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__wrap { margin: 0 12px; }
+.demo__heading { font-size: 16px; font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__heading--gap { margin-left: 6px; }
+.demo__desc { margin-top: 4px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__action { flex: 1; height: 44px; align-items: center; justify-content: center; }
+.demo__button { margin-top: 12px; }
+.demo__inner { margin-bottom: 12px; }
+</style>

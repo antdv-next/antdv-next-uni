@@ -1,0 +1,69 @@
+<script setup lang="uts">
+import { AmSegmentedOption } from '@/uni_modules/antdv-next-uni/types/segmented.uts'
+
+const periods : string[] = ['日', '周', '月', '年']
+const views : AmSegmentedOption[] = [
+	{ label: '列表', value: 'list', icon: 'order' },
+	{ label: '宫格', value: 'grid', icon: 'appstore' },
+	{ label: '地图', value: 'map', icon: 'location', disabled: true }
+]
+const numbers : number[] = [1, 2, 3]
+
+const period = ref('周')
+const view = ref('list')
+const level = ref(2)
+const size = ref('middle')
+const log = ref('')
+
+function onChange(value : any) {
+	log.value = 'change: ' + value
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-segmented v-model:value="period" :options="periods" @change="onChange" />
+			<text class="demo__hint">value = {{ period }}　{{ log }}</text>
+		</view>
+
+		<text class="demo__title">撑满宽度</text>
+		<view class="demo__card">
+			<am-segmented v-model:value="period" :options="periods" block />
+		</view>
+
+		<text class="demo__title">图标与禁用项</text>
+		<view class="demo__card">
+			<am-segmented v-model:value="view" :options="views" />
+		</view>
+
+		<text class="demo__title">数字的值、非受控（defaultValue）</text>
+		<view class="demo__card">
+			<am-segmented v-model:value="level" :options="numbers" />
+			<am-segmented class="demo__gap" :options="periods" default-value="月" />
+		</view>
+
+		<text class="demo__title">尺寸与形状</text>
+		<view class="demo__card">
+			<am-segmented v-model:value="size" :options="['small', 'middle', 'large']" />
+			<am-segmented class="demo__gap" v-model:value="period" :options="periods" :size="size" />
+			<am-segmented class="demo__gap" v-model:value="period" :options="periods" :size="size" shape="round" />
+		</view>
+
+		<text class="demo__title">竖向与禁用</text>
+		<view class="demo__card">
+			<am-segmented v-model:value="period" :options="periods" vertical />
+			<am-segmented class="demo__gap" v-model:value="period" :options="periods" disabled />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card { margin: 0 12px; padding: 16px; background-color: var(--am-color-bg-container, #ffffff); border-radius: 12px; }
+.demo__hint { margin-top: 12px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__gap { margin-top: 12px; }
+.demo__footer { height: 40px; }
+</style>

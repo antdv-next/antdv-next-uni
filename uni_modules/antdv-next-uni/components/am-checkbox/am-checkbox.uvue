@@ -1,0 +1,148 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { includesValue } from '../../utils/value.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+
+// 复选框（= antdv-next-mobile 的 Checkbox）：v-model:checked、indeterminate、disabled、value（在 <am-checkbox-group> 里用）、
+// block（整行：文字在前、方框在后）、shape（square / round）、icon 同名同义；事件 update:checked、change、click；
+// 插槽 default（文字处的自定义内容）、icon（参数 checked、indeterminate、disabled）。
+// 放在 <am-checkbox-group> 里时，选中与否由组的 value 决定，点击交给组处理。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `label` 属性（多出的属性）：uvue 的样式不继承，默认插槽里的文字拿不到字号与颜色；
+// - `icon` 是图标名（勾的图标，默认 check），不是渲染函数；
+// - change 的参数是选中与否（布尔），不是事件对象；
+// - `checked` 只有布尔值：没有 checkedValue / unCheckedValue、defaultChecked；
+// - 没有原生 input：没有 name、id、title、tabIndex、autoFocus、required、skipGroup，没有 focus / blur 事件。
+//
+// 选中时底色、边框过渡，勾缩放出现：要过渡的值写在内联 style 上（Android 上只切换类名不会过渡）
+defineOptions({ name: 'AmCheckbox' })
+
+const props = defineProps({
+	checked: { type: Boolean, default: false },
+	indeterminate: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	/** 在 <am-checkbox-group> 里代表的值 */
+	value: { type: [String, Number, Boolean] as PropType<any | null>, default: null },
+	block: { type: Boolean, default: false },
+	shape: { type: String, default: '' },
+	/** 勾的图标名 */
+	icon: { type: String, default: 'check' },
+	/** 文字 */
+	label: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:checked', 'change', 'click'])
+
+const theme = useAmTheme()
+const notifyChange = useAmFieldChange()
+
+// ---------- 所在的多选组 ----------
+const groupValue = inject<(() => any[]) | null>('amCheckboxGroupValue', null)
+const groupToggle = inject<((value : any | null) => void) | null>('amCheckboxGroupToggle', null)
+const groupDisabled = inject<(() => boolean) | null>('amCheckboxGroupDisabled', null)
+const groupFull = inject<(() => boolean) | null>('amCheckboxGroupFull', null)
+const groupShape = inject<(() => string) | null>('amCheckboxGroupShape', null)
+const groupBlock = inject<(() => boolean) | null>('amCheckboxGroupBlock', null)
+const inGroup = groupValue != null
+
+const checked = computed(() : boolean => groupValue != null ? includesValue(groupValue(), props.value) : props.checked)
+
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => {
+	if (disabledOf()) return true
+	if (groupDisabled != null && groupDisabled()) return true
+	// 组里已经选满（max）时，没选中的不能再选
+	return groupFull != null && groupFull() && !checked.value
+})
+
+const shape = computed(() : string => {
+	if (props.shape.length > 0) return props.shape
+	const fromGroup = groupShape != null ? groupShape() : ''
+	return fromGroup.length > 0 ? fromGroup : 'square'
+})
+const block = computed(() : boolean => props.block || (groupBlock != null && groupBlock()))
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-checkbox']
+	if (block.value) list.push('am-checkbox--block')
+	else if (inGroup) list.push('am-checkbox--in-group')
+	if (disabled.value) list.push('am-checkbox--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const markStyle = computed(() : string => {
+	const current = theme()
+	const on = checked.value || props.indeterminate
+	return 'border-color:' + (on ? current.colorPrimary : current.colorBorder) + ';background-color:' + (on ? current.colorPrimary : current.colorBgContainer) + ';' +
+		amTransition('background-color, border-color', AM_DURATION_MID)
+})
+const iconStyle = computed(() : string => 'transform:scale(' + (checked.value ? 1 : 0.3) + ');opacity:' + (checked.value ? 1 : 0) + ';' + amTransition('transform, opacity', AM_DURATION_MID))
+const barStyle = computed(() : string => 'transform:scaleX(' + (!checked.value && props.indeterminate ? 1 : 0) + ');' + amTransition('transform', AM_DURATION_MID))
+const iconColor = computed(() : string => theme().colorTextLightSolid)
+
+function onClick(event : UniPointerEvent) {
+	emit('click', event)
+	if (disabled.value) return
+	if (groupToggle != null) {
+		groupToggle(props.value)
+		return
+	}
+	const next = !checked.value
+	emit('update:checked', next)
+	emit('change', next)
+	notifyChange()
+}
+</script>
+
+<template>
+	<view :class="classes" @click="onClick">
+		<slot name="icon" :checked="checked" :indeterminate="indeterminate" :disabled="disabled">
+			<view :class="['am-checkbox__mark', 'am-checkbox__mark--' + shape]" :style="markStyle">
+				<!-- 勾与半选的横线一直在，按状态缩放出现（App 端没有 @keyframes，用 transform 的过渡） -->
+				<view class="am-checkbox__icon" :style="iconStyle">
+					<am-icon :name="icon" :size="14" :color="iconColor" />
+				</view>
+				<view class="am-checkbox__bar" :style="barStyle"></view>
+			</view>
+		</slot>
+		<!-- 整行（block）时根节点是 row-reverse：文字在前、方框在后 -->
+		<view :class="['am-checkbox__body', block ? 'am-checkbox__body--block' : '']">
+			<text v-if="label.length > 0" :class="['am-checkbox__label', block ? '' : 'am-checkbox__label--inline']">{{ label }}</text>
+			<slot></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-checkbox { flex-direction: row; align-items: center; height: 32px; }
+/* 横排的组里：选项之间的间距（没有 gap，写在每一项的右边） */
+.am-checkbox--in-group { margin-right: var(--am-padding, 16px); }
+.am-checkbox--block { flex-direction: row-reverse; height: 48px; }
+.am-checkbox--disabled { opacity: 0.4; }
+.am-checkbox__mark {
+	width: 20px;
+	height: 20px;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	align-items: center;
+	justify-content: center;
+}
+.am-checkbox__mark--square {
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-checkbox__mark--round { border-radius: 10px; }
+.am-checkbox__icon { position: absolute; }
+.am-checkbox__bar { position: absolute; width: 10px; height: 2px; border-radius: 1px; background-color: var(--am-color-text-light-solid, #ffffff); }
+.am-checkbox__label { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-checkbox__label--inline { margin-left: var(--am-padding-xs, 8px); }
+.am-checkbox__body { flex-direction: row; align-items: center; }
+.am-checkbox__body--block { flex: 1; }
+</style>

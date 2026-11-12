@@ -1,0 +1,9 @@
+// am-swipe-action 的 leftActions / rightActions 项（= antdv-next-mobile 的 SwipeActionItem）。
+// 没有 onClick（UTS 的类型里不放函数）：用 action 事件
+
+export type AmSwipeActionItem = {
+	key : string
+	text ?: string | null
+	/** 预设色 primary / danger / warning / success / default，或任意颜色值（作为背景色） */
+	color ?: string | null
+}

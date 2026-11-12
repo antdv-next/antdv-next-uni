@@ -1,0 +1,94 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+
+// 可选中的标签（= antdv-next-mobile 的 CheckableTag）：v-model:checked、defaultChecked、icon、disabled、
+// size（small / middle / large）、round 同名同义；事件 update:checked、change、click；插槽 default、icon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `text` 属性：uvue 的样式不继承，默认插槽里的文字拿不到标签的颜色与字号（插槽仍可放自定义内容）；
+// - `icon` 是图标名（<am-icon> 的 name），自定义内容用 icon 插槽；
+// - 属性没有 undefined，分不出“受控”与“非受控”：点击后自己先切换并发出事件，`checked` 变化时再跟随它
+defineOptions({ name: 'AmCheckableTag' })
+
+const props = defineProps({
+	checked: { type: Boolean, default: false },
+	defaultChecked: { type: Boolean, default: false },
+	icon: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	round: { type: Boolean, default: false },
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:checked', 'change', 'click'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const checked = ref(props.checked || props.defaultChecked)
+watch(() : boolean => props.checked, (value : boolean) => { checked.value = value })
+
+// 选中态的颜色写在 style 上：Android 上只切换类名时没有过渡
+const style = computed(() : string => 'background-color:' + (checked.value ? theme().colorPrimary : theme().colorFillTertiary) + ';')
+const contentColor = computed(() : string => checked.value ? theme().colorTextLightSolid : theme().colorText)
+const textStyle = computed(() : string => 'color:' + contentColor.value + ';')
+const iconSize = computed(() : number => size.value == 'small' ? 12 : (size.value == 'large' ? 16 : 14))
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-checkable-tag', 'am-checkable-tag--' + size.value]
+	if (props.round) list.push('am-checkable-tag--round')
+	if (disabled.value) list.push('am-checkable-tag--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const hoverClass = computed(() : string => disabled.value ? 'none' : 'am-checkable-tag--active')
+
+function onClick(event : UniPointerEvent) {
+	if (disabled.value) return
+	checked.value = !checked.value
+	emit('update:checked', checked.value)
+	emit('change', checked.value)
+	emit('click', event)
+}
+</script>
+
+<template>
+	<view :class="classes" :style="style" :hover-class="hoverClass" @click="onClick">
+		<slot v-if="$slots['icon'] != null" name="icon"></slot>
+		<am-icon v-else-if="icon.length > 0" :name="icon" :size="iconSize" :color="contentColor" class="am-checkable-tag__icon" />
+		<text v-if="text.length > 0" :class="['am-checkable-tag__text', 'am-checkable-tag__text--' + size]" :style="textStyle">{{ text }}</text>
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-checkable-tag {
+	flex-direction: row;
+	align-items: center;
+	align-self: flex-start;
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+	transition-property: background-color, opacity;
+	transition-duration: 200ms;
+}
+.am-checkable-tag--middle { height: 28px; padding-left: var(--am-padding-sm, 12px); padding-right: var(--am-padding-sm, 12px); }
+.am-checkable-tag--small { height: 22px; padding-left: var(--am-padding-xs, 8px); padding-right: var(--am-padding-xs, 8px); }
+.am-checkable-tag--large { height: 34px; padding-left: var(--am-padding, 16px); padding-right: var(--am-padding, 16px); }
+.am-checkable-tag--round { border-radius: 999px; }
+.am-checkable-tag--active { opacity: 0.7; }
+.am-checkable-tag--disabled { opacity: 0.4; }
+.am-checkable-tag__icon { margin-right: 4px; }
+.am-checkable-tag__text { white-space: nowrap; }
+.am-checkable-tag__text--middle { font-size: var(--am-font-size, 14px); }
+.am-checkable-tag__text--small { font-size: var(--am-font-size-sm, 12px); }
+.am-checkable-tag__text--large { font-size: var(--am-font-size-lg, 16px); }
+</style>

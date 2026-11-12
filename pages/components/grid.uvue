@@ -1,0 +1,105 @@
+<script setup lang="uts">
+const justifies : string[] = ['start', 'center', 'end', 'space-between', 'space-around', 'space-evenly']
+const cells : number[] = [1, 2, 3, 4, 5, 6]
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础栅格（24 份）</text>
+		<view class="demo__card">
+			<am-row root-class="demo__line">
+				<am-col :span="24"><view class="demo__cell"><text class="demo__cell-text">24</text></view></am-col>
+			</am-row>
+			<am-row root-class="demo__line">
+				<am-col :span="12"><view class="demo__cell"><text class="demo__cell-text">12</text></view></am-col>
+				<am-col :span="12"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">12</text></view></am-col>
+			</am-row>
+			<am-row root-class="demo__line">
+				<am-col :span="8"><view class="demo__cell"><text class="demo__cell-text">8</text></view></am-col>
+				<am-col :span="8"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">8</text></view></am-col>
+				<am-col :span="8"><view class="demo__cell"><text class="demo__cell-text">8</text></view></am-col>
+			</am-row>
+			<am-row>
+				<am-col :span="6"><view class="demo__cell"><text class="demo__cell-text">6</text></view></am-col>
+				<am-col :span="6"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">6</text></view></am-col>
+				<am-col :span="6"><view class="demo__cell"><text class="demo__cell-text">6</text></view></am-col>
+				<am-col :span="6"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">6</text></view></am-col>
+			</am-row>
+		</view>
+
+		<text class="demo__title">间距（gutter / verticalGutter）</text>
+		<view class="demo__card">
+			<am-row :gutter="12" :vertical-gutter="12">
+				<am-col v-for="n in cells" :key="n" :span="8"><view class="demo__cell"><text class="demo__cell-text">{{ n }}</text></view></am-col>
+			</am-row>
+		</view>
+
+		<text class="demo__title">偏移（offset）与移动（push / pull）</text>
+		<view class="demo__card">
+			<am-row root-class="demo__line">
+				<am-col :span="8"><view class="demo__cell"><text class="demo__cell-text">8</text></view></am-col>
+				<am-col :span="8" :offset="8"><view class="demo__cell"><text class="demo__cell-text">8 offset 8</text></view></am-col>
+			</am-row>
+			<am-row>
+				<am-col :span="16" :push="8"><view class="demo__cell"><text class="demo__cell-text">16 push 8</text></view></am-col>
+				<am-col :span="8" :pull="16"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">8 pull 16</text></view></am-col>
+			</am-row>
+		</view>
+
+		<text class="demo__title">水平排列（justify）</text>
+		<view class="demo__card">
+			<view v-for="item in justifies" :key="item">
+				<text class="demo__text">{{ item }}</text>
+				<am-row :justify="item" root-class="demo__line demo__stage">
+					<am-col :span="5"><view class="demo__cell"><text class="demo__cell-text">5</text></view></am-col>
+					<am-col :span="5"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">5</text></view></am-col>
+					<am-col :span="5"><view class="demo__cell"><text class="demo__cell-text">5</text></view></am-col>
+				</am-row>
+			</view>
+		</view>
+
+		<text class="demo__title">垂直对齐（align）</text>
+		<view class="demo__card">
+			<am-row align="middle" root-class="demo__stage">
+				<am-col :span="8"><view class="demo__cell demo__cell--tall"><text class="demo__cell-text">middle</text></view></am-col>
+				<am-col :span="8"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">8</text></view></am-col>
+				<am-col :span="8"><view class="demo__cell demo__cell--taller"><text class="demo__cell-text">8</text></view></am-col>
+			</am-row>
+		</view>
+
+		<text class="demo__title">弹性宽度（flex）</text>
+		<view class="demo__card">
+			<am-row root-class="demo__line" :wrap="false">
+				<am-col flex="100px"><view class="demo__cell"><text class="demo__cell-text">100px</text></view></am-col>
+				<am-col flex="auto"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">auto</text></view></am-col>
+			</am-row>
+			<am-row :wrap="false">
+				<am-col flex="2"><view class="demo__cell"><text class="demo__cell-text">2</text></view></am-col>
+				<am-col flex="3"><view class="demo__cell demo__cell--light"><text class="demo__cell-text">3</text></view></am-col>
+			</am-row>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__line { margin-bottom: 12px; }
+.demo__stage { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.demo__cell { height: 36px; align-items: center; justify-content: center; background-color: var(--am-color-primary, #1677ff); }
+.demo__cell--light { background-color: var(--am-color-primary-hover, #4592ff); }
+.demo__cell--tall { height: 56px; }
+.demo__cell--taller { height: 72px; }
+.demo__cell-text { font-size: 13px; color: #ffffff; }
+</style>

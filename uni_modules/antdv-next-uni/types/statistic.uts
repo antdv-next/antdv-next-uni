@@ -1,0 +1,16 @@
+// Statistic / StatisticTimer 的类型（= antdv-next-mobile statistic/interface.ts）
+
+/** 计时器 `formatter` 插槽里的 time（= StatisticTimeData） */
+export type AmStatisticTimeData = {
+	days : number
+	hours : number
+	minutes : number
+	seconds : number
+	milliseconds : number
+}
+
+/** 数值拆成整数部分（带千分位、负号）与小数部分（带小数点） */
+export type AmStatisticNumber = {
+	int : string
+	decimal : string
+}

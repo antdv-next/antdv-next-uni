@@ -1,0 +1,82 @@
+<script setup lang="uts">
+import { AmStepsItem } from '@/uni_modules/antdv-next-uni/types/steps.uts'
+
+const items : AmStepsItem[] = [
+	{ title: '填写信息' },
+	{ title: '提交审核' },
+	{ title: '完成' }
+]
+const detailed : AmStepsItem[] = [
+	{ title: '已下单', subTitle: '09:30', content: '订单已提交，等待商家接单' },
+	{ title: '配送中', subTitle: '10:12', content: '骑手正在赶往你的位置' },
+	{ title: '已送达', content: '感谢使用，欢迎再次下单' }
+]
+const withIcons : AmStepsItem[] = [
+	{ title: '登录', icon: 'user' },
+	{ title: '支付', icon: 'wallet' },
+	{ title: '完成', icon: 'success' }
+]
+
+const current = ref(1)
+const clickCurrent = ref(0)
+
+function next() {
+	current.value = current.value >= 2 ? 0 : current.value + 1
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-steps :current="current" :items="items" />
+			<am-button class="demo__button" block text="下一步" @click="next" />
+		</view>
+
+		<text class="demo__title">标题在图标右侧</text>
+		<view class="demo__card">
+			<am-steps :current="current" :items="items" title-placement="horizontal" size="small" />
+		</view>
+
+		<text class="demo__title">错误状态</text>
+		<view class="demo__card">
+			<am-steps :current="1" status="error" :items="items" />
+		</view>
+
+		<text class="demo__title">点状步骤条</text>
+		<view class="demo__card">
+			<am-steps :current="current" :items="items" type="dot" />
+		</view>
+
+		<text class="demo__title">自定义图标</text>
+		<view class="demo__card">
+			<am-steps :current="current" :items="withIcons" />
+		</view>
+
+		<text class="demo__title">可点击（clickable + v-model:current）</text>
+		<view class="demo__card">
+			<am-steps v-model:current="clickCurrent" :items="items" clickable />
+			<text class="demo__hint">current = {{ clickCurrent }}</text>
+		</view>
+
+		<text class="demo__title">竖向</text>
+		<view class="demo__card">
+			<am-steps :current="current" :items="detailed" orientation="vertical" />
+		</view>
+
+		<text class="demo__title">竖向点状、起始序号</text>
+		<view class="demo__card">
+			<am-steps :current="current" :items="detailed" orientation="vertical" type="dot" />
+			<am-steps :current="4" :initial="3" :items="items" size="small" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card { margin: 0 12px; padding: 16px; background-color: var(--am-color-bg-container, #ffffff); border-radius: 12px; }
+.demo__button { margin-top: 16px; }
+.demo__hint { margin-top: 12px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+</style>

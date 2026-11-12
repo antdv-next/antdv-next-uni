@@ -1,0 +1,164 @@
+<script setup lang="uts">
+import { mixColor, useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+
+// 标签（= antdv-next-mobile 的 Tag）：color（预设色名、状态色 success / processing / error / warning / default 或颜色值）、
+// variant（filled / solid / outlined）、bordered、closable、closeIcon、icon、disabled、size（small / middle / large）、
+// round 同名同义；事件 close；插槽 default、icon、closeIcon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `text` 属性：uvue 的样式不继承，默认插槽里的文字拿不到标签的颜色与字号（插槽仍可放自定义内容）；
+// - `icon` / `closeIcon` 是图标名（<am-icon> 的 name），自定义内容用同名插槽；`closable` 只有布尔值；
+// - 点了关闭只发出 close，标签不会自己消失（事件对象上拿不到 defaultPrevented）：在 close 里用 v-if 去掉它；
+// - 多出 click 事件（组件上没声明的事件不会落到根节点）；没有 href / target；
+// - 颜色值要写成十六进制（#rgb / #rrggbb）：浅底、边框的颜色在 UTS 里按 antdv-next-mobile 的比例混出来（App 端没有 color-mix()）
+defineOptions({ name: 'AmTag' })
+
+const props = defineProps({
+	color: { type: String, default: '' },
+	variant: { type: String, default: 'filled' },
+	bordered: { type: Boolean, default: true },
+	closable: { type: Boolean, default: false },
+	closeIcon: { type: String, default: 'close' },
+	icon: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	round: { type: Boolean, default: false },
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['close', 'click'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+// 预设色：与 antdv-next-mobile 的 tag/style 相同（gold / yellow / lime 比色板深一档，浅底上的字才看得清）
+const PRESETS = new Map<string, string>([
+	['pink', '#eb2f96'], ['magenta', '#eb2f96'], ['red', '#f5222d'], ['volcano', '#fa541c'], ['orange', '#fa8c16'],
+	['gold', '#d48806'], ['yellow', '#d4b106'], ['lime', '#7cb305'], ['green', '#52c41a'], ['cyan', '#13c2c2'],
+	['blue', '#1677ff'], ['geekblue', '#2f54eb'], ['purple', '#722ed1']
+])
+
+/** 标签的主色；没有颜色（或 default）时为空 */
+const mainColor = computed(() : string => {
+	const color = props.color
+	if (color.length == 0 || color == 'default') return ''
+	const current = theme()
+	if (color == 'success') return current.colorSuccess
+	if (color == 'processing') return current.colorInfo
+	if (color == 'error') return current.colorError
+	if (color == 'warning') return current.colorWarning
+	return PRESETS.get(color) ?? color
+})
+
+/** 文字、图标的颜色 */
+const contentColor = computed(() : string => {
+	const current = theme()
+	const color = mainColor.value
+	if (props.variant == 'solid') return color.length > 0 ? current.colorTextLightSolid : current.colorBgContainer
+	return color.length > 0 ? color : current.colorText
+})
+
+const style = computed(() : string => {
+	const current = theme()
+	const color = mainColor.value
+	let background = ''
+	let border = 'transparent'
+	if (props.variant == 'solid') {
+		background = color.length > 0 ? color : current.colorText
+	} else if (props.variant == 'outlined') {
+		background = color.length > 0 ? mixColor(color, 6, current.colorBgContainer) : current.colorBgContainer
+		if (props.bordered) border = color.length > 0 ? mixColor(color, 45, current.colorBgContainer) : current.colorBorder
+	} else {
+		background = color.length > 0 ? mixColor(color, 10, current.colorBgContainer) : current.colorFillSecondary
+	}
+	return 'background-color:' + background + ';border-color:' + border + ';'
+})
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-tag', 'am-tag--' + size.value]
+	if (props.round) list.push(size.value == 'small' ? 'am-tag--round-small' : 'am-tag--round')
+	if (disabled.value) list.push('am-tag--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const textStyle = computed(() : string => 'color:' + contentColor.value + ';')
+const iconSize = computed(() : number => size.value == 'small' ? 10 : (size.value == 'large' ? 14 : 12))
+
+function onClick(event : UniPointerEvent) {
+	if (!disabled.value) emit('click', event)
+}
+
+function onClose(event : UniPointerEvent) {
+	event.stopPropagation()
+	if (!disabled.value) emit('close', event)
+}
+</script>
+
+<template>
+	<view :class="classes" :style="style" @click="onClick">
+		<slot v-if="$slots['icon'] != null" name="icon"></slot>
+		<am-icon v-else-if="icon.length > 0" :name="icon" :size="iconSize" :color="contentColor" class="am-tag__icon" />
+		<text v-if="text.length > 0" :class="['am-tag__text', 'am-tag__text--' + size]" :style="textStyle">{{ text }}</text>
+		<slot></slot>
+		<view v-if="closable" class="am-tag__close" @click="onClose">
+			<slot name="closeIcon">
+				<am-icon :name="closeIcon" :size="iconSize - 2" :color="contentColor" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-tag {
+	flex-direction: row;
+	align-items: center;
+	align-self: flex-start;
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06));
+}
+.am-tag--middle {
+	height: 22px;
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-tag--small {
+	height: 18px;
+	padding-left: var(--am-padding-xxs, 4px);
+	padding-right: var(--am-padding-xxs, 4px);
+	border-top-left-radius: var(--am-border-radius-xs, 2px);
+	border-top-right-radius: var(--am-border-radius-xs, 2px);
+	border-bottom-left-radius: var(--am-border-radius-xs, 2px);
+	border-bottom-right-radius: var(--am-border-radius-xs, 2px);
+}
+.am-tag--large {
+	height: 28px;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-tag--round { padding-left: 10px; padding-right: 10px; border-radius: 999px; }
+.am-tag--round-small { border-radius: 999px; }
+.am-tag--disabled { opacity: 0.4; }
+.am-tag__icon { margin-right: 4px; }
+.am-tag__text { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); white-space: nowrap; }
+.am-tag__text--middle { font-size: var(--am-font-size-sm, 12px); }
+.am-tag__text--small { font-size: 10px; }
+.am-tag__text--large { font-size: var(--am-font-size, 14px); }
+/* 内边距放大点击范围 */
+.am-tag__close { margin-left: 2px; margin-right: -4px; padding: 4px; opacity: 0.65; }
+</style>

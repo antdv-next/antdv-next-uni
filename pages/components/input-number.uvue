@@ -1,0 +1,103 @@
+<script setup lang="uts">
+const count = ref<number | null>(1)
+const price = ref<number | null>(9.9)
+const amount = ref<number | null>(null)
+const temperature = ref<number | null>(-5)
+const stepInfo = ref('')
+
+function onStep(value : number, info : UTSJSONObject) {
+	stepInfo.value = 'step：' + value + '，' + (JSON.stringify(info) ?? '')
+}
+
+function text(value : number | null) : string {
+	return value == null ? 'null' : '' + value
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（spinner：两侧的 − / + 按钮）</text>
+		<view class="demo__card">
+			<am-input-number v-model:value="count" :min="1" :max="10" @step="onStep" />
+			<text class="demo__hint">当前值：{{ text(count) }}（1 ~ 10）</text>
+			<text class="demo__hint">{{ stepInfo }}</text>
+		</view>
+
+		<text class="demo__title">步长与小数位</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<text class="demo__label">step 0.1</text>
+				<am-input-number v-model:value="price" :min="0" :step="0.1" :precision="1" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">可以为负</text>
+				<am-input-number v-model:value="temperature" :min="-20" :max="40" :step="5" suffix="℃" />
+			</view>
+			<text class="demo__hint">{{ text(price) }} / {{ text(temperature) }}</text>
+		</view>
+
+		<text class="demo__title">mode="input"：普通的数字输入框</text>
+		<view class="demo__card">
+			<am-input-number class="demo__block" v-model:value="amount" mode="input" :min="0" :precision="2" prefix="¥" placeholder="0.00" />
+			<am-input-number class="demo__block" v-model:value="amount" mode="input" variant="filled" :min="0" suffix="元" placeholder="filled" />
+			<am-input-number v-model:value="amount" mode="input" variant="underlined" :min="0" placeholder="underlined" />
+			<text class="demo__hint">当前值：{{ text(amount) }}（清空为 null，失焦时按 min / precision 修正）</text>
+		</view>
+
+		<text class="demo__title">尺寸</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<text class="demo__label">large</text>
+				<am-input-number v-model:value="count" size="large" :min="1" :max="10" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">middle</text>
+				<am-input-number v-model:value="count" :min="1" :max="10" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">small</text>
+				<am-input-number v-model:value="count" size="small" :min="1" :max="10" />
+			</view>
+		</view>
+
+		<text class="demo__title">变体与状态</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<text class="demo__label">filled</text>
+				<am-input-number v-model:value="count" variant="filled" :min="1" :max="10" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">error</text>
+				<am-input-number v-model:value="count" status="error" :min="1" :max="10" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">没有按钮</text>
+				<am-input-number v-model:value="count" :controls="false" :min="1" :max="10" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">readOnly</text>
+				<am-input-number v-model:value="count" read-only />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">disabled</text>
+				<am-input-number v-model:value="count" disabled />
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__row { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.demo__label { width: 96px; font-size: 14px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__footer { height: 40px; }
+</style>

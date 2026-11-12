@@ -1,0 +1,408 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
+
+// 数字输入框（= antdv-next-mobile 的 InputNumber）：v-model:value（数字，清空为 null）、min、max、step、precision、
+// disabled、readOnly、controls、mode（spinner：两侧 − / + 按钮，默认；input：普通的数字输入框）、changeOnBlur、
+// prefix、suffix、status、size、variant、placeholder、autofocus、name、id 同名同义；
+// 事件 update:value、change、input（输入中的文字）、step（值、{ offset, type: 'up' | 'down', emitter }）、pressEnter、
+// focus、blur；方法 focus()、blur()；插槽 prefix、suffix、upIcon、downIcon。
+// 输入过程中不打断，失焦时按 min / max / precision 修正。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 值只有数字（没有 stringMode）；min / max 不写时为 ∓9007199254740991（即不限）；precision 为 -1 表示不限；
+// - `controls` 只有布尔值，按钮的图标用 upIcon / downIcon 插槽换；prefix / suffix 是字符串（图标名或文字）；
+// - 没有 formatter / parser（函数属性）、longPress（按住连续加减）、keyboard、inputmode（min 小于 0 时用文本键盘，
+//   否则用带小数点的数字键盘）、defaultValue（用 v-model:value）、readonly（只保留 readOnly）
+defineOptions({ name: 'AmInputNumber' })
+
+const props = defineProps({
+	value: { type: Number as PropType<number | null>, default: null },
+	min: { type: Number, default: -9007199254740991 },
+	max: { type: Number, default: 9007199254740991 },
+	step: { type: Number, default: 1 },
+	/** 小数位数；-1 为不限 */
+	precision: { type: Number, default: -1 },
+	disabled: { type: Boolean, default: false },
+	readOnly: { type: Boolean, default: false },
+	/** 是否显示 − / + 按钮（mode 为 spinner 时） */
+	controls: { type: Boolean, default: true },
+	mode: { type: String, default: 'spinner' },
+	/** 失焦时按 min / max / precision 修正输入的值 */
+	changeOnBlur: { type: Boolean, default: true },
+	prefix: { type: String, default: '' },
+	suffix: { type: String, default: '' },
+	status: { type: String, default: '' },
+	size: { type: String, default: '' },
+	/** outlined / filled / borderless / underlined；空为表单的 variant，再没有则 outlined */
+	variant: { type: String, default: '' },
+	placeholder: { type: String, default: '' },
+	autofocus: { type: Boolean, default: false },
+	name: { type: String, default: '' },
+	id: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'input', 'step', 'pressEnter', 'focus', 'blur'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const statusOf = useAmFieldStatus(() : string => props.status)
+const status = computed(() : string => statusOf())
+const variantOf = useAmFieldVariant(() : string => props.variant)
+const variant = computed(() : string => variantOf())
+const notifyChange = useAmFieldChange()
+const notifyBlur = useAmFieldBlur()
+
+const spinner = computed(() : boolean => props.mode != 'input')
+const focused = ref(false)
+const wantFocus = ref(props.autofocus)
+/** 输入中的文字（聚焦时显示它，不显示格式化后的值，免得打断输入） */
+const draft = ref('')
+
+const placeholderStyle = computed(() : string => 'color:' + theme().colorTextQuaternary + ';')
+const affixColor = computed(() : string => theme().colorTextTertiary)
+// 负数要能输入负号：数字键盘上没有
+const inputType = computed(() : string => props.min < 0 ? 'text' : 'digit')
+
+/** 小数位数 */
+function decimals(value : number) : number {
+	const text = '' + value
+	const index = text.indexOf('.')
+	return index < 0 || text.indexOf('e') >= 0 ? 0 : text.length - index - 1
+}
+
+function format(value : number | null) : string {
+	if (value == null) return ''
+	if (props.precision >= 0) return value.toFixed(props.precision)
+	return value == Math.floor(value) ? value.toFixed(0) : '' + value
+}
+
+const text = computed(() : string => focused.value ? draft.value : format(props.value))
+
+/** 夹在 min ~ max 之间，并按 precision（没有时按 digits）取整到小数位，去掉浮点误差 */
+function normalize(value : number, digits : number) : number {
+	let next = Math.max(props.min, Math.min(props.max, value))
+	const places = props.precision >= 0 ? props.precision : digits
+	if (places >= 0 && places <= 20) next = parseFloat(next.toFixed(places))
+	return next
+}
+
+function commit(value : number | null) {
+	if (value == props.value) return
+	emit('update:value', value)
+	emit('change', value)
+	notifyChange()
+}
+
+const canDown = computed(() : boolean => {
+	const value = props.value
+	return !disabled.value && !props.readOnly && (value == null || value > props.min)
+})
+const canUp = computed(() : boolean => {
+	const value = props.value
+	return !disabled.value && !props.readOnly && (value == null || value < props.max)
+})
+
+function onInput(event : UniInputEvent) {
+	const value = event.detail.value
+	draft.value = value
+	emit('input', value)
+	if (value.length == 0) {
+		commit(null)
+		return
+	}
+	const n = parseFloat(value)
+	if (!isNaN(n)) commit(n)
+}
+
+function onFocus(event : UniInputFocusEvent) {
+	draft.value = format(props.value)
+	focused.value = true
+	emit('focus', event)
+}
+
+function onBlur(event : UniInputBlurEvent) {
+	focused.value = false
+	wantFocus.value = false
+	const value = props.value
+	if (props.changeOnBlur && value != null) commit(normalize(value, decimals(value)))
+	emit('blur', event)
+	notifyBlur()
+}
+
+function onConfirm() {
+	emit('pressEnter', props.value)
+}
+
+/** direction：1 加、-1 减 */
+function stepBy(direction : number) {
+	if (direction > 0 ? !canUp.value : !canDown.value) return
+	const base = props.value ?? 0
+	const next = normalize(base + direction * props.step, Math.max(decimals(base), decimals(props.step)))
+	if (focused.value) draft.value = format(next)
+	commit(next)
+	const info = { offset: props.step, type: direction > 0 ? 'up' : 'down', emitter: 'handler' } as UTSJSONObject
+	emit('step', next, info)
+}
+
+function focus() {
+	wantFocus.value = true
+}
+
+function blur() {
+	wantFocus.value = false
+}
+
+defineExpose({ focus, blur })
+
+/** 按钮的边长 = 组件的高度 */
+const actionIconSize = computed(() : number => size.value == 'small' ? 12 : (size.value == 'large' ? 16 : 14))
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-input-number', spinner.value ? 'am-input-number--spinner' : 'am-input-number--input']
+	list.push((spinner.value ? 'am-input-number--spinner-' : 'am-input-number--input-') + size.value)
+	if (disabled.value) list.push('am-input-number--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const wrapperClasses = computed(() : string[] => {
+	const mode = spinner.value ? 'spinner' : 'input'
+	const list : string[] = ['am-input-number__wrapper', 'am-input-number__wrapper--' + variant.value, 'am-input-number__wrapper--' + mode + '-' + variant.value]
+	if (variant.value != 'underlined' && !(variant.value == 'borderless' && !spinner.value)) list.push('am-input-number__wrapper--box-' + mode + '-' + size.value)
+	if (focused.value) list.push('am-input-number__wrapper--focused-' + variant.value)
+	if (status.value.length > 0) list.push('am-input-number__wrapper--' + variant.value + '-' + status.value)
+	return list
+})
+
+const controlClasses = computed(() : string[] => {
+	const mode = spinner.value ? 'spinner' : 'input'
+	return ['am-input-number__control', 'am-input-number__control--' + mode, 'am-input-number__control--' + mode + '-' + size.value]
+})
+
+function actionClasses(enabled : boolean) : string[] {
+	const list : string[] = ['am-input-number__action', 'am-input-number__action--' + size.value]
+	if (!enabled) list.push('am-input-number__action--disabled')
+	return list
+}
+
+function actionColor(enabled : boolean) : string {
+	return enabled ? theme().colorPrimary : theme().colorTextQuaternary
+}
+
+/** 字符串是不是图标名（小写字母与连字符） */
+function isIcon(name : string) : boolean {
+	return /^[a-z]+(-[a-z]+)*$/.test(name)
+}
+</script>
+
+<template>
+	<view :class="classes">
+		<view
+			v-if="spinner && controls"
+			:class="actionClasses(canDown)"
+			:hover-class="canDown ? 'am-input-number__action--active' : 'none'"
+			@click="stepBy(-1)"
+		>
+			<slot name="downIcon">
+				<am-icon name="minus" :size="actionIconSize" :color="actionColor(canDown)" />
+			</slot>
+		</view>
+		<view :class="wrapperClasses">
+			<view v-if="prefix.length > 0" class="am-input-number__prefix">
+				<am-icon v-if="isIcon(prefix)" :name="prefix" :size="16" :color="affixColor" />
+				<text v-else class="am-input-number__affix">{{ prefix }}</text>
+			</view>
+			<slot name="prefix"></slot>
+			<input
+				:id="id"
+				:name="name"
+				:class="controlClasses"
+				:type="inputType"
+				:value="text"
+				:placeholder="placeholder"
+				:placeholder-style="placeholderStyle"
+				:disabled="disabled || readOnly"
+				:focus="wantFocus"
+				@input="onInput"
+				@focus="onFocus"
+				@blur="onBlur"
+				@confirm="onConfirm"
+			/>
+			<view v-if="suffix.length > 0" class="am-input-number__suffix">
+				<am-icon v-if="isIcon(suffix)" :name="suffix" :size="16" :color="affixColor" />
+				<text v-else class="am-input-number__affix">{{ suffix }}</text>
+			</view>
+			<slot name="suffix"></slot>
+		</view>
+		<view
+			v-if="spinner && controls"
+			:class="actionClasses(canUp)"
+			:hover-class="canUp ? 'am-input-number__action--active' : 'none'"
+			@click="stepBy(1)"
+		>
+			<slot name="upIcon">
+				<am-icon name="plus" :size="actionIconSize" :color="actionColor(canUp)" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-input-number { flex-direction: row; align-items: center; }
+.am-input-number--disabled { opacity: 0.4; }
+
+/* ---------- 高度：spinner 比同尺寸的输入框矮一档 ---------- */
+.am-input-number--spinner-middle { height: var(--am-control-height-sm, 30px); }
+.am-input-number--spinner-small { height: var(--am-control-height-xs, 24px); }
+.am-input-number--spinner-large { height: var(--am-control-height, 40px); }
+.am-input-number--input-middle { height: var(--am-control-height, 40px); }
+.am-input-number--input-small { height: var(--am-control-height-sm, 30px); }
+.am-input-number--input-large { height: var(--am-control-height-lg, 48px); }
+
+/* ---------- 输入区 ---------- */
+.am-input-number__wrapper {
+	flex-direction: row;
+	align-items: center;
+	align-self: stretch;
+	transition-property: border-color;
+	transition-duration: 200ms;
+}
+.am-input-number__wrapper--input-outlined,
+.am-input-number__wrapper--input-filled,
+.am-input-number__wrapper--input-underlined,
+.am-input-number__wrapper--input-borderless { flex: 1; }
+.am-input-number__wrapper--spinner-outlined,
+.am-input-number__wrapper--spinner-filled,
+.am-input-number__wrapper--spinner-underlined,
+.am-input-number__wrapper--spinner-borderless { margin-left: 2px; margin-right: 2px; }
+
+.am-input-number__wrapper--box-spinner-middle,
+.am-input-number__wrapper--box-spinner-small {
+	padding-left: var(--am-padding-xxs, 4px);
+	padding-right: var(--am-padding-xxs, 4px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input-number__wrapper--box-spinner-large {
+	padding-left: var(--am-padding-xxs, 4px);
+	padding-right: var(--am-padding-xxs, 4px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-input-number__wrapper--box-input-middle {
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-input-number__wrapper--box-input-small {
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input-number__wrapper--box-input-large {
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+
+/* ---------- 变体 ---------- */
+.am-input-number__wrapper--outlined {
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+}
+.am-input-number__wrapper--filled,
+.am-input-number__wrapper--spinner-borderless {
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-input-number__wrapper--underlined {
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border, #d9d9d9);
+}
+
+.am-input-number__wrapper--focused-outlined { border-color: var(--am-color-primary, #1677ff); }
+.am-input-number__wrapper--focused-filled { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-bg-container, #ffffff); }
+.am-input-number__wrapper--focused-underlined { border-bottom-color: var(--am-color-primary, #1677ff); }
+
+.am-input-number__wrapper--outlined-error { border-color: var(--am-color-error, #ff4d4f); }
+.am-input-number__wrapper--outlined-warning { border-color: var(--am-color-warning, #faad14); }
+.am-input-number__wrapper--filled-error,
+.am-input-number__wrapper--borderless-error { background-color: var(--am-color-error-bg, #fff1f1); }
+.am-input-number__wrapper--filled-warning,
+.am-input-number__wrapper--borderless-warning { background-color: var(--am-color-warning-bg, #fff7e8); }
+.am-input-number__wrapper--underlined-error { border-bottom-color: var(--am-color-error, #ff4d4f); }
+.am-input-number__wrapper--underlined-warning { border-bottom-color: var(--am-color-warning, #faad14); }
+
+/* ---------- 内部 ---------- */
+.am-input-number__control { height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-input-number__control--spinner { text-align: center; }
+.am-input-number__control--input { flex: 1; }
+.am-input-number__control--spinner-middle { width: 48px; font-size: var(--am-font-size-lg, 16px); }
+.am-input-number__control--spinner-small { width: 40px; height: 20px; font-size: var(--am-font-size, 14px); }
+.am-input-number__control--spinner-large { width: 56px; font-size: var(--am-font-size-lg, 16px); }
+.am-input-number__control--input-middle { font-size: var(--am-font-size-lg, 16px); }
+.am-input-number__control--input-small { font-size: var(--am-font-size, 14px); }
+.am-input-number__control--input-large { font-size: var(--am-font-size-xl, 18px); }
+.am-input-number__prefix { margin-right: 4px; flex-direction: row; align-items: center; }
+.am-input-number__suffix { margin-left: 4px; flex-direction: row; align-items: center; }
+.am-input-number__affix { font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+
+/* ---------- − / + 按钮 ---------- */
+.am-input-number__action {
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+	transition-property: background-color;
+	transition-duration: 100ms;
+}
+.am-input-number__action--middle {
+	width: var(--am-control-height-sm, 30px);
+	height: var(--am-control-height-sm, 30px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input-number__action--small {
+	width: var(--am-control-height-xs, 24px);
+	height: var(--am-control-height-xs, 24px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input-number__action--large {
+	width: var(--am-control-height, 40px);
+	height: var(--am-control-height, 40px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-input-number__action--active { background-color: var(--am-color-fill, rgba(0, 0, 0, 0.15)); }
+.am-input-number__action--disabled { opacity: 0.6; }
+</style>

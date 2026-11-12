@@ -1,0 +1,123 @@
+<script setup lang="uts">
+import { AmModalAction } from '@/uni_modules/antdv-next-uni/types/modal.uts'
+import { alertAmModal, confirmAmModal } from '@/uni_modules/antdv-next-uni/utils/modal.uts'
+
+const basic = ref(false)
+const danger = ref(false)
+const single = ref(false)
+const loadingOpen = ref(false)
+const confirmLoading = ref(false)
+const actionsOpen = ref(false)
+const custom = ref(false)
+const log = ref('')
+
+const actions : AmModalAction[] = [
+	{ key: 'save', text: '保存草稿', bold: true },
+	{ key: 'discard', text: '不保存', danger: true },
+	{ key: 'back', text: '继续编辑' }
+]
+
+function onOk() {
+	log.value = 'ok'
+	basic.value = false
+}
+
+function onCancel() {
+	log.value = 'cancel'
+}
+
+function onSubmit() {
+	confirmLoading.value = true
+	setTimeout(() => {
+		confirmLoading.value = false
+		loadingOpen.value = false
+	}, 1500)
+}
+
+function onAction(action : AmModalAction, index : number) {
+	log.value = 'action: ' + action.key + '（第 ' + index + ' 个）'
+}
+
+function onAfterOpenChange(open : boolean) {
+	log.value = 'afterOpenChange: ' + open
+}
+
+// 函数式用法：原生对话框（代替 Modal.confirm / Modal.alert）
+function askNative() {
+	confirmAmModal({ title: '删除订单', content: '删除后不能恢复，确定删除吗？', okType: 'danger', okText: '删除' }).then((ok : boolean) => {
+		log.value = 'confirmAmModal: ' + ok
+	})
+}
+
+function alertNative() {
+	alertAmModal({ title: '提示', content: '库存不足，请减少数量。' }).then(() => {
+		log.value = 'alertAmModal: 已关闭'
+	})
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-button class="demo__block" block text="确认对话框" @click="basic = true" />
+			<am-button class="demo__block" block text="危险操作（okType = danger）" @click="danger = true" />
+			<am-button block text="只有一个按钮（okCancel = false）" @click="single = true" />
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">确定按钮的加载状态</text>
+		<view class="demo__card">
+			<am-button block text="confirmLoading" @click="loadingOpen = true" />
+		</view>
+
+		<text class="demo__title">多个操作</text>
+		<view class="demo__card">
+			<am-button block text="actions（多于两个时竖排）" @click="actionsOpen = true" />
+		</view>
+
+		<text class="demo__title">自定义内容与底部</text>
+		<view class="demo__card">
+			<am-button block text="默认插槽 + footer 插槽 + 关闭图标" @click="custom = true" />
+		</view>
+
+		<text class="demo__title">函数式用法（原生对话框）</text>
+		<view class="demo__card">
+			<am-button class="demo__block" block text="confirmAmModal()" @click="askNative" />
+			<am-button block text="alertAmModal()" @click="alertNative" />
+		</view>
+		<view class="demo__footer"></view>
+
+		<am-modal v-model:open="basic" title="确认提交" content="提交后进入审批流程，审批期间不能修改。" @ok="onOk" @cancel="onCancel" @after-open-change="onAfterOpenChange" />
+		<am-modal v-model:open="danger" title="删除订单" content="删除后不能恢复。" ok-type="danger" ok-text="删除" :mask-closable="false" @ok="danger = false" />
+		<am-modal v-model:open="single" title="提示" content="库存不足，请减少数量。" :ok-cancel="false" @ok="single = false" />
+		<am-modal v-model:open="loadingOpen" title="保存修改" content="点确定后模拟 1.5 秒的请求。" :confirm-loading="confirmLoading" @ok="onSubmit" />
+		<am-modal v-model:open="actionsOpen" title="还没有保存" content="离开前要保存草稿吗？" :actions="actions" close-on-action @action="onAction" />
+		<am-modal v-model:open="custom" title="自定义" closable>
+			<view class="demo__panel">
+				<text class="demo__panel-text">内容放在默认插槽，底部用 footer 插槽。</text>
+			</view>
+			<template #footer>
+				<view class="demo__panel-footer">
+					<am-button type="primary" block text="我知道了" @click="custom = false" />
+				</view>
+			</template>
+		</am-modal>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__panel { padding: 16px; }
+.demo__panel-text { font-size: 16px; line-height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__panel-footer { padding: 8px 16px; }
+.demo__footer { height: 40px; }
+</style>

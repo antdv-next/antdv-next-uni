@@ -1,0 +1,7 @@
+{
+  "missingProps": {
+    "tabPosition": "已废弃的属性不移植，用 tabPlacement",
+    "sticky": "App 端没有 position: sticky；需要吸顶时把标签栏放在滚动区域外面",
+    "offsetTop": "同 sticky"
+  }
+}

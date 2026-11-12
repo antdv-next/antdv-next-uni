@@ -1,0 +1,94 @@
+<script setup lang="uts">
+import { AmStatisticTimeData } from '../../types/statistic.uts'
+import { formatTimeStr, parseTime } from '../../utils/statistic.uts'
+
+// 计时器（= antdv-next-mobile 的 StatisticTimer）：type（countdown 倒计时 / countup 正计时）、value（目标 / 起始的时间戳）、
+// format（Y M D H m s S，[] 里的文字原样输出，默认 HH:mm:ss）、title、prefix、suffix、loading、valueStyle 同名同义；
+// 事件 finish（只有倒计时）、change（每次刷新，参数为剩余 / 已过的毫秒数）；
+// 插槽 title、prefix、suffix、formatter（参数 value、formatted、time：{ days, hours, minutes, seconds, milliseconds }）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `value` 只能是时间戳（毫秒数字），不能是日期字符串；
+// - title / prefix / suffix 是字符串（规则同 <am-statistic>），`valueStyle` 是 style 字符串；
+// - 刷新间隔：format 里有毫秒（S）时约 30 次 / 秒（同移动端库），否则 5 次 / 秒——App 端每次刷新都要跨线程更新文字，
+//   显示不到毫秒时没必要刷那么快，change 事件也随之变少
+defineOptions({ name: 'AmStatisticTimer' })
+
+const props = defineProps({
+	type: { type: String, default: 'countdown' },
+	value: { type: Number, default: 0 },
+	format: { type: String, default: 'HH:mm:ss' },
+	title: { type: String, default: '' },
+	prefix: { type: String, default: '' },
+	suffix: { type: String, default: '' },
+	loading: { type: Boolean, default: false },
+	valueStyle: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['finish', 'change'])
+
+const diff = ref(0)
+let timer = 0
+
+function isDown() : boolean {
+	return props.type == 'countdown'
+}
+
+function getDiff() : number {
+	const now = Date.now()
+	return Math.max(isDown() ? props.value - now : now - props.value, 0)
+}
+
+function stop() {
+	clearInterval(timer)
+	timer = 0
+}
+
+function tick() {
+	diff.value = getDiff()
+	emit('change', diff.value)
+	if (isDown() && props.value <= Date.now()) {
+		stop()
+		emit('finish')
+	}
+}
+
+function start() {
+	stop()
+	diff.value = getDiff()
+	// 已经过期的倒计时只显示 0，不触发 finish（同 Antdv Next）
+	if (isDown() && props.value <= Date.now()) return
+	timer = setInterval(() => { tick() }, props.format.indexOf('S') >= 0 ? 33 : 200)
+}
+
+onMounted(() => start())
+onUnmounted(() => stop())
+watch(() : string => props.value + ':' + props.type + ':' + props.format, () => start())
+
+const formatted = computed(() : string => formatTimeStr(diff.value, props.format))
+const time = computed(() : AmStatisticTimeData => parseTime(diff.value))
+</script>
+
+<template>
+	<am-statistic :root-class="rootClass" :title="title" :prefix="prefix" :suffix="suffix" :loading="loading" :value-style="valueStyle" :value="diff">
+		<template #title>
+			<slot name="title"></slot>
+		</template>
+		<template #prefix>
+			<slot name="prefix"></slot>
+		</template>
+		<template #suffix>
+			<slot name="suffix"></slot>
+		</template>
+		<template #formatter>
+			<slot name="formatter" :value="diff" :formatted="formatted" :time="time">
+				<text class="am-statistic-timer__value" :style="valueStyle">{{ formatted }}</text>
+			</slot>
+		</template>
+	</am-statistic>
+</template>
+
+<style>
+.am-statistic-timer__value { font-size: 24px; line-height: 32px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

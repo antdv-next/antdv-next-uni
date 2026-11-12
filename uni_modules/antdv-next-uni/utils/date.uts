@@ -1,0 +1,107 @@
+// 日期：值统一是字符串（与 PC 的 valueFormat 写法相同：YYYY-MM-DD、YYYY-MM-DD HH:mm、HH:mm:ss），
+// 不用 dayjs（App 端不能用 npm 的 JS 库）。只支持组件用到的几个占位符：YYYY MM DD HH mm ss
+
+export type AmDateParts = {
+	year : number
+	month : number
+	day : number
+	hour : number
+	minute : number
+	second : number
+}
+
+function pad(value : number) : string {
+	return value < 10 ? '0' + value : '' + value
+}
+
+/** 按格式输出 */
+export function formatDate(parts : AmDateParts, format : string) : string {
+	return format
+		.replace('YYYY', '' + parts.year)
+		.replace('MM', pad(parts.month))
+		.replace('DD', pad(parts.day))
+		.replace('HH', pad(parts.hour))
+		.replace('mm', pad(parts.minute))
+		.replace('ss', pad(parts.second))
+}
+
+/** 按格式解析；解析不了时为 null。也接受 ISO 字符串（2024-01-02T03:04:05Z 按本地时间取） */
+export function parseDate(text : string, format : string) : AmDateParts | null {
+	if (text.length == 0) return null
+	if (text.indexOf('T') > 0) {
+		const date = new Date(text)
+		if (isNaN(date.getTime())) return null
+		return fromDate(date)
+	}
+	const tokens = ['YYYY', 'MM', 'DD', 'HH', 'mm', 'ss']
+	const parts : AmDateParts = { year: 1970, month: 1, day: 1, hour: 0, minute: 0, second: 0 }
+	let found = 0
+	for (let i = 0; i < tokens.length; i++) {
+		const index = format.indexOf(tokens[i])
+		if (index < 0) continue
+		const length = tokens[i].length
+		if (text.length < index + length) return null
+		const value = parseInt(text.substring(index, index + length))
+		if (isNaN(value)) return null
+		found++
+		if (i == 0) parts.year = value
+		else if (i == 1) parts.month = value
+		else if (i == 2) parts.day = value
+		else if (i == 3) parts.hour = value
+		else if (i == 4) parts.minute = value
+		else parts.second = value
+	}
+	return found == 0 ? null : parts
+}
+
+export function fromDate(date : Date) : AmDateParts {
+	return {
+		year: date.getFullYear(),
+		month: date.getMonth() + 1,
+		day: date.getDate(),
+		hour: date.getHours(),
+		minute: date.getMinutes(),
+		second: date.getSeconds()
+	}
+}
+
+export function copyDate(parts : AmDateParts) : AmDateParts {
+	return { year: parts.year, month: parts.month, day: parts.day, hour: parts.hour, minute: parts.minute, second: parts.second }
+}
+
+export function today() : AmDateParts {
+	return fromDate(new Date())
+}
+
+/** 日期选择默认的最早日期：1900-01-01 */
+export function defaultMinDate() : AmDateParts {
+	return { year: 1900, month: 1, day: 1, hour: 0, minute: 0, second: 0 }
+}
+
+/** 日期选择默认的最晚日期：30 年后的年底 */
+export function defaultMaxDate() : AmDateParts {
+	return { year: today().year + 30, month: 12, day: 31, hour: 23, minute: 59, second: 59 }
+}
+
+/** 某月的天数 */
+export function daysInMonth(year : number, month : number) : number {
+	return new Date(year, month, 0).getDate()
+}
+
+/** 比较两个日期：-1 / 0 / 1 */
+export function compareDate(a : AmDateParts, b : AmDateParts) : number {
+	const x = [a.year, a.month, a.day, a.hour, a.minute, a.second]
+	const y = [b.year, b.month, b.day, b.hour, b.minute, b.second]
+	for (let i = 0; i < x.length; i++) {
+		if (x[i] < y[i]) return -1
+		if (x[i] > y[i]) return 1
+	}
+	return 0
+}
+
+/** picker（date / month / year）与是否带时间 → 默认的格式（同 Antdv Next 的默认 valueFormat 写法） */
+export function defaultDateFormat(picker : string, showTime : boolean) : string {
+	if (picker == 'year') return 'YYYY'
+	if (picker == 'month') return 'YYYY-MM'
+	return showTime ? 'YYYY-MM-DD HH:mm:ss' : 'YYYY-MM-DD'
+}

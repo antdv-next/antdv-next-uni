@@ -1,0 +1,25 @@
+<script setup lang="uts">
+// 安全区域（= antdv-next-mobile 的 SafeArea）：position（top / bottom）同名同义。在刘海、底部横条的位置留出空白，
+// 放在吸顶 / 吸底的栏里（内容写在默认插槽里时，空白加在内容的上方 / 下方）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 高度来自 uni-app x 的 --uni-safe-area-inset-top / bottom（不是 env()），没有 --am-safe-area-multiple（没有 calc()）；
+// - 有原生导航栏的页面顶部安全区域为 0（导航栏已经避开了刘海）
+defineOptions({ name: 'AmSafeArea' })
+
+defineProps({
+	position: { type: String, default: 'bottom' },
+	rootClass: { type: String, default: '' }
+})
+</script>
+
+<template>
+	<view :class="['am-safe-area', 'am-safe-area--' + position, rootClass]">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-safe-area--top { padding-top: var(--uni-safe-area-inset-top, 0px); }
+.am-safe-area--bottom { padding-bottom: var(--uni-safe-area-inset-bottom, 0px); }
+</style>

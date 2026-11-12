@@ -1,0 +1,11 @@
+{
+  "missingProps": {
+    "srcSet": "image 组件没有 srcset",
+    "alt": "image 组件没有 alt",
+    "draggable": "image 组件没有 draggable",
+    "crossOrigin": "image 组件没有 crossorigin"
+  },
+  "extraProps": {
+    "text": "uvue 的样式不继承，默认插槽里的文字拿不到头像的颜色与字号，所以文字头像用属性传"
+  }
+}

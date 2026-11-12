@@ -1,0 +1,88 @@
+<script setup lang="uts">
+import { AmProgressSuccess } from '@/uni_modules/antdv-next-uni/types/progress.uts'
+
+const percent = ref(30)
+const success : AmProgressSuccess = { percent: 30 }
+
+function change(step : number) {
+	percent.value = Math.max(0, Math.min(100, percent.value + step))
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">线形进度条</text>
+		<view class="demo__card">
+			<am-progress root-class="demo__block" :percent="30" />
+			<am-progress root-class="demo__block" :percent="50" status="active" />
+			<am-progress root-class="demo__block" :percent="70" status="exception" />
+			<am-progress root-class="demo__block" :percent="100" />
+			<am-progress :percent="50" :show-info="false" />
+		</view>
+
+		<text class="demo__title">尺寸、粗细与端点</text>
+		<view class="demo__card">
+			<am-progress root-class="demo__block" :percent="40" size="small" />
+			<am-progress root-class="demo__block" :percent="40" :stroke-width="12" />
+			<am-progress :percent="40" :stroke-width="12" stroke-linecap="butt" />
+		</view>
+
+		<text class="demo__title">颜色与已完成的分段</text>
+		<view class="demo__card">
+			<am-progress root-class="demo__block" :percent="60" stroke-color="#722ed1" rail-color="rgba(114, 46, 209, 0.15)" />
+			<am-progress :percent="60" :success="success" />
+		</view>
+
+		<text class="demo__title">分段（steps）</text>
+		<view class="demo__card">
+			<am-progress root-class="demo__block" :percent="50" :steps="3" />
+			<am-progress root-class="demo__block" :percent="30" :steps="5" />
+			<am-progress :percent="100" :steps="5" size="small" stroke-color="#52c41a" />
+		</view>
+
+		<text class="demo__title">圆形进度条</text>
+		<view class="demo__card demo__row">
+			<am-progress class="demo__item" type="circle" :percent="75" />
+			<am-progress class="demo__item" type="circle" :percent="70" status="exception" />
+			<am-progress class="demo__item" type="circle" :percent="100" />
+		</view>
+
+		<text class="demo__title">圆形：尺寸与分段</text>
+		<view class="demo__card demo__row">
+			<am-progress class="demo__item" type="circle" :percent="30" size="small" />
+			<am-progress class="demo__item" type="circle" :percent="60" size="80" :stroke-width="8" />
+			<am-progress class="demo__item" type="circle" :percent="75" size="80" :success="success" />
+		</view>
+
+		<text class="demo__title">动态与自定义文字（默认插槽）</text>
+		<view class="demo__card">
+			<am-progress root-class="demo__block" :percent="percent" />
+			<view class="demo__row">
+				<am-progress class="demo__item" type="circle" :percent="percent" size="100">
+					<template #default="{ percent }">
+						<text class="demo__text">{{ percent }} 天</text>
+					</template>
+				</am-progress>
+				<am-button class="demo__item" icon="minus" @click="change(-10)" />
+				<am-button class="demo__item" icon="plus" @click="change(10)" />
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+</style>

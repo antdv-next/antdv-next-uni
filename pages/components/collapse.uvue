@@ -1,0 +1,85 @@
+<script setup lang="uts">
+import { AmCollapseItem } from '@/uni_modules/antdv-next-uni/types/collapse.uts'
+
+const TEXT = '一只狗的寿命大概十到十五年，在这期间它会一直陪着你，是人类最忠实的朋友。'
+
+const items : AmCollapseItem[] = [
+	{ key: '1', label: '面板标题 1', content: TEXT },
+	{ key: '2', label: '面板标题 2', content: TEXT },
+	{ key: '3', label: '面板标题 3', content: TEXT }
+]
+
+const special : AmCollapseItem[] = [
+	{ key: 'extra', label: '右侧有额外内容', extra: '更多', content: TEXT },
+	{ key: 'arrow', label: '不显示箭头', showArrow: false, content: TEXT },
+	{ key: 'header', label: '只有标题文字可点', collapsible: 'header', content: TEXT },
+	{ key: 'icon', label: '只有箭头可点', collapsible: 'icon', content: TEXT },
+	{ key: 'disabled', label: '禁用', collapsible: 'disabled', content: TEXT }
+]
+
+const sizes : string[] = ['small', 'middle', 'large']
+const size = ref('middle')
+const activeKey = ref<string[]>(['1'])
+const accordionKey = ref<string[]>([])
+const first : string[] = ['1']
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（v-model:activeKey）</text>
+		<am-collapse v-model:activeKey="activeKey" :items="items" />
+		<text class="demo__hint demo__pad">展开的面板：{{ activeKey.join('、') }}</text>
+
+		<text class="demo__title">手风琴</text>
+		<am-collapse v-model:activeKey="accordionKey" :items="items" accordion />
+
+		<text class="demo__title">不绑定（defaultActiveKey）</text>
+		<am-collapse :items="items" :default-active-key="first" />
+
+		<text class="demo__title">额外内容、箭头与可点击的区域</text>
+		<am-collapse :items="special" />
+
+		<text class="demo__title">箭头在右侧与尺寸</text>
+		<view class="demo__row demo__pad">
+			<am-button v-for="name in sizes" :key="name" class="demo__item" size="small" :type="size == name ? 'primary' : 'default'" :text="name" @click="size = name" />
+		</view>
+		<am-collapse :items="items" expand-icon-placement="end" :size="size" />
+
+		<text class="demo__title">透明、无边框（ghost）</text>
+		<am-collapse :items="items" ghost :default-active-key="first" />
+
+		<text class="demo__title">自定义标题与内容（插槽）</text>
+		<am-collapse :items="items" destroy-on-hidden>
+			<template #labelRender="{ item, index }">
+				<view class="demo__row">
+					<am-icon name="file" :size="16" />
+					<text class="demo__text demo__label">{{ (index as number) + 1 }}. {{ (item as AmCollapseItem).label }}</text>
+				</view>
+			</template>
+			<template #contentRender="{ item }">
+				<text class="demo__text">{{ (item as AmCollapseItem).content }}</text>
+				<am-button class="demo__top" size="small" type="primary" text="操作" />
+			</template>
+		</am-collapse>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__pad { padding: 0 16px; }
+.demo__label { margin-left: 8px; }
+.demo__top { margin-top: 12px; }
+</style>

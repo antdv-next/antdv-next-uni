@@ -1,0 +1,117 @@
+// Statistic / StatisticTimer 的格式化：算法同 antdv-next-mobile 的 statistic/utils.ts（UTS 里没有带回调的正则替换，逐字符处理）
+import { AmStatisticNumber, AmStatisticTimeData } from '../types/statistic.uts'
+
+/** 左侧补 0 到 length 位 */
+export function padZero(value : number, length : number) : string {
+	let text = '' + value
+	while (text.length < length) text = '0' + text
+	return text
+}
+
+/** 数值 → 整数部分（千分位）+ 小数部分；precision 为 -1 时小数原样，否则补 0 / 截断到 precision 位 */
+export function formatStatisticNumber(value : number, precision : number, groupSeparator : string, decimalSeparator : string) : AmStatisticNumber {
+	const text = '' + value
+	const negative = text.startsWith('-')
+	const body = negative ? text.substring(1) : text
+	const dot = body.indexOf('.')
+	const integer = dot >= 0 ? body.substring(0, dot) : body
+	let decimal = dot >= 0 ? body.substring(dot + 1) : ''
+	let grouped = ''
+	for (let i = 0; i < integer.length; i++) {
+		if (i > 0 && (integer.length - i) % 3 == 0) grouped += groupSeparator
+		grouped += integer.charAt(i)
+	}
+	if (precision >= 0) {
+		while (decimal.length < precision) decimal += '0'
+		decimal = decimal.substring(0, precision)
+	}
+	const result : AmStatisticNumber = {
+		int: (negative ? '-' : '') + grouped,
+		decimal: decimal.length > 0 ? decimalSeparator + decimal : ''
+	}
+	return result
+}
+
+const UNIT_NAMES : string[] = ['Y', 'M', 'D', 'H', 'm', 's', 'S']
+const UNIT_MS : number[] = [31536000000, 2592000000, 86400000, 3600000, 60000, 1000, 1]
+
+/**
+ * 时长（毫秒）按格式输出：Y M D H m s S 为单位，连写几位就补 0 到几位，[] 里的文字原样输出。
+ * formatTimeStr(90061001, 'D 天 HH:mm:ss.SSS') → '1 天 01:01:01.001'
+ */
+export function formatTimeStr(duration : number, format : string) : string {
+	const present : boolean[] = [false, false, false, false, false, false, false]
+	let inside = false
+	for (let i = 0; i < format.length; i++) {
+		const ch = format.charAt(i)
+		if (inside) {
+			if (ch == ']') inside = false
+			continue
+		}
+		if (ch == '[') {
+			inside = format.indexOf(']', i) >= 0
+			continue
+		}
+		const unit = UNIT_NAMES.indexOf(ch)
+		if (unit >= 0) present[unit] = true
+	}
+	const values : number[] = []
+	let left = duration
+	for (let u = 0; u < UNIT_NAMES.length; u++) {
+		if (present[u]) {
+			const value = Math.floor(left / UNIT_MS[u])
+			left -= value * UNIT_MS[u]
+			values.push(value)
+		} else {
+			values.push(0)
+		}
+	}
+	let out = ''
+	let index = 0
+	while (index < format.length) {
+		const ch = format.charAt(index)
+		if (ch == '[') {
+			const end = format.indexOf(']', index)
+			if (end >= 0) {
+				out += format.substring(index + 1, end)
+				index = end + 1
+				continue
+			}
+		}
+		const unit = UNIT_NAMES.indexOf(ch)
+		if (unit >= 0 && ch != '[') {
+			let next = index
+			while (next < format.length && format.charAt(next) == ch) next++
+			out += padZero(values[unit], next - index)
+			index = next
+			continue
+		}
+		out += ch
+		index++
+	}
+	return out
+}
+
+/** 时长（毫秒）拆成天、时、分、秒、毫秒 */
+export function parseTime(duration : number) : AmStatisticTimeData {
+	const day = 86400000
+	const result : AmStatisticTimeData = {
+		days: Math.floor(duration / day),
+		hours: Math.floor((duration % day) / 3600000),
+		minutes: Math.floor((duration % 3600000) / 60000),
+		seconds: Math.floor((duration % 60000) / 1000),
+		milliseconds: Math.floor(duration % 1000)
+	}
+	return result
+}
+
+/** style 字符串里的 color（给图标用：图标的颜色是属性，不吃外面的 style）；没有时为空 */
+export function styleColor(style : string) : string {
+	const parts = style.split(';')
+	for (let i = 0; i < parts.length; i++) {
+		const colon = parts[i].indexOf(':')
+		if (colon < 0) continue
+		if (parts[i].substring(0, colon).trim() == 'color') return parts[i].substring(colon + 1).trim()
+	}
+	return ''
+}

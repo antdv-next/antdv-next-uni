@@ -1,0 +1,89 @@
+<script setup lang="uts">
+import { AmDescriptionsItem } from '@/uni_modules/antdv-next-uni/types/descriptions.uts'
+
+const user : AmDescriptionsItem[] = [
+	{ label: '用户名', content: 'Zhou Maomao' },
+	{ label: '手机号', content: '1810000000' },
+	{ label: '居住地', content: '浙江省杭州市' },
+	{ label: '备注', content: '无' },
+	{ label: '地址', content: '浙江省杭州市西湖区古翠路 80 号' }
+]
+
+const order : AmDescriptionsItem[] = [
+	{ label: '商品', content: '云数据库' },
+	{ label: '计费方式', content: '预付费' },
+	{ label: '下单时间', content: '2018-04-24 18:00:00', filled: true },
+	{ label: '金额', content: '¥80.00' },
+	{ label: '优惠', content: '¥20.00' },
+	{ label: '状态', content: '运行中', span: 2 }
+]
+
+const sizes : string[] = ['small', 'middle', 'large']
+const size = ref('middle')
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-descriptions title="用户信息" :items="user" />
+		</view>
+
+		<text class="demo__title">内容靠右（contentAlign="end"）</text>
+		<view class="demo__card">
+			<am-descriptions title="订单信息" extra="复制" :items="user" :colon="false" content-align="end" />
+		</view>
+
+		<text class="demo__title">多列与跨列（column / span / filled）</text>
+		<view class="demo__card">
+			<am-descriptions :items="order" :column="2" />
+		</view>
+
+		<text class="demo__title">垂直布局</text>
+		<view class="demo__card">
+			<am-descriptions :items="order" :column="2" layout="vertical" />
+		</view>
+
+		<text class="demo__title">带边框与尺寸</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="name in sizes" :key="name" class="demo__item" size="small" :type="size == name ? 'primary' : 'default'" :text="name" @click="size = name" />
+			</view>
+			<am-descriptions root-class="demo__block" title="横向" :items="user" bordered :size="size" />
+			<am-descriptions title="垂直、两列" :items="order" :column="2" layout="vertical" bordered :size="size" />
+		</view>
+
+		<text class="demo__title">自定义内容（contentRender 插槽）</text>
+		<view class="demo__card">
+			<am-descriptions :items="user">
+				<template #extra>
+					<am-button size="small" type="link" text="编辑" />
+				</template>
+				<template #title>
+					<text class="demo__text">用 title 插槽写的标题</text>
+				</template>
+				<template #contentRender="{ item, index }">
+					<text :class="['demo__text', index == 1 ? 'demo__link' : '']">{{ (item as AmDescriptionsItem).content }}</text>
+				</template>
+			</am-descriptions>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__link { color: var(--am-color-primary, #1677ff); }
+</style>

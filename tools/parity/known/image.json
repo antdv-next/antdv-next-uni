@@ -1,0 +1,11 @@
+{
+  "missingProps": {
+    "alt": "uvue 的 image 没有 alt",
+    "position": "uvue 的 image 没有 object-position（裁剪方式由 fit 映射到 mode）",
+    "crossorigin": "uvue 的 image 没有这个属性",
+    "referrerpolicy": "uvue 的 image 没有这个属性"
+  },
+  "extraProps": {
+    "previewList": "预览用系统的 uni.previewImage，多张一起预览的地址列表（移动端库用 <am-image-preview-group>，待 ImagePreview 做好后再对齐）"
+  }
+}

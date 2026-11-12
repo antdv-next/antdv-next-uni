@@ -1,0 +1,55 @@
+<script setup lang="uts">
+// 索引栏的锚点（= antdv-next-mobile 的 IndexBarAnchor）：放在 <am-index-bar> 里每个分组的前面，index 为右侧索引中的字；
+// 默认插槽是锚点的内容（默认显示 index）。挂载时登记到 am-index-bar（它量出每个锚点的位置，用于跳转、高亮与吸顶）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - index 是字符串；
+// - 多一个 `title`：吸顶的标题由 am-index-bar 另画一份（App 端没有 position: sticky），插槽的内容复制不过去，
+//   所以锚点的文字不是 index 时写在 title 上
+defineOptions({ name: 'AmIndexBarAnchor' })
+
+const props = defineProps({
+	index: { type: String, default: '' },
+	/** 锚点（与吸顶标题）的文字，默认同 index */
+	title: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const register = inject<((index : string, title : string, id : string) => void) | null>('amIndexBarRegister', null)
+const unregister = inject<((id : string) => void) | null>('amIndexBarUnregister', null)
+const prefix = inject<(() => string) | null>('amIndexBarPrefix', null)
+
+const id = (prefix == null ? 'am-index-bar-anchor' : prefix()) + '-' + props.index
+const label = computed(() : string => props.title.length > 0 ? props.title : props.index)
+
+onMounted(() => {
+	if (register != null) register(props.index, label.value, id)
+})
+// 文字变了：重新登记（吸顶标题跟着变）
+watch(() : string => label.value, (text : string) => {
+	if (register != null) register(props.index, text, id)
+})
+onUnmounted(() => {
+	if (unregister != null) unregister(id)
+})
+</script>
+
+<template>
+	<view :id="id" :class="['am-index-bar-anchor', rootClass]">
+		<slot>
+			<text class="am-index-bar-anchor__text">{{ label }}</text>
+		</slot>
+	</view>
+</template>
+
+<style>
+/* 高度与 am-index-bar 的吸顶标题一致（ANCHOR_HEIGHT） */
+.am-index-bar-anchor {
+	height: 32px;
+	justify-content: center;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	background-color: var(--am-color-bg-layout, #f5f5f5);
+}
+.am-index-bar-anchor__text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+</style>

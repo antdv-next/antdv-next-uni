@@ -1,0 +1,19 @@
+{
+  "missingProps": {
+    "defaultChecked": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:checked",
+    "name": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "id": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "title": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "tabIndex": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "autoFocus": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "required": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "icon": "UTS 里不能把渲染函数当属性传，自定义图标用 icon 插槽（参数 checked、disabled）"
+  },
+  "extraProps": {
+    "label": "文字用属性传：uvue 的样式不继承，默认插槽里的文字拿不到字号与颜色"
+  },
+  "missingEmits": {
+    "focus": "不是原生的可聚焦元素，没有焦点事件",
+    "blur": "不是原生的可聚焦元素，没有焦点事件"
+  }
+}

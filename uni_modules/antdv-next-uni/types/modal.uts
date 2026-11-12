@@ -1,0 +1,22 @@
+// Modal 的类型（= antdv-next-mobile 的 modal/interface.ts）
+
+/** 对话框底部的一个操作（= ModalAction）：没有 onClick（UTS 的数据里不放函数），用组件的 action 事件 */
+export type AmModalAction = {
+	key : string
+	text : string
+	danger ?: boolean | null
+	/** 强调（主色、加粗） */
+	bold ?: boolean | null
+	disabled ?: boolean | null
+}
+
+/** confirmAmModal() / alertAmModal() 的参数（= ModalFuncProps 中原生对话框做得到的部分） */
+export type AmModalFuncProps = {
+	title ?: string | null
+	content ?: string | null
+	/** 默认取全局语言包的 Modal.okText（alert 为 Modal.justOkText） */
+	okText ?: string | null
+	cancelText ?: string | null
+	/** primary（默认）/ danger：确定按钮的颜色 */
+	okType ?: string | null
+}

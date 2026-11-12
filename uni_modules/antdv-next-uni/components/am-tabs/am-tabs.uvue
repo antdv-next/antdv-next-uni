@@ -1,0 +1,323 @@
+<script setup lang="uts">
+import { AmTabsItem } from '../../types/tabs.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { AM_DURATION_SLOW, amTransition, amUid, AmRect, measureAllWithin, measureById } from '../../utils/motion.uts'
+
+// 标签页（= antdv-next-mobile 的 Tabs）：items（key、label、content、icon、disabled、forceRender、destroyOnHidden）、
+// v-model:activeKey、defaultActiveKey、type（line / card / capsule）、size、centered、stretch、tabPlacement（top / bottom）、
+// animated、destroyOnHidden、swipeable 同名同义；事件 update:activeKey、change、tabClick；
+// 插槽 labelRender、contentRender、default（内容的兜底）、leftExtra、rightExtra，前三个的参数是 { item, index }。
+// 下划线只有一条，切换时滑到选中项的正中（transform 平移，不改 left）：平分宽度时用百分比平移（不用量尺寸，
+// 第一帧就在对的位置）；标签可以横向滚动时量出选中项的位置，并把选中项滚到中间。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - key 是字符串；空字符串表示“没传”（这时用 defaultActiveKey，再没有就是第一个未禁用的标签）；
+// - 标签的 label / content 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据）；自定义内容用插槽；
+// - stretch 是布尔值，没有“未设置”：标签不超过 4 个且没有 centered 时总是平分，stretch 只能把更多的标签也强制平分；
+// - animated 只有布尔值，控制下划线的滑动；内容区切换没有滑动动画；
+// - swipeable 是“在内容区左右一划就切换”，内容不跟手；
+// - 没有 sticky / offsetTop（App 端没有 position: sticky）；没有已废弃的 tabPosition
+defineOptions({ name: 'AmTabs' })
+
+const props = defineProps({
+	items: { type: Array as PropType<AmTabsItem[]>, default: () : AmTabsItem[] => [] },
+	activeKey: { type: String, default: '' },
+	defaultActiveKey: { type: String, default: '' },
+	type: { type: String, default: 'line' },
+	size: { type: String, default: '' },
+	centered: { type: Boolean, default: false },
+	tabPlacement: { type: String, default: 'top' },
+	/** 下划线切换时是否滑动 */
+	animated: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	/** 在内容区左右滑动切换标签 */
+	swipeable: { type: Boolean, default: false },
+	/** 标签平分宽度（不超过 4 个且没有 centered 时总是平分） */
+	stretch: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:activeKey', 'change', 'tabClick'])
+
+/** 下划线的宽度（像素），与样式中的 .am-tabs__ink 一致 */
+const INK_WIDTH = 24
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+
+const uid = amUid('am-tabs')
+
+function firstEnabledKey() : string {
+	for (let i = 0; i < props.items.length; i++) {
+		if (props.items[i].disabled != true) return props.items[i].key
+	}
+	return ''
+}
+
+/** 非受控时的 key */
+const inner = ref(props.defaultActiveKey)
+const current = computed(() : string => {
+	if (props.activeKey.length > 0) return props.activeKey
+	if (inner.value.length > 0) return inner.value
+	return firstEnabledKey()
+})
+const activeIndex = computed(() : number => props.items.findIndex((item) : boolean => item.key == current.value))
+
+const stretched = computed(() : boolean => !props.centered && (props.stretch || props.items.length <= 4))
+const line = computed(() : boolean => props.type != 'card' && props.type != 'capsule')
+
+/** 挂载后才开过渡：否则第一次出现时下划线从最左边滑过来 */
+const ready = ref(false)
+
+// 平分宽度：下划线放在一个与标签同宽的槽里，按序号平移整数倍
+const slotStyle = computed(() : string => {
+	const count = Math.max(props.items.length, 1)
+	const index = Math.max(activeIndex.value, 0)
+	let text = 'width:' + (100 / count) + '%;transform:translateX(' + (index * 100) + '%);'
+	if (activeIndex.value < 0) text += 'opacity:0;'
+	if (ready.value && props.animated) text += amTransition('transform', AM_DURATION_SLOW)
+	return text
+})
+
+// 可滚动：量出选中项相对列表的位置
+const inkLeft = ref(0)
+const inkReady = ref(false)
+const scrollLeft = ref(0)
+
+const freeStyle = computed(() : string => {
+	let text = 'transform:translateX(' + inkLeft.value + 'px);'
+	if (!inkReady.value || activeIndex.value < 0) text += 'opacity:0;'
+	if (ready.value && inkReady.value && props.animated) text += amTransition('transform', AM_DURATION_SLOW)
+	return text
+})
+
+/** 各标签相对列表的位置与可视宽度（挂载、标签变化时量一次；切换时直接取，下划线当帧就开始移动） */
+let rects : (AmRect | null)[] = []
+let viewportWidth = 0
+
+function apply() {
+	const index = activeIndex.value
+	const item = index >= 0 && index < rects.length ? rects[index] : null
+	if (item == null) return
+	inkLeft.value = item.left + item.width / 2 - INK_WIDTH / 2
+	// 第一次就位之后下一帧再开过渡，避免从 0 滑过来
+	if (!inkReady.value) setTimeout(() => { inkReady.value = true }, 30)
+	// 选中项滚到可视区域的中间
+	if (viewportWidth > 0) scrollLeft.value = Math.max(0, item.left + item.width / 2 - viewportWidth / 2)
+}
+
+function measure() {
+	if (stretched.value) return
+	measureById(uid).then((viewport : AmRect | null) => {
+		if (viewport != null) viewportWidth = viewport.width
+		measureAllWithin(uid + '-list', uid + '-', props.items.length).then((result : (AmRect | null)[]) => {
+			rects = result
+			apply()
+		})
+	})
+}
+
+let measureTimer = 0
+function scheduleMeasure(delay : number) {
+	clearTimeout(measureTimer)
+	measureTimer = setTimeout(() => { measure() }, delay)
+}
+
+watch(() : number => activeIndex.value, () => {
+	const index = activeIndex.value
+	if (index >= 0 && index < rects.length && rects[index] != null) apply()
+	else measure()
+})
+watch(() : AmTabsItem[] => props.items, () => { scheduleMeasure(30) })
+watch(() : string => size.value + props.type + (stretched.value ? '1' : '0'), () => { scheduleMeasure(30) })
+
+onMounted(() => {
+	scheduleMeasure(50)
+	setTimeout(() => { ready.value = true }, 80)
+})
+onUnmounted(() => { clearTimeout(measureTimer) })
+
+function activate(item : AmTabsItem) {
+	if (item.disabled == true || item.key == current.value) return
+	inner.value = item.key
+	emit('update:activeKey', item.key)
+	emit('change', item.key)
+}
+
+function onTabClick(item : AmTabsItem, event : UniPointerEvent) {
+	emit('tabClick', item.key, event)
+	activate(item)
+}
+
+// 内容区：激活过的才渲染（forceRender 的除外），隐藏的用 v-show 留着；destroyOnHidden 时只渲染当前的
+const visited = ref<string[]>([])
+watch(() : string => current.value, (key : string) => {
+	if (key.length > 0 && !visited.value.includes(key)) visited.value = [...visited.value, key]
+}, { immediate: true })
+
+function paneRendered(item : AmTabsItem) : boolean {
+	if (item.key == current.value) return true
+	if (item.destroyOnHidden ?? props.destroyOnHidden) return false
+	return item.forceRender == true || visited.value.includes(item.key)
+}
+
+// 左右一划切换：横向位移超过 50px 且明显大于纵向
+let startX = 0
+let startY = 0
+
+function onTouchStart(event : UniTouchEvent) {
+	if (!props.swipeable || event.touches.length == 0) return
+	startX = event.touches[0].clientX
+	startY = event.touches[0].clientY
+}
+
+function onTouchEnd(event : UniTouchEvent) {
+	if (!props.swipeable || event.changedTouches.length == 0) return
+	const dx = event.changedTouches[0].clientX - startX
+	const dy = event.changedTouches[0].clientY - startY
+	if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+	const step = dx < 0 ? 1 : -1
+	let index = activeIndex.value + step
+	while (index >= 0 && index < props.items.length) {
+		if (props.items[index].disabled != true) {
+			activate(props.items[index])
+			return
+		}
+		index += step
+	}
+}
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-tabs']
+	if (props.tabPlacement == 'bottom') list.push('am-tabs--bottom')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+function itemClasses(item : AmTabsItem) : string[] {
+	const list : string[] = ['am-tabs__item', 'am-tabs__item--' + size.value]
+	const active = item.key == current.value
+	if (stretched.value) list.push('am-tabs__item--stretch')
+	if (props.type == 'card' && active) list.push('am-tabs__item--card-active')
+	if (props.type == 'capsule') {
+		list.push('am-tabs__item--capsule', 'am-tabs__item--capsule-' + size.value)
+		if (active) list.push('am-tabs__item--capsule-active')
+	}
+	if (item.disabled == true) list.push('am-tabs__item--disabled')
+	return list
+}
+
+function labelClasses(item : AmTabsItem) : string[] {
+	const list : string[] = ['am-tabs__label', 'am-tabs__label--' + size.value]
+	if (props.type == 'capsule') list.push('am-tabs__label--capsule')
+	if (item.key == current.value) list.push(props.type == 'capsule' ? 'am-tabs__label--capsule-active' : 'am-tabs__label--active')
+	return list
+}
+
+/** 图标不继承颜色：按主题取 */
+function iconColor(item : AmTabsItem) : string {
+	const active = item.key == current.value
+	if (props.type == 'capsule') return active ? theme().colorTextLightSolid : theme().colorText
+	return active ? theme().colorPrimary : theme().colorText
+}
+const iconSize = computed(() : number => size.value == 'large' ? 20 : (size.value == 'small' ? 14 : 16))
+</script>
+
+<template>
+	<view :class="classes">
+		<view :class="['am-tabs__header', 'am-tabs__header--' + size, type == 'card' ? 'am-tabs__header--card' : '']">
+			<slot name="leftExtra"></slot>
+			<scroll-view :id="uid" class="am-tabs__nav" direction="horizontal" :show-scrollbar="false" :scroll-left="scrollLeft" :scroll-with-animation="true">
+				<view
+					:id="uid + '-list'"
+					:class="['am-tabs__list', 'am-tabs__list--' + size, stretched ? 'am-tabs__list--stretch' : '', centered ? 'am-tabs__list--centered' : '', type == 'capsule' ? 'am-tabs__list--capsule' : '']"
+				>
+					<view
+						v-for="(item, index) in items"
+						:key="item.key"
+						:id="uid + '-' + index"
+						:class="itemClasses(item)"
+						@click="onTabClick(item, $event)"
+					>
+						<slot name="labelRender" :item="item" :index="index">
+							<am-icon v-if="(item.icon ?? '').length > 0" :name="item.icon ?? ''" :size="iconSize" :color="iconColor(item)" :class="(item.label ?? '').length > 0 ? 'am-tabs__icon' : ''" />
+							<text v-if="(item.label ?? '').length > 0" :class="labelClasses(item)">{{ item.label }}</text>
+						</slot>
+					</view>
+					<view v-if="line && stretched" class="am-tabs__ink-slot" :style="slotStyle">
+						<view class="am-tabs__ink"></view>
+					</view>
+					<view v-else-if="line" class="am-tabs__ink am-tabs__ink--free" :style="freeStyle"></view>
+				</view>
+			</scroll-view>
+			<slot name="rightExtra"></slot>
+		</view>
+		<view class="am-tabs__body" @touchstart="onTouchStart" @touchend="onTouchEnd">
+			<view v-for="(item, index) in items" :key="item.key" v-show="item.key == current" class="am-tabs__content">
+				<view v-if="paneRendered(item)" class="am-tabs__pane">
+					<slot name="contentRender" :item="item" :index="index">
+						<text v-if="(item.content ?? '').length > 0" class="am-tabs__content-text">{{ item.content }}</text>
+						<slot v-else :item="item" :index="index"></slot>
+					</slot>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-tabs--bottom { flex-direction: column-reverse; }
+.am-tabs__header { flex-direction: row; align-items: center; background-color: var(--am-color-bg-container, #ffffff); }
+.am-tabs__header--small { height: 36px; }
+.am-tabs__header--middle { height: 44px; }
+.am-tabs__header--large { height: 52px; }
+.am-tabs__header--card { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-tabs__nav { flex: 1; }
+.am-tabs__list { flex-direction: row; align-items: center; }
+.am-tabs__list--small { height: 36px; }
+.am-tabs__list--middle { height: 44px; }
+.am-tabs__list--large { height: 52px; }
+.am-tabs__list--stretch { width: 100%; }
+.am-tabs__list--centered { width: 100%; justify-content: center; }
+.am-tabs__list--capsule { padding-left: var(--am-padding-sm, 12px); padding-right: var(--am-padding-xxs, 4px); }
+.am-tabs__item {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-tabs__item--small { height: 36px; }
+.am-tabs__item--middle { height: 44px; }
+.am-tabs__item--large { height: 52px; }
+.am-tabs__item--stretch { flex: 1; padding-left: 4px; padding-right: 4px; }
+.am-tabs__item--card-active { background-color: var(--am-color-bg-container, #ffffff); }
+.am-tabs__item--capsule { margin-right: var(--am-padding-xs, 8px); background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-tabs__item--capsule-small { height: 26px; border-radius: 13px; }
+.am-tabs__item--capsule-middle { height: 30px; border-radius: 15px; }
+.am-tabs__item--capsule-large { height: 34px; border-radius: 17px; }
+.am-tabs__item--capsule-active { background-color: var(--am-color-primary, #1677ff); }
+.am-tabs__item--disabled { opacity: 0.4; }
+.am-tabs__icon { margin-right: 6px; }
+.am-tabs__label { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); white-space: nowrap; }
+.am-tabs__label--small { font-size: var(--am-font-size, 14px); }
+.am-tabs__label--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-tabs__label--large { font-size: var(--am-font-size-xl, 18px); }
+.am-tabs__label--capsule { font-size: var(--am-font-size, 14px); }
+.am-tabs__label--active { color: var(--am-color-primary, #1677ff); }
+.am-tabs__label--capsule-active { color: var(--am-color-text-light-solid, #ffffff); }
+/* 槽与标签同宽、贴在底部，下划线在槽里居中 */
+.am-tabs__ink-slot { position: absolute; left: 0; bottom: 0; height: 2px; align-items: center; }
+.am-tabs__ink { width: 24px; height: 2px; border-radius: 2px; background-color: var(--am-color-primary, #1677ff); }
+.am-tabs__ink--free { position: absolute; left: 0; bottom: 0; }
+.am-tabs__content-text {
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	font-size: var(--am-font-size, 14px);
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+}
+</style>

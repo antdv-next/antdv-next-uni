@@ -1,0 +1,102 @@
+<script setup lang="uts">
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 下拉菜单（= antdv-next-mobile 的 Dropdown）：一条筛选栏，每个 <am-dropdown-item> 是栏上的一个标题，点开后在栏的下方展开面板。
+// v-model:activeKey（展开的是哪一项）、defaultActiveKey、closeOnMaskClick、closeOnClickAway、arrowIcon、zIndex 同名同义；
+// 事件 update:activeKey、change；方法 close()。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - key 是字符串，空字符串表示全部收起（移动端库是 null）；子项用 `item-key` 指定 key（组件里拿不到 vnode 的 key），
+//   不写时按顺序为 '0'、'1'……；
+// - 没有 Teleport：面板是 fixed 的一层，位置按量到的菜单栏下边缘定（展开时重新量），所以没有 getContainer；
+//   菜单栏放在会移动的容器（滚动区域）里时，展开后再滚动面板不会跟着走；
+// - closeOnClickAway：App 端没有“触摸组件以外的区域”的全局事件，做成菜单栏上方也盖一层透明的遮罩，点它收起；
+// - arrowIcon 是图标名（默认 down），自定义图标用子项的 arrowIcon 插槽（父组件的插槽传不到子项里）
+defineOptions({ name: 'AmDropdown' })
+
+const props = defineProps({
+	/** 展开项的 key，空字符串为全部收起 */
+	activeKey: { type: String, default: '' },
+	defaultActiveKey: { type: String, default: '' },
+	closeOnMaskClick: { type: Boolean, default: true },
+	closeOnClickAway: { type: Boolean, default: true },
+	/** 箭头的图标名 */
+	arrowIcon: { type: String, default: 'down' },
+	zIndex: { type: Number, default: 1000 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:activeKey', 'change'])
+
+const uid = amUid('am-dropdown')
+
+/** 展开的 key：属性变化时跟着变；没有用 v-model 时由组件自己记住 */
+const inner = ref(props.activeKey.length > 0 ? props.activeKey : props.defaultActiveKey)
+watch(() : string => props.activeKey, (key : string) => { inner.value = key })
+const current = computed(() : string => inner.value)
+
+/** 菜单栏的下边缘（窗口坐标）：面板从这里往下展开 */
+const barBottom = ref(0)
+const barTop = ref(0)
+
+function measure() {
+	measureById(uid).then((rect : AmRect | null) => {
+		if (rect == null) return
+		barTop.value = rect.top
+		barBottom.value = rect.top + rect.height
+	})
+}
+
+function setActive(key : string) {
+	if (key == current.value) return
+	if (key.length > 0) measure()
+	inner.value = key
+	emit('update:activeKey', key)
+	emit('change', key)
+}
+
+// 子项登记顺序号：没有写 item-key 的按顺序取 '0'、'1'……
+let seed = 0
+provide('amDropdownNextKey', () : string => {
+	const key = '' + seed
+	seed++
+	return key
+})
+provide('amDropdownActive', () : string => current.value)
+provide('amDropdownToggle', (key : string) => { setActive(key == current.value ? '' : key) })
+provide('amDropdownClose', () => { setActive('') })
+provide('amDropdownBarTop', () : number => barTop.value)
+provide('amDropdownBarBottom', () : number => barBottom.value)
+provide('amDropdownMaskClosable', () : boolean => props.closeOnMaskClick)
+provide('amDropdownClickAway', () : boolean => props.closeOnClickAway)
+provide('amDropdownArrowIcon', () : string => props.arrowIcon)
+provide('amDropdownZIndex', () : number => props.zIndex)
+
+onMounted(() => {
+	setTimeout(() => { measure() }, 50)
+	setTimeout(() => { measure() }, 400)
+})
+onPageShow(() => { setTimeout(() => { measure() }, 30) })
+
+defineExpose({
+	/** 收起展开着的面板 */
+	close: () => { setActive('') }
+})
+</script>
+
+<template>
+	<view :id="uid" :class="['am-dropdown', rootClass]">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-dropdown {
+	flex-direction: row;
+	height: 44px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+</style>

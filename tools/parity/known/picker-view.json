@@ -1,0 +1,8 @@
+{
+  "missingProps": {
+    "fieldNames": "columns 的选项就是 AmOption（label / value / disabled），不需要映射字段名",
+    "defaultValue": "UTS 里分不出“没传”和空值，非受控用法请用 v-model:value",
+    "optionRender": "选项渲染在原生 picker-view-column 里，作用域插槽 / 渲染函数未在 App 端验证，暂不提供",
+    "virtual": "滚轮是原生的 picker-view，由各端原生实现滚动，不需要虚拟列表"
+  }
+}

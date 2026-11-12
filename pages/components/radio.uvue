@@ -1,0 +1,86 @@
+<script setup lang="uts">
+import { AmOption } from '@/uni_modules/antdv-next-uni/types/index.uts'
+
+const single = ref(false)
+const gender = ref<any | null>('male')
+const pay = ref<any | null>('wechat')
+const size = ref<any | null>('m')
+const speed = ref<any | null>(2)
+const custom = ref<any | null>('b')
+
+const genders : AmOption[] = [
+	{ label: '男', value: 'male' },
+	{ label: '女', value: 'female' },
+	{ label: '保密（不可选）', value: 'secret', disabled: true }
+]
+const pays : AmOption[] = [{ label: '微信支付', value: 'wechat' }, { label: '支付宝', value: 'alipay' }, { label: '银行卡', value: 'card' }]
+const sizes : AmOption[] = [{ label: 'S', value: 's' }, { label: 'M', value: 'm' }, { label: 'L', value: 'l' }, { label: 'XL', value: 'xl', disabled: true }]
+const speeds : AmOption[] = [{ label: '慢', value: 1 }, { label: '中', value: 2 }, { label: '快', value: 3 }]
+
+function text(value : any | null) : string {
+	return JSON.stringify(value) ?? 'null'
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-radio v-model:checked="single" label="单个单选框（选中后不能取消）" />
+			<am-radio :checked="true" disabled label="选中且禁用" />
+			<text class="demo__hint">checked：{{ single }}</text>
+		</view>
+
+		<text class="demo__title">单选组（options）</text>
+		<view class="demo__card">
+			<am-radio-group v-model:value="gender" :options="genders" />
+			<text class="demo__hint">value：{{ text(gender) }}</text>
+		</view>
+
+		<text class="demo__title">竖排（vertical）与列表式（block）</text>
+		<view class="demo__card">
+			<am-radio-group class="demo__block" v-model:value="pay" :options="pays" vertical />
+			<am-radio-group v-model:value="pay" :options="pays" block />
+			<text class="demo__hint">value：{{ text(pay) }}</text>
+		</view>
+
+		<text class="demo__title">按钮样式（optionType="button"）</text>
+		<view class="demo__card">
+			<am-radio-group class="demo__block" v-model:value="size" :options="sizes" option-type="button" />
+			<am-radio-group class="demo__block" v-model:value="size" :options="sizes" option-type="button" button-style="solid" size="small" />
+			<am-radio-group v-model:value="speed" :options="speeds" option-type="button" block />
+			<text class="demo__hint">size：{{ text(size) }}，speed（数字）：{{ text(speed) }}</text>
+		</view>
+
+		<text class="demo__title">组里直接放 am-radio</text>
+		<view class="demo__card">
+			<am-radio-group v-model:value="custom">
+				<am-radio value="a" label="选项 A" />
+				<am-radio value="b" label="选项 B" />
+				<am-radio value="c" label="选项 C" disabled />
+			</am-radio-group>
+			<text class="demo__hint">value：{{ text(custom) }}</text>
+		</view>
+
+		<text class="demo__title">禁用整组</text>
+		<view class="demo__card">
+			<am-radio-group :value="gender" :options="genders" disabled />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__row { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.demo__label { width: 96px; font-size: 14px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__footer { height: 40px; }
+</style>

@@ -1,0 +1,12 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:value",
+    "readonly": "只保留 readOnly 一种写法",
+    "formatter": "函数属性暂不提供（显示的文字只按 precision 格式化）",
+    "parser": "同 formatter",
+    "stringMode": "值只有数字",
+    "keyboard": "没有硬件键盘的方向键事件",
+    "longPress": "按住连续加减暂不提供（App 端的长按与 hover-class 配合未验证）",
+    "inputmode": "原生 input 组件用 type 选择键盘：min 小于 0 时用文本键盘，否则用带小数点的数字键盘"
+  }
+}

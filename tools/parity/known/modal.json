@@ -1,0 +1,12 @@
+{
+  "missingProps": {
+    "okButtonProps": "底部是对话框自己的文字按钮（不是 am-button），用 okText / okType / confirmLoading 控制；要完全自定义用 footer 插槽",
+    "cancelButtonProps": "同 okButtonProps",
+    "centered": "移动端的对话框总是居中（移动端库里这个属性也只是为了与 PC 同名）",
+    "keyboard": "手机上没有 ESC；Android 的返回键会先关掉最上面的弹出层",
+    "forceRender": "am-popup 还没有 forceRender",
+    "scrollLock": "fixed 的遮罩已经拦住了页面的滚动",
+    "image": "顶部的图片用 header 插槽放 <image>",
+    "rootStyle": "根节点是 am-popup，样式不能透传到子组件内部；用 rootClass"
+  }
+}

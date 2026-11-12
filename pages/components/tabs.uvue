@@ -1,0 +1,98 @@
+<script setup lang="uts">
+import { AmTabsItem } from '@/uni_modules/antdv-next-uni/types/tabs.uts'
+
+const basic : AmTabsItem[] = [
+	{ key: 'all', label: '全部', content: '全部订单的内容' },
+	{ key: 'pay', label: '待付款', content: '待付款的内容' },
+	{ key: 'ship', label: '待发货', content: '待发货的内容' },
+	{ key: 'done', label: '已完成', disabled: true }
+]
+const many : AmTabsItem[] = [
+	{ key: '1', label: '推荐' },
+	{ key: '2', label: '手机数码' },
+	{ key: '3', label: '家用电器' },
+	{ key: '4', label: '食品生鲜' },
+	{ key: '5', label: '美妆' },
+	{ key: '6', label: '运动户外' },
+	{ key: '7', label: '图书' },
+	{ key: '8', label: '母婴' }
+]
+const icons : AmTabsItem[] = [
+	{ key: 'home', label: '首页', icon: 'home' },
+	{ key: 'cart', label: '购物车', icon: 'cart' },
+	{ key: 'user', label: '我的', icon: 'user' }
+]
+const sizes : string[] = ['small', 'middle', 'large']
+
+const active = ref('all')
+const scrollKey = ref('1')
+const cardKey = ref('all')
+const capsuleKey = ref('1')
+const swipeKey = ref('home')
+const size = ref('middle')
+const log = ref('')
+
+function onChange(key : string) {
+	log.value = 'change: ' + key
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（不超过 4 个时平分宽度）</text>
+		<am-tabs v-model:activeKey="active" :items="basic" @change="onChange" />
+		<text class="demo__hint">activeKey = {{ active }}　{{ log }}</text>
+
+		<text class="demo__title">标签较多时横向滚动</text>
+		<am-tabs v-model:activeKey="scrollKey" :items="many">
+			<template #default="{ item }">
+				<text class="demo__pane">「{{ item.label }}」的内容（默认插槽）</text>
+			</template>
+		</am-tabs>
+
+		<text class="demo__title">卡片</text>
+		<am-tabs v-model:activeKey="cardKey" :items="basic" type="card" />
+
+		<text class="demo__title">胶囊</text>
+		<am-tabs v-model:activeKey="capsuleKey" :items="many" type="capsule" />
+
+		<text class="demo__title">图标、居中、非受控（defaultActiveKey）</text>
+		<am-tabs :items="icons" default-active-key="cart" centered />
+
+		<text class="demo__title">在内容区左右滑动切换</text>
+		<am-tabs v-model:activeKey="swipeKey" :items="icons" swipeable>
+			<template #contentRender="{ item, index }">
+				<view class="demo__swipe">
+					<text class="demo__swipe-text">第 {{ index + 1 }} 页：{{ item.label }}</text>
+				</view>
+			</template>
+		</am-tabs>
+
+		<text class="demo__title">尺寸与附加内容</text>
+		<view class="demo__card demo__row">
+			<am-button v-for="name in sizes" :key="name" class="demo__item" size="small" :type="size == name ? 'primary' : 'default'" :text="name" @click="size = name" />
+		</view>
+		<am-tabs :items="icons" :size="size" tab-placement="bottom">
+			<template #rightExtra>
+				<am-icon class="demo__extra" name="filter" :size="18" />
+			</template>
+			<template #default="{ item }">
+				<text class="demo__pane">标签栏在下方：{{ item.label }}</text>
+			</template>
+		</am-tabs>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__hint { padding: 8px 16px 0 16px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card { margin: 0 12px 10px 12px; padding: 16px 16px 6px 16px; background-color: var(--am-color-bg-container, #ffffff); border-radius: 12px; }
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 8px; margin-bottom: 10px; }
+.demo__pane { padding: 12px 16px; font-size: 14px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); background-color: var(--am-color-bg-container, #ffffff); }
+.demo__swipe { height: 120px; align-items: center; justify-content: center; background-color: var(--am-color-bg-container, #ffffff); }
+.demo__swipe-text { font-size: 16px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__extra { margin: 0 12px; }
+.demo__footer { height: 40px; }
+</style>

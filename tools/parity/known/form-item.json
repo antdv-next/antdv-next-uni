@@ -1,0 +1,12 @@
+{
+  "missingProps": {
+    "validateDebounce": "校验是同步的，没有防抖",
+    "messageVariables": "提示模板只有 ${label} 等内置变量；要自定义文字用规则的 message",
+    "noStyle": "没有无样式模式：UTS 里拿不到子表单项的状态来合并显示",
+    "colon": "没有“没传”的布尔值，冒号只在 <am-form colon> 上设",
+    "id": "根节点的 id 由组件生成（scrollToField 用它），不生成字段的 id"
+  },
+  "extraProps": {
+    "bordered": "底部的分隔线：没有相邻选择器，最后一项的线要用 :bordered=\"false\" 去掉（同 am-list-item）"
+  }
+}

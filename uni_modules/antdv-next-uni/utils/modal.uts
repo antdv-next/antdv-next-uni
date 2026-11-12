@@ -1,0 +1,51 @@
+import { AmModalFuncProps } from '../types/modal.uts'
+import { amLocaleState } from '../locale/locale.uts'
+import { amThemeState } from '../theme/theme.uts'
+
+// 对话框的函数式用法（代替 antdv-next-mobile 的 Modal.confirm() / Modal.alert() / modal.confirmAsync()）。
+// uni-app x 不能动态挂载组件，所以静态方法做不成同样的形式：这里用原生对话框 uni.showModal，
+// 文字取全局语言包（setAmLocale），确定按钮的颜色取全局主题（setAmTheme）。
+// 要自定义内容、图标、多个操作时，在页面里放 <am-modal v-model:open>
+
+/** 确认对话框（= Modal.confirm / confirmAsync）：点了确定为 true，取消或关闭为 false */
+export function confirmAmModal(options : AmModalFuncProps) : Promise<boolean> {
+	const texts = amLocaleState.locale.Modal
+	const theme = amThemeState.theme
+	return new Promise<boolean>((resolve) => {
+		uni.showModal({
+			title: options.title ?? '',
+			content: options.content ?? '',
+			showCancel: true,
+			confirmText: options.okText ?? texts.okText,
+			cancelText: options.cancelText ?? texts.cancelText,
+			confirmColor: options.okType == 'danger' ? theme.colorError : theme.colorPrimary,
+			success: (result) => {
+				resolve(result.confirm)
+			},
+			fail: (_) => {
+				resolve(false)
+			}
+		})
+	})
+}
+
+/** 只有一个按钮的提示对话框（= Modal.alert）：关闭后完成 */
+export function alertAmModal(options : AmModalFuncProps) : Promise<void> {
+	const texts = amLocaleState.locale.Modal
+	const theme = amThemeState.theme
+	return new Promise<void>((resolve) => {
+		uni.showModal({
+			title: options.title ?? '',
+			content: options.content ?? '',
+			showCancel: false,
+			confirmText: options.okText ?? texts.justOkText,
+			confirmColor: options.okType == 'danger' ? theme.colorError : theme.colorPrimary,
+			success: (_) => {
+				resolve()
+			},
+			fail: (_) => {
+				resolve()
+			}
+		})
+	})
+}

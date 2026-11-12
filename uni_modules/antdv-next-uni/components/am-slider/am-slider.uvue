@@ -1,0 +1,143 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+
+// 滑动输入条（= antdv-next-mobile 的 Slider）：v-model:value（数字；range 时为 [小, 大]）、min、max、step、range、
+// disabled 同名同义；事件 update:value、change（拖动中与松手时）、changeComplete（松手时）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 用内置的 slider 组件（各端原生的拖动手感），不是自己画的轨道，所以没有 marks、dots、included、reverse、
+//   vertical / orientation、tooltip（拖动时的气泡）、keyboard、id、ariaLabelForHandle，也没有 mark / handle 插槽；
+// - `range` 用上下两条：上面一条调小的值，下面一条调大的值（原生 slider 只有一个滑块）；
+// - `showValue`（多出的属性）：在右侧显示当前值，代替 tooltip；
+// - 颜色在 UTS 中取主题（slider 的颜色属性不支持 CSS 变量）；没有 defaultValue（用 v-model:value）
+defineOptions({ name: 'AmSlider' })
+
+const props = defineProps({
+	value: { type: [Number, Array] as PropType<any | null>, default: null },
+	min: { type: Number, default: 0 },
+	max: { type: Number, default: 100 },
+	step: { type: Number, default: 1 },
+	range: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	/** 在右侧显示当前值 */
+	showValue: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'changeComplete'])
+
+const theme = useAmTheme()
+const notifyChange = useAmFieldChange()
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const activeColor = computed(() : string => theme().colorPrimary)
+const railColor = computed(() : string => theme().colorFillSecondary)
+
+const single = computed(() : number => {
+	const value = props.value
+	return typeof value == 'number' ? (value as number) : props.min
+})
+const pair = computed(() : number[] => {
+	const value = props.value
+	if (Array.isArray(value)) {
+		const list = value as any[]
+		const a = list.length > 0 && typeof list[0] == 'number' ? (list[0] as number) : props.min
+		const b = list.length > 1 && typeof list[1] == 'number' ? (list[1] as number) : props.max
+		return [a, b]
+	}
+	return [props.min, props.max]
+})
+
+function numberText(value : number) : string {
+	return value == Math.floor(value) ? value.toFixed(0) : '' + value
+}
+
+/** complete：松手（原生的 change）；拖动中（changing）为 false */
+function onSingle(event : UniSliderChangeEvent, complete : boolean) {
+	const value = event.detail.value
+	emit('update:value', value)
+	emit('change', value)
+	if (complete) emit('changeComplete', value)
+	notifyChange()
+}
+
+function onRange(index : number, event : UniSliderChangeEvent, complete : boolean) {
+	const next : number[] = [pair.value[0], pair.value[1]]
+	next[index] = event.detail.value
+	// 两个值不交叉：拖过了另一个就把它一起带过去
+	if (next[0] > next[1]) {
+		if (index == 0) next[1] = next[0]
+		else next[0] = next[1]
+	}
+	emit('update:value', next)
+	emit('change', next)
+	if (complete) emit('changeComplete', next)
+	notifyChange()
+}
+</script>
+
+<template>
+	<view :class="['am-slider', rootClass]">
+		<view v-if="!range" class="am-slider__row">
+			<slider
+				class="am-slider__control"
+				:value="single"
+				:min="min"
+				:max="max"
+				:step="step"
+				:disabled="disabled"
+				:active-color="activeColor"
+				:background-color="railColor"
+				:block-size="24"
+				block-color="#ffffff"
+				@changing="onSingle($event, false)"
+				@change="onSingle($event, true)"
+			/>
+			<text v-if="showValue" class="am-slider__value">{{ numberText(single) }}</text>
+		</view>
+		<view v-else>
+			<view class="am-slider__row">
+				<slider
+					class="am-slider__control"
+					:value="pair[0]"
+					:min="min"
+					:max="max"
+					:step="step"
+					:disabled="disabled"
+					:active-color="railColor"
+					:background-color="activeColor"
+					:block-size="24"
+					block-color="#ffffff"
+					@changing="onRange(0, $event, false)"
+					@change="onRange(0, $event, true)"
+				/>
+				<text v-if="showValue" class="am-slider__value">{{ numberText(pair[0]) }}</text>
+			</view>
+			<view class="am-slider__row">
+				<slider
+					class="am-slider__control"
+					:value="pair[1]"
+					:min="min"
+					:max="max"
+					:step="step"
+					:disabled="disabled"
+					:active-color="activeColor"
+					:background-color="railColor"
+					:block-size="24"
+					block-color="#ffffff"
+					@changing="onRange(1, $event, false)"
+					@change="onRange(1, $event, true)"
+				/>
+				<text v-if="showValue" class="am-slider__value">{{ numberText(pair[1]) }}</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-slider__row { flex-direction: row; align-items: center; }
+.am-slider__control { flex: 1; }
+.am-slider__value { width: 40px; text-align: right; font-size: var(--am-font-size, 14px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

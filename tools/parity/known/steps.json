@@ -1,0 +1,10 @@
+{
+  "missingProps": {
+    "direction": "已废弃的属性不移植，用 orientation",
+    "progressDot": "已废弃的属性不移植，用 type=\"dot\"",
+    "labelPlacement": "已废弃的属性不移植，用 titlePlacement"
+  },
+  "extraProps": {
+    "clickable": "移动端库是“监听了 change 或用了 v-model:current 才可点击”，uni-app x 的组件里拿不到有没有监听，要显式写"
+  }
+}

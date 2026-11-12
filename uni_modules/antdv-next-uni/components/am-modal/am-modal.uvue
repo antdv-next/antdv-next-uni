@@ -1,0 +1,186 @@
+<script setup lang="uts">
+import { AmModalAction } from '../../types/modal.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 对话框（= antdv-next-mobile 的 Modal）：v-model:open、title、content、footer、okText、cancelText、okType、
+// confirmLoading、okCancel（false 时只有一个按钮，文字默认取语言包的 justOkText）、closable、closeIcon、mask、maskClosable、
+// destroyOnHidden、zIndex、width、actions（用一组操作代替确定 / 取消，多于两个时竖排）、closeOnAction 同名同义；
+// 事件 update:open、ok、cancel（取消按钮、遮罩、关闭图标、Android 返回键）、action（操作、下标）、afterClose、afterOpenChange；
+// 插槽 default（内容）、title、header（标题上方：插图、图标）、footer。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / content / okText / cancelText 是字符串，自定义内容用插槽（title、default、footer）；closeIcon 是图标名，没有同名插槽；
+// - footer 是布尔值（false 不显示底部按钮），自定义底部用 footer 插槽（插槽没有 ok / cancel 参数，自己发事件）；
+// - okType 只影响确定按钮的颜色：danger 为错误色，其余为主色；width 是像素数；
+// - actions 的项没有 onClick（UTS 的数据里不放函数），用 action 事件；
+// - 没有 okButtonProps / cancelButtonProps、image、centered（总是居中）、keyboard、forceRender、scrollLock、rootStyle；
+// - 没有静态方法 Modal.confirm() 等（不能动态挂载组件）：用 utils/modal.uts 的 confirmAmModal() / alertAmModal()（原生对话框）
+defineOptions({ name: 'AmModal' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	title: { type: String, default: '' },
+	content: { type: String, default: '' },
+	footer: { type: Boolean, default: true },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	okType: { type: String, default: 'primary' },
+	confirmLoading: { type: Boolean, default: false },
+	okCancel: { type: Boolean, default: true },
+	closable: { type: Boolean, default: false },
+	closeIcon: { type: String, default: 'close' },
+	mask: { type: Boolean, default: true },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	width: { type: Number, default: 0 },
+	actions: { type: Array as PropType<AmModalAction[]>, default: () : AmModalAction[] => [] },
+	closeOnAction: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'ok', 'cancel', 'action', 'afterClose', 'afterOpenChange'])
+
+const locale = useAmLocale()
+const theme = useAmTheme()
+
+const okLabel = computed(() : string => {
+	if (props.okText.length > 0) return props.okText
+	return props.okCancel ? locale().Modal.okText : locale().Modal.justOkText
+})
+const cancelLabel = computed(() : string => props.cancelText.length > 0 ? props.cancelText : locale().Modal.cancelText)
+const loadingColor = computed(() : string => props.okType == 'danger' ? theme().colorError : theme().colorPrimary)
+/** 操作多于两个时竖排 */
+const stacked = computed(() : boolean => props.actions.length > 2)
+
+function cancel() {
+	emit('cancel')
+	emit('update:open', false)
+}
+
+function onOpen(open : boolean) {
+	if (!open) cancel()
+}
+
+function onOk(event : UniPointerEvent) {
+	if (!props.confirmLoading) emit('ok', event)
+}
+
+function onAction(index : number) {
+	const action = props.actions[index]
+	if (action.disabled == true) return
+	emit('action', action, index)
+	if (props.closeOnAction) emit('update:open', false)
+}
+
+function onAfterOpenChange(open : boolean) {
+	emit('afterOpenChange', open)
+	if (!open) emit('afterClose')
+}
+</script>
+
+<template>
+	<am-popup
+		:open="open"
+		placement="center"
+		:mask="mask"
+		:mask-closable="maskClosable"
+		:closable="closable"
+		:close-icon="closeIcon"
+		:destroy-on-hidden="destroyOnHidden"
+		:z-index="zIndex"
+		:width="width"
+		:root-class="rootClass"
+		@update:open="onOpen"
+		@after-open-change="onAfterOpenChange"
+	>
+		<slot name="header"></slot>
+		<view class="am-modal__title">
+			<slot name="title">
+				<text v-if="title.length > 0" class="am-modal__title-text">{{ title }}</text>
+			</slot>
+		</view>
+		<view class="am-modal__body">
+			<slot>
+				<text v-if="content.length > 0" class="am-modal__content">{{ content }}</text>
+			</slot>
+		</view>
+		<slot name="footer">
+			<view v-if="footer && actions.length > 0" :class="['am-modal__footer', stacked ? 'am-modal__footer--stacked' : '']">
+				<view
+					v-for="(action, index) in actions"
+					:key="action.key"
+					:class="[
+						'am-modal__button',
+						stacked ? '' : 'am-modal__button--row',
+						index > 0 ? (stacked ? 'am-modal__button--split-top' : 'am-modal__button--split-left') : '',
+						action.disabled == true ? 'am-modal__button--disabled' : ''
+					]"
+					:hover-class="action.disabled == true ? 'none' : 'am-modal__button--active'"
+					@click="onAction(index)"
+				>
+					<text
+						:class="[
+							'am-modal__text',
+							action.bold == true ? 'am-modal__text--bold' : '',
+							action.danger == true ? 'am-modal__text--danger' : ''
+						]"
+					>{{ action.text }}</text>
+				</view>
+			</view>
+			<view v-else-if="footer" class="am-modal__footer">
+				<view v-if="okCancel" class="am-modal__button am-modal__button--row" hover-class="am-modal__button--active" @click="cancel">
+					<text class="am-modal__text">{{ cancelLabel }}</text>
+				</view>
+				<view :class="['am-modal__button', 'am-modal__button--row', okCancel ? 'am-modal__button--split-left' : '']" hover-class="am-modal__button--active" @click="onOk">
+					<am-loading v-if="confirmLoading" :color="loadingColor" />
+					<text v-else :class="['am-modal__text', 'am-modal__text--bold', okType == 'danger' ? 'am-modal__text--danger' : '']">{{ okLabel }}</text>
+				</view>
+			</view>
+		</slot>
+	</am-popup>
+</template>
+
+<style>
+.am-modal__title { padding: 24px 24px 0 24px; align-items: center; }
+.am-modal__title-text {
+	font-size: var(--am-font-size-xl, 18px);
+	font-weight: bold;
+	line-height: 26px;
+	text-align: center;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+}
+.am-modal__body { padding: 8px 24px 24px 24px; }
+.am-modal__content {
+	font-size: var(--am-font-size-lg, 16px);
+	line-height: 24px;
+	text-align: center;
+	color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65));
+}
+.am-modal__footer {
+	flex-direction: row;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-modal__footer--stacked { flex-direction: column; }
+.am-modal__button { height: 52px; flex-direction: row; align-items: center; justify-content: center; }
+/* 横排时平分宽度；竖排时每个按钮占一行 */
+.am-modal__button--row { flex: 1; }
+.am-modal__button--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-modal__button--disabled { opacity: 0.4; }
+.am-modal__button--split-left {
+	border-left-width: 1px;
+	border-left-style: solid;
+	border-left-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-modal__button--split-top {
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-modal__text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-modal__text--bold { font-weight: bold; color: var(--am-color-primary, #1677ff); }
+.am-modal__text--danger { color: var(--am-color-error, #ff4d4f); }
+</style>

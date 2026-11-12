@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "labelRender": "是函数（返回节点），UTS 里函数不能返回节点；用同名插槽",
+    "contentRender": "是函数（返回节点），UTS 里函数不能返回节点；用同名插槽"
+  }
+}

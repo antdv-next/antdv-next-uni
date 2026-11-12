@@ -1,0 +1,218 @@
+<script setup lang="uts">
+import { AmSwipeActionItem } from '../../types/swipe-action.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { AM_DURATION_SLOW, amTransition, amUid, AmRect, measureById } from '../../utils/motion.uts'
+import { amSwipeActionClosed, amSwipeActionOpen } from '../../utils/swipe-action.uts'
+
+// 滑动操作（= antdv-next-mobile 的 SwipeAction）：左滑露出右侧的按钮、右滑露出左侧的按钮。
+// leftActions / rightActions（key、text、color）、closeOnAction、closeOnTouchOutside、disabled、stopPropagation 同名同义；
+// 事件 action（action, event）、actionsReveal（side）、close；插槽 default、left、right；方法 show(side) / close()。
+// 手势：横向拖动超过 5px 才算滑动（竖着划照常滚动列表），跟手移动（拉过按钮宽度后有阻尼），
+// 松手时拉开超过三成就展开、否则弹回；展开着时点内容只是收起（不触发内容的点击）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 按钮的 text 是文字，没有 onClick（UTS 的类型里不放函数）：用 action 事件；
+// - closeOnTouchOutside：App 端没有“触摸组件以外的区域”的全局事件，做成“同一时刻只有一个是展开的”
+//   （展开另一个时收起这一个）；滚动列表、切换页签时可以调用 utils/swipe-action.uts 的 closeAmSwipeAction()；
+// - 用 touch 事件，电脑浏览器上不能用鼠标拖
+defineOptions({ name: 'AmSwipeAction' })
+
+const props = defineProps({
+	leftActions: { type: Array as PropType<AmSwipeActionItem[]>, default: () : AmSwipeActionItem[] => [] },
+	rightActions: { type: Array as PropType<AmSwipeActionItem[]>, default: () : AmSwipeActionItem[] => [] },
+	closeOnAction: { type: Boolean, default: true },
+	/** 展开另一个滑动操作时收起这一个 */
+	closeOnTouchOutside: { type: Boolean, default: true },
+	disabled: { type: Boolean, default: false },
+	/** 横向拖动时阻止 touch 事件冒泡（放在轮播、可滑动的标签页里时用） */
+	stopPropagation: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['action', 'actionsReveal', 'close'])
+
+const theme = useAmTheme()
+const uid = amUid('am-swipe-action')
+const numericId = parseInt(uid.substring(uid.lastIndexOf('-') + 1))
+
+const offset = ref(0)
+const dragging = ref(false)
+/** 两侧按钮区的宽度（量出来的） */
+const leftSize = ref(0)
+const rightSize = ref(0)
+/** 当前展开的是哪一侧：left / right / 空 */
+const side = ref('')
+
+function measure() {
+	measureById(uid + '-left').then((rect : AmRect | null) => { leftSize.value = rect == null ? 0 : rect.width })
+	measureById(uid + '-right').then((rect : AmRect | null) => { rightSize.value = rect == null ? 0 : rect.width })
+}
+
+let measureTimer = 0
+function scheduleMeasure() {
+	clearTimeout(measureTimer)
+	measureTimer = setTimeout(() => { measure() }, 50)
+}
+
+onMounted(() => { scheduleMeasure() })
+watch(() : AmSwipeActionItem[] => props.leftActions, () => { scheduleMeasure() })
+watch(() : AmSwipeActionItem[] => props.rightActions, () => { scheduleMeasure() })
+
+function settle(next : string) {
+	const previous = side.value
+	side.value = next
+	offset.value = next == 'left' ? leftSize.value : (next == 'right' ? -rightSize.value : 0)
+	if (next.length > 0) {
+		if (props.closeOnTouchOutside) amSwipeActionOpen(numericId, () => { settle('') })
+		if (previous != next) emit('actionsReveal', next)
+	} else {
+		amSwipeActionClosed(numericId)
+		if (previous.length > 0) emit('close')
+	}
+}
+
+// 手势
+let startX = 0
+let startY = 0
+let startOffset = 0
+/** 0 未定、1 横向（拖动内容）、2 纵向（交给列表滚动） */
+let axis = 0
+
+function onTouchStart(event : UniTouchEvent) {
+	if (props.disabled || event.touches.length == 0) return
+	startX = event.touches[0].clientX
+	startY = event.touches[0].clientY
+	startOffset = offset.value
+	axis = 0
+}
+
+/** 拉过按钮宽度后阻尼：多拉的部分只走三成 */
+function damp(value : number) : number {
+	const max = leftSize.value
+	const min = -rightSize.value
+	if (value > max) return max + Math.min(40, (value - max) * 0.3)
+	if (value < min) return min - Math.min(40, (min - value) * 0.3)
+	return value
+}
+
+function onTouchMove(event : UniTouchEvent) {
+	if (props.disabled || event.touches.length == 0 || axis == 2) return
+	const dx = event.touches[0].clientX - startX
+	const dy = event.touches[0].clientY - startY
+	if (axis == 0) {
+		if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+		axis = Math.abs(dx) > Math.abs(dy) ? 1 : 2
+		if (axis == 2) return
+		dragging.value = true
+	}
+	// 横向拖动时不让列表跟着上下滚
+	event.preventDefault()
+	if (props.stopPropagation) event.stopPropagation()
+	let next = startOffset + dx
+	// 没有按钮的一侧拉不开
+	if (leftSize.value == 0 && next > 0) next = 0
+	if (rightSize.value == 0 && next < 0) next = 0
+	offset.value = damp(next)
+}
+
+function onTouchEnd() {
+	if (axis != 1) {
+		axis = 0
+		return
+	}
+	axis = 0
+	dragging.value = false
+	const value = offset.value
+	if (value > 0) settle(value >= leftSize.value * (startOffset > 0 ? 0.7 : 0.3) ? 'left' : '')
+	else if (value < 0) settle(-value >= rightSize.value * (startOffset < 0 ? 0.7 : 0.3) ? 'right' : '')
+	else settle('')
+}
+
+function trackStyle(base : number) : string {
+	const motion = dragging.value ? '' : amTransition('transform', AM_DURATION_SLOW)
+	return 'transform:translateX(' + (base + offset.value) + 'px);' + motion
+}
+const contentStyle = computed(() : string => trackStyle(0))
+// 按钮跟着内容一起滑出来：右侧按钮放在右边缘之外，内容左移多少它就移进来多少
+const rightStyle = computed(() : string => trackStyle(rightSize.value))
+const leftStyle = computed(() : string => trackStyle(-leftSize.value))
+
+/** 按钮的背景色：预设色按主题取，其余当作颜色值 */
+function actionStyle(action : AmSwipeActionItem) : string {
+	const current = theme()
+	let color = action.color ?? ''
+	if (color.length == 0 || color == 'default') color = current.colorTextTertiary
+	else if (color == 'primary') color = current.colorPrimary
+	else if (color == 'danger') color = current.colorError
+	else if (color == 'warning') color = current.colorWarning
+	else if (color == 'success') color = current.colorSuccess
+	return 'background-color:' + color + ';'
+}
+
+function fire(action : AmSwipeActionItem, event : UniPointerEvent) {
+	emit('action', action, event)
+	if (props.closeOnAction) settle('')
+}
+
+function show(target : string) {
+	// 按钮区的宽度还没量到（刚挂载）：量完再展开
+	if (leftSize.value == 0 && rightSize.value == 0) {
+		measure()
+		setTimeout(() => { settle(target == 'left' ? 'left' : 'right') }, 300)
+		return
+	}
+	settle(target == 'left' ? 'left' : 'right')
+}
+
+onUnmounted(() => {
+	clearTimeout(measureTimer)
+	amSwipeActionClosed(numericId)
+})
+
+defineExpose({
+	/** 展开某一侧的按钮：'left' / 'right'（默认） */
+	show: (target : string) => { show(target) },
+	close: () => { settle('') }
+})
+</script>
+
+<template>
+	<view :class="['am-swipe-action', rootClass]" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd" @touchcancel="onTouchEnd">
+		<view v-if="leftActions.length > 0 || $slots['left'] != null" :id="uid + '-left'" class="am-swipe-action__actions am-swipe-action__actions--left" :style="leftStyle">
+			<slot name="left">
+				<view v-for="action in leftActions" :key="action.key" class="am-swipe-action__action" :style="actionStyle(action)" @click="fire(action, $event)">
+					<text class="am-swipe-action__text">{{ action.text ?? '' }}</text>
+				</view>
+			</slot>
+		</view>
+		<view class="am-swipe-action__content" :style="contentStyle">
+			<slot></slot>
+			<!-- 展开着时盖一层：点内容只是收起，不触发内容自己的点击 -->
+			<view v-if="side.length > 0" class="am-swipe-action__cover" @click="settle('')"></view>
+		</view>
+		<view v-if="rightActions.length > 0 || $slots['right'] != null" :id="uid + '-right'" class="am-swipe-action__actions am-swipe-action__actions--right" :style="rightStyle">
+			<slot name="right">
+				<view v-for="action in rightActions" :key="action.key" class="am-swipe-action__action" :style="actionStyle(action)" @click="fire(action, $event)">
+					<text class="am-swipe-action__text">{{ action.text ?? '' }}</text>
+				</view>
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-swipe-action { overflow: hidden; }
+.am-swipe-action__content { background-color: var(--am-color-bg-container, #ffffff); }
+.am-swipe-action__cover { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.am-swipe-action__actions { position: absolute; top: 0; bottom: 0; flex-direction: row; }
+.am-swipe-action__actions--left { left: 0; }
+.am-swipe-action__actions--right { right: 0; }
+.am-swipe-action__action {
+	min-width: 64px;
+	align-items: center;
+	justify-content: center;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-swipe-action__text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text-light-solid, #ffffff); }
+</style>

@@ -1,0 +1,233 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+
+// 分页（= antdv-next-mobile 的 Pagination）：v-model:current、defaultCurrent、total、pageSize、simple、disabled、size、
+// showLessItems、hideOnSinglePage、prevIcon、nextIcon 同名同义；事件 update:current、change(page, pageSize)；
+// 插槽 itemRender（page、type：page / prev / next / jump-prev / jump-next）、showTotal（total、range）、prevIcon、nextIcon。
+// 页码的折叠规则与移动端库相同；simple 为“上一页 / 当前页 / 总页数 / 下一页”。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - prevIcon / nextIcon 是图标名（空为默认：页码模式是箭头，simple 模式是文字“上一页 / 下一页”）；
+// - showTotal、itemRender 只有插槽（UTS 的属性里不能放渲染函数）；itemRender 插槽没有 element 参数；
+// - current 为 0 表示没传（页码从 1 开始），这时用 defaultCurrent 并由组件自己记住当前页
+defineOptions({ name: 'AmPagination' })
+
+type AmPagerItem = {
+	type : string
+	page : number
+	disabled : boolean
+}
+
+const props = defineProps({
+	/** 当前页（从 1 开始）；0 为没传 */
+	current: { type: Number, default: 0 },
+	defaultCurrent: { type: Number, default: 1 },
+	total: { type: Number, default: 0 },
+	pageSize: { type: Number, default: 10 },
+	simple: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	showLessItems: { type: Boolean, default: false },
+	hideOnSinglePage: { type: Boolean, default: false },
+	/** 上一页的图标名 */
+	prevIcon: { type: String, default: '' },
+	/** 下一页的图标名 */
+	nextIcon: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:current', 'change'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const pageCount = computed(() : number => Math.max(Math.ceil(props.total / (props.pageSize > 0 ? props.pageSize : 10)), 1))
+
+const inner = ref(props.defaultCurrent)
+const current = computed(() : number => {
+	const page = Math.floor(props.current > 0 ? props.current : inner.value)
+	return Math.min(Math.max(page, 1), pageCount.value)
+})
+
+const range = computed(() : number[] => [
+	props.total == 0 ? 0 : (current.value - 1) * props.pageSize + 1,
+	Math.min(current.value * props.pageSize, props.total)
+])
+
+function pageItem(page : number) : AmPagerItem {
+	const item : AmPagerItem = { type: 'page', page: page, disabled: false }
+	return item
+}
+
+const pages = computed(() : AmPagerItem[] => {
+	const count = pageCount.value
+	const sibling = props.showLessItems ? 0 : 1
+	const jumpStep = props.showLessItems ? 3 : 5
+	const list : AmPagerItem[] = []
+	if (count <= sibling * 2 + 5) {
+		for (let i = 1; i <= count; i++) list.push(pageItem(i))
+		return list
+	}
+	const start = Math.max(Math.min(current.value - sibling, count - sibling * 2 - 2), 3)
+	const end = Math.min(Math.max(current.value + sibling, sibling * 2 + 3), count - 2)
+	list.push(pageItem(1))
+	if (start > 3) {
+		const jump : AmPagerItem = { type: 'jump-prev', page: Math.max(current.value - jumpStep, 1), disabled: false }
+		list.push(jump)
+	} else list.push(pageItem(2))
+	for (let p = start; p <= end; p++) list.push(pageItem(p))
+	if (end < count - 2) {
+		const jump : AmPagerItem = { type: 'jump-next', page: Math.min(current.value + jumpStep, count), disabled: false }
+		list.push(jump)
+	} else list.push(pageItem(count - 1))
+	list.push(pageItem(count))
+	return list
+})
+
+const prevItem = computed(() : AmPagerItem => {
+	const item : AmPagerItem = { type: 'prev', page: Math.max(current.value - 1, 1), disabled: current.value <= 1 }
+	return item
+})
+const nextItem = computed(() : AmPagerItem => {
+	const item : AmPagerItem = { type: 'next', page: Math.min(current.value + 1, pageCount.value), disabled: current.value >= pageCount.value }
+	return item
+})
+
+const visible = computed(() : boolean => !(props.hideOnSinglePage && pageCount.value <= 1))
+
+function go(item : AmPagerItem) {
+	if (disabled.value || item.disabled || item.page == current.value) return
+	inner.value = item.page
+	emit('update:current', item.page)
+	emit('change', item.page, props.pageSize)
+}
+
+const iconSize = computed(() : number => size.value == 'small' ? 12 : (size.value == 'large' ? 16 : 14))
+const iconColor = computed(() : string => theme().colorText)
+
+function itemClasses(item : AmPagerItem) : string[] {
+	const list : string[] = ['am-pagination__item', 'am-pagination__item--' + size.value]
+	if (item.type == 'page' && item.page == current.value) list.push('am-pagination__item--active')
+	if (item.disabled || disabled.value) list.push('am-pagination__item--disabled')
+	return list
+}
+
+function buttonClasses(item : AmPagerItem) : string[] {
+	const list : string[] = ['am-pagination__button', 'am-pagination__item--' + size.value]
+	if (item.disabled || disabled.value) list.push('am-pagination__item--disabled')
+	return list
+}
+
+function hoverClass(item : AmPagerItem) : string {
+	return item.disabled || disabled.value || (item.type == 'page' && item.page == current.value) ? 'none' : 'am-pagination__item--hover'
+}
+
+function textClasses(item : AmPagerItem) : string[] {
+	const list : string[] = ['am-pagination__text', 'am-pagination__text--' + size.value]
+	if (item.type == 'page' && item.page == current.value) list.push('am-pagination__text--active')
+	return list
+}
+</script>
+
+<template>
+	<view v-if="visible" :class="['am-pagination', rootClass]">
+		<view class="am-pagination__total">
+			<slot name="showTotal" :total="total" :range="range"></slot>
+		</view>
+		<!-- 简洁模式：上一页 / 当前页 / 总页数 / 下一页 -->
+		<view v-if="simple" class="am-pagination__list">
+			<view :class="buttonClasses(prevItem)" :hover-class="hoverClass(prevItem)" @click="go(prevItem)">
+				<slot name="itemRender" :page="prevItem.page" type="prev">
+					<slot name="prevIcon">
+						<am-icon v-if="prevIcon.length > 0" :name="prevIcon" :size="iconSize" :color="iconColor" />
+						<text v-else :class="['am-pagination__text', 'am-pagination__text--' + size]">{{ locale().Pagination.prev }}</text>
+					</slot>
+				</slot>
+			</view>
+			<view class="am-pagination__simple">
+				<text :class="['am-pagination__text', 'am-pagination__text--' + size, 'am-pagination__text--current']">{{ current }}</text>
+				<text :class="['am-pagination__text', 'am-pagination__text--' + size, 'am-pagination__text--slash']">/</text>
+				<text :class="['am-pagination__text', 'am-pagination__text--' + size]">{{ pageCount }}</text>
+			</view>
+			<view :class="buttonClasses(nextItem)" :hover-class="hoverClass(nextItem)" @click="go(nextItem)">
+				<slot name="itemRender" :page="nextItem.page" type="next">
+					<slot name="nextIcon">
+						<am-icon v-if="nextIcon.length > 0" :name="nextIcon" :size="iconSize" :color="iconColor" />
+						<text v-else :class="['am-pagination__text', 'am-pagination__text--' + size]">{{ locale().Pagination.next }}</text>
+					</slot>
+				</slot>
+			</view>
+		</view>
+		<view v-else class="am-pagination__list">
+			<view :class="itemClasses(prevItem)" :hover-class="hoverClass(prevItem)" @click="go(prevItem)">
+				<slot name="itemRender" :page="prevItem.page" type="prev">
+					<slot name="prevIcon">
+						<am-icon :name="prevIcon.length > 0 ? prevIcon : 'left'" :size="iconSize" :color="iconColor" />
+					</slot>
+				</slot>
+			</view>
+			<view v-for="item in pages" :key="item.type + item.page" :class="itemClasses(item)" :hover-class="hoverClass(item)" @click="go(item)">
+				<slot name="itemRender" :page="item.page" :type="item.type">
+					<am-icon v-if="item.type != 'page'" name="more" :size="iconSize" :color="iconColor" />
+					<text v-else :class="textClasses(item)">{{ item.page }}</text>
+				</slot>
+			</view>
+			<view :class="itemClasses(nextItem)" :hover-class="hoverClass(nextItem)" @click="go(nextItem)">
+				<slot name="itemRender" :page="nextItem.page" type="next">
+					<slot name="nextIcon">
+						<am-icon :name="nextIcon.length > 0 ? nextIcon : 'right'" :size="iconSize" :color="iconColor" />
+					</slot>
+				</slot>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-pagination { flex-direction: row; align-items: center; justify-content: center; flex-wrap: wrap; }
+.am-pagination__total { flex-direction: row; align-items: center; }
+.am-pagination__list { flex-direction: row; align-items: center; justify-content: center; }
+.am-pagination__item {
+	align-items: center;
+	justify-content: center;
+	margin-left: 2px;
+	margin-right: 2px;
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-pagination__item--small { min-width: 28px; height: 28px; }
+.am-pagination__item--middle { min-width: 34px; height: 34px; }
+.am-pagination__item--large { min-width: 40px; height: 40px; }
+.am-pagination__item--active { background-color: var(--am-color-primary, #1677ff); }
+.am-pagination__item--hover { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-pagination__item--disabled { opacity: 0.4; }
+/* 简洁模式的按钮：浅色填充 */
+.am-pagination__button {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-pagination__simple { flex-direction: row; align-items: center; margin-left: 16px; margin-right: 16px; }
+.am-pagination__text { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-pagination__text--small { font-size: var(--am-font-size-sm, 12px); }
+.am-pagination__text--middle { font-size: var(--am-font-size, 14px); }
+.am-pagination__text--large { font-size: var(--am-font-size-lg, 16px); }
+.am-pagination__text--active { color: var(--am-color-text-light-solid, #ffffff); }
+.am-pagination__text--current { color: var(--am-color-primary, #1677ff); }
+.am-pagination__text--slash { margin-left: 4px; margin-right: 4px; color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+</style>

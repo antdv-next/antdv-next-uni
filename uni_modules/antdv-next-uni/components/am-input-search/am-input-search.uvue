@@ -1,0 +1,304 @@
+<script setup lang="uts">
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus } from '../../utils/form-field.uts'
+
+// 搜索框（= antdv-next-mobile 的 InputSearch）：v-model:value、placeholder、disabled、readOnly、maxlength、allowClear、
+// prefix（代替搜索图标）、suffix、size、status、variant（默认 filled）、enterkeyhint、autofocus、name、id、enterButton、
+// searchIcon、loading、showCancel、cancelText、round 同名同义；
+// 事件 update:value、change、input、pressEnter、focus、blur、clear、search、cancel；方法 focus()、blur()。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - prefix / suffix / searchIcon / enterButton / cancelText 是字符串（图标名或文字），自定义内容用同名插槽；
+//   `enterButton` 是按钮的文字，或按钮的图标名（如 'search'）；空为没有按钮；
+// - change / input 的参数是当前的值；search 的参数是（值，来源 'input' / 'clear'），没有事件对象；
+// - 没有 defaultValue（用 v-model:value）、readonly（只保留 readOnly）、clearTrigger（有内容时一直显示清除按钮）、
+//   inputmode、autocomplete；maxlength 为 -1 表示不限
+defineOptions({ name: 'AmInputSearch' })
+
+const props = defineProps({
+	value: { type: String, default: '' },
+	/** 空为语言包的 InputSearch.placeholder */
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	readOnly: { type: Boolean, default: false },
+	maxlength: { type: Number, default: -1 },
+	allowClear: { type: Boolean, default: true },
+	/** 代替搜索图标：图标名或文字 */
+	prefix: { type: String, default: '' },
+	suffix: { type: String, default: '' },
+	size: { type: String, default: '' },
+	status: { type: String, default: '' },
+	/** outlined / filled / borderless / underlined；空为 filled */
+	variant: { type: String, default: '' },
+	enterkeyhint: { type: String, default: 'search' },
+	autofocus: { type: Boolean, default: false },
+	name: { type: String, default: '' },
+	id: { type: String, default: '' },
+	/** 输入框后面的搜索按钮：按钮的文字，或图标名；空为没有 */
+	enterButton: { type: String, default: '' },
+	/** 搜索图标的名称 */
+	searchIcon: { type: String, default: 'search' },
+	loading: { type: Boolean, default: false },
+	/** 显示“取消”（聚焦或有内容时出现） */
+	showCancel: { type: Boolean, default: false },
+	/** 空为语言包的 InputSearch.cancelText */
+	cancelText: { type: String, default: '' },
+	round: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'input', 'pressEnter', 'focus', 'blur', 'clear', 'search', 'cancel'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const statusOf = useAmFieldStatus(() : string => props.status)
+const status = computed(() : string => statusOf())
+const variant = computed(() : string => props.variant.length > 0 ? props.variant : 'filled')
+const notifyChange = useAmFieldChange()
+const notifyBlur = useAmFieldBlur()
+
+const focused = ref(false)
+const wantFocus = ref(props.autofocus)
+
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().InputSearch.placeholder)
+const cancelLabel = computed(() : string => props.cancelText.length > 0 ? props.cancelText : locale().InputSearch.cancelText)
+const placeholderStyle = computed(() : string => 'color:' + theme().colorTextQuaternary + ';')
+const iconColor = computed(() : string => theme().colorTextTertiary)
+const clearColor = computed(() : string => theme().colorTextQuaternary)
+const spinnerStyle = computed(() : string => 'width:16px;height:16px;border-color:' + theme().colorTextTertiary + ';')
+const showClear = computed(() : boolean => props.allowClear && props.value.length > 0 && !disabled.value && !props.readOnly)
+const cancelVisible = computed(() : boolean => props.showCancel && (focused.value || props.value.length > 0))
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-input-search']
+	if (disabled.value) list.push('am-input-search--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const barClasses = computed(() : string[] => {
+	const list : string[] = ['am-input-search__bar', 'am-input-search__bar--' + variant.value, 'am-input-search__bar--' + size.value]
+	if (variant.value != 'borderless') list.push('am-input-search__bar--box-' + size.value)
+	if (props.round && variant.value != 'underlined' && variant.value != 'borderless') list.push('am-input-search__bar--round')
+	if (focused.value) list.push('am-input-search__bar--focused-' + variant.value)
+	if (status.value.length > 0) list.push('am-input-search__bar--' + variant.value + '-' + status.value)
+	return list
+})
+
+/** 字符串是不是图标名（小写字母与连字符） */
+function isIcon(name : string) : boolean {
+	return /^[a-z]+(-[a-z]+)*$/.test(name)
+}
+
+function onInput(event : UniInputEvent) {
+	const value = event.detail.value
+	emit('update:value', value)
+	emit('input', value)
+	emit('change', value)
+	notifyChange()
+}
+
+function onFocus(event : UniInputFocusEvent) {
+	focused.value = true
+	emit('focus', event)
+}
+
+function onBlur(event : UniInputBlurEvent) {
+	focused.value = false
+	wantFocus.value = false
+	emit('blur', event)
+	notifyBlur()
+}
+
+function onConfirm() {
+	emit('pressEnter', props.value)
+	emit('search', props.value, 'input')
+}
+
+function onSearchClick() {
+	if (disabled.value || props.loading) return
+	emit('search', props.value, 'input')
+}
+
+function clear() {
+	emit('update:value', '')
+	emit('input', '')
+	emit('change', '')
+	emit('clear')
+	emit('search', '', 'clear')
+	notifyChange()
+}
+
+function cancel() {
+	wantFocus.value = false
+	if (props.value.length > 0) {
+		emit('update:value', '')
+		emit('input', '')
+		emit('change', '')
+		notifyChange()
+	}
+	emit('cancel')
+}
+
+function focus() {
+	wantFocus.value = true
+}
+
+function blur() {
+	wantFocus.value = false
+}
+
+defineExpose({ focus, blur })
+</script>
+
+<template>
+	<view :class="classes">
+		<view :class="barClasses">
+			<view class="am-input-search__prefix">
+				<loading v-if="loading" :style="spinnerStyle"></loading>
+				<am-icon v-else-if="prefix.length == 0" :name="searchIcon" :size="16" :color="iconColor" />
+				<am-icon v-else-if="isIcon(prefix)" :name="prefix" :size="16" :color="iconColor" />
+				<text v-else class="am-input-search__affix">{{ prefix }}</text>
+			</view>
+			<slot name="prefix"></slot>
+			<input
+				:id="id"
+				:name="name"
+				:class="['am-input-search__control', 'am-input-search__control--' + size]"
+				:value="value"
+				type="text"
+				:placeholder="placeholderText"
+				:placeholder-style="placeholderStyle"
+				:maxlength="maxlength"
+				:disabled="disabled || readOnly"
+				:focus="wantFocus"
+				:confirm-type="enterkeyhint"
+				@input="onInput"
+				@focus="onFocus"
+				@blur="onBlur"
+				@confirm="onConfirm"
+			/>
+			<view v-if="showClear" class="am-input-search__clear" @click="clear">
+				<slot name="clearIcon">
+					<am-icon name="error-fill" :size="16" :color="clearColor" />
+				</slot>
+			</view>
+			<view v-if="suffix.length > 0" class="am-input-search__suffix">
+				<am-icon v-if="isIcon(suffix)" :name="suffix" :size="16" :color="iconColor" />
+				<text v-else class="am-input-search__affix">{{ suffix }}</text>
+			</view>
+			<slot name="suffix"></slot>
+		</view>
+		<view v-if="enterButton.length > 0" class="am-input-search__button">
+			<am-button
+				type="primary"
+				:size="size"
+				:shape="round ? 'round' : 'default'"
+				:icon="isIcon(enterButton) ? enterButton : ''"
+				:text="isIcon(enterButton) ? '' : enterButton"
+				:loading="loading"
+				:disabled="disabled"
+				@click="onSearchClick"
+			/>
+		</view>
+		<slot name="enterButton"></slot>
+		<view v-if="cancelVisible" class="am-input-search__cancel" @click="cancel">
+			<text class="am-input-search__cancel-text">{{ cancelLabel }}</text>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-input-search { flex-direction: row; align-items: center; }
+.am-input-search--disabled { opacity: 0.4; }
+.am-input-search__bar { flex: 1; flex-direction: row; align-items: center; }
+
+/* ---------- 尺寸 ---------- */
+.am-input-search__bar--middle { height: var(--am-control-height, 40px); }
+.am-input-search__bar--small { height: var(--am-control-height-sm, 30px); }
+.am-input-search__bar--large { height: var(--am-control-height-lg, 48px); }
+.am-input-search__bar--box-middle {
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-input-search__bar--box-small {
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input-search__bar--box-large {
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+
+/* ---------- 变体 ---------- */
+.am-input-search__bar--outlined {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+}
+.am-input-search__bar--filled {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-input-search__bar--underlined {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	padding-left: 0;
+	padding-right: 0;
+	border-radius: 0;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border, #d9d9d9);
+}
+/* 写在尺寸、变体之后：胶囊形的圆角盖过按尺寸给的圆角 */
+.am-input-search__bar--round { border-radius: 999px; }
+
+.am-input-search__bar--focused-outlined { border-color: var(--am-color-primary, #1677ff); }
+.am-input-search__bar--focused-filled { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-bg-container, #ffffff); }
+.am-input-search__bar--focused-underlined { border-bottom-color: var(--am-color-primary, #1677ff); }
+
+.am-input-search__bar--outlined-error { border-color: var(--am-color-error, #ff4d4f); }
+.am-input-search__bar--outlined-warning { border-color: var(--am-color-warning, #faad14); }
+.am-input-search__bar--filled-error { background-color: var(--am-color-error-bg, #fff1f1); }
+.am-input-search__bar--filled-warning { background-color: var(--am-color-warning-bg, #fff7e8); }
+.am-input-search__bar--underlined-error { border-bottom-color: var(--am-color-error, #ff4d4f); }
+.am-input-search__bar--underlined-warning { border-bottom-color: var(--am-color-warning, #faad14); }
+
+/* ---------- 内部 ---------- */
+.am-input-search__control { flex: 1; height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-input-search__control--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-input-search__control--small { font-size: var(--am-font-size, 14px); }
+.am-input-search__control--large { font-size: var(--am-font-size-xl, 18px); }
+.am-input-search__prefix { margin-right: 8px; flex-direction: row; align-items: center; }
+.am-input-search__suffix { margin-left: 8px; flex-direction: row; align-items: center; }
+.am-input-search__affix { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-input-search__clear { padding: 2px; margin-left: 4px; }
+.am-input-search__button { margin-left: 8px; }
+.am-input-search__cancel { margin-left: 12px; height: 32px; justify-content: center; }
+.am-input-search__cancel-text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-primary, #1677ff); }
+</style>

@@ -1,0 +1,5 @@
+{
+  "missingProps": {
+    "role": "uvue 的 view 不支持 role / aria-* 无障碍属性（编译警告）"
+  }
+}

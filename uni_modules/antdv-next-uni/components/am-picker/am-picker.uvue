@@ -1,0 +1,174 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { AmPickerChangeInfo, AmPickerFormat } from '../../types/picker.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmPickerField } from '../../utils/picker-field.uts'
+import { pickerItems, pickerValues } from '../../utils/picker-option.uts'
+
+// 选择器（= antdv-next-mobile 的 Picker）：触发区 + 底部弹层 + 滚轮，点“确定”才提交。
+// columns（AmOption[][]）、v-model:value（每列一个值）、v-model:open、placeholder、disabled、allowClear、status、variant、
+// size、trigger、suffixIcon、title、okText、cancelText、zIndex、maskClosable、destroyOnHidden、loading、itemHeight、
+// visibleItemCount、format 同名同义；事件 update:value、update:open、openChange、change（提交的值变了：确定或清除）、
+// select（拨动滚轮，尚未提交）、confirm、cancel、clear；插槽 header（头部与滚轮之间）、footer（滚轮下方）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - columns 只能是数组（联动的列在 select 事件里自己换）；选项是 AmOption，没有 fieldNames、optionRender、virtual；
+// - 没有 defaultValue / defaultOpen（UTS 里分不出“没传”）：不绑定 open 时组件自己管开关；
+// - 自定义触发区不用默认插槽（插槽参数里放不了 toggle 函数）：`:trigger="false"` + `v-model:open`；
+// - title、suffixIcon 是字符串（suffixIcon 为图标名），没有同名插槽（插槽要经两层组件转发，
+//   App 端转发的空插槽会不会盖掉默认内容尚未验证）；没有 id；
+// - format 是函数属性（Web 已验证；App 端若不可用请改用 select / change 事件自己显示）
+defineOptions({ name: 'AmPicker' })
+
+const props = defineProps({
+	columns: { type: Array as PropType<AmOption[][]>, default: () : AmOption[][] => [] },
+	value: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	open: { type: Boolean, default: false },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	trigger: { type: Boolean, default: true },
+	suffixIcon: { type: String, default: '' },
+	title: { type: String, default: '' },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	loading: { type: Boolean, default: false },
+	itemHeight: { type: Number, default: 44 },
+	visibleItemCount: { type: Number, default: 5 },
+	format: { type: Function as PropType<AmPickerFormat | null>, default: null },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'update:open', 'openChange', 'change', 'select', 'confirm', 'cancel', 'clear'])
+
+const locale = useAmLocale()
+const field = useAmPickerField()
+
+/** 弹层的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+/** 弹层里滚轮的值，确定时才提交 */
+const draft = ref<any[]>(pickerValues(props.columns, props.value))
+
+watch(() : boolean => props.open, (open : boolean) => {
+	opened.value = open
+})
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	if (open) draft.value = pickerValues(props.columns, props.value)
+	else field.blur()
+})
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().Picker.placeholder)
+
+const label = computed(() : string => {
+	if (props.value.length == 0) return ''
+	const items = pickerItems(props.columns, props.value)
+	const format = props.format
+	if (format != null) return format(items)
+	const labels : string[] = []
+	for (let i = 0; i < items.length; i++) {
+		const item = items[i]
+		if (item != null) labels.push(item.label)
+	}
+	return labels.join(' / ')
+})
+
+function infoOf(value : any[], columnIndex : number) : AmPickerChangeInfo {
+	const info : AmPickerChangeInfo = { items: pickerItems(props.columns, value), columnIndex: columnIndex }
+	return info
+}
+
+function sameValues(a : any[], b : any[]) : boolean {
+	if (a.length != b.length) return false
+	for (let i = 0; i < a.length; i++) if (a[i] != b[i]) return false
+	return true
+}
+
+function onTrigger() {
+	setOpen(!opened.value)
+}
+
+function onSelect(value : any[], info : AmPickerChangeInfo) {
+	draft.value = value
+	emit('select', value, info)
+}
+
+function onOk() {
+	// 打开后 columns 可能换过（联动、异步加载）：按现在的列再取一次
+	const value = pickerValues(props.columns, draft.value)
+	const info = infoOf(value, -1)
+	if (!sameValues(value, props.value)) {
+		emit('update:value', value)
+		emit('change', value, info)
+		field.change()
+	}
+	emit('confirm', value, info)
+	setOpen(false)
+}
+
+function onCancel() {
+	emit('cancel')
+	setOpen(false)
+}
+
+function onClear() {
+	const value : any[] = []
+	emit('update:value', value)
+	emit('change', value, infoOf(value, -1))
+	emit('clear')
+	field.change()
+}
+</script>
+
+<template>
+	<am-picker-trigger
+		v-if="trigger"
+		:label="label"
+		:placeholder="placeholderText"
+		:open="opened"
+		:disabled="disabled"
+		:allow-clear="allowClear"
+		:status="status"
+		:variant="variant"
+		:size="size"
+		:suffix-icon="suffixIcon"
+		:root-class="rootClass"
+		@click="onTrigger"
+		@clear="onClear"
+	/>
+	<am-picker-popup
+		:open="opened"
+		:title="title"
+		:ok-text="okText"
+		:cancel-text="cancelText"
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		@ok="onOk"
+		@cancel="onCancel"
+	>
+		<slot name="header"></slot>
+		<am-picker-view
+			:columns="columns"
+			:value="draft"
+			:loading="loading"
+			:item-height="itemHeight"
+			:visible-item-count="visibleItemCount"
+			@change="onSelect"
+		/>
+		<slot name="footer"></slot>
+	</am-picker-popup>
+</template>

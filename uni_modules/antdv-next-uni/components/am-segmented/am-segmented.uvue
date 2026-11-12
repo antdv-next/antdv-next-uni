@@ -1,0 +1,237 @@
+<script setup lang="uts">
+import { AmSegmentedOption } from '../../types/segmented.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+import { hasAmKey, sameAmKey } from '../../utils/key.uts'
+import { AM_DURATION_SLOW, amTransition, amUid, AmRect, measureAllWithin } from '../../utils/motion.uts'
+
+// 分段控制器（= antdv-next-mobile 的 Segmented）：options（字符串 / 数字 / { label, value, icon, disabled }）、
+// v-model:value、defaultValue、block、size、shape（default / round）、disabled、vertical、orientation 同名同义；
+// 事件 update:value、change；插槽 labelRender、iconRender（参数为选项）。
+// 选中的底是一块单独的滑块，切换时平移并改宽高滑到新的选项上；量到选项的位置之前（或平台量不到时）
+// 由选中项自己画底色，不会出现没有选中态的一帧。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 选项的 label 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据）；自定义内容用插槽；
+// - 选项没有 className（传给内部节点的类在 App 端不生效）
+defineOptions({ name: 'AmSegmented' })
+
+const props = defineProps({
+	options: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	value: { type: [String, Number], default: '' },
+	/** 没有传 value 时的初始值；也没有时为第一个选项 */
+	defaultValue: { type: [String, Number], default: '' },
+	block: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	shape: { type: String, default: 'default' },
+	vertical: { type: Boolean, default: false },
+	/** horizontal / vertical，优先于 vertical */
+	orientation: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const isVertical = computed(() : boolean => props.orientation.length > 0 ? props.orientation == 'vertical' : props.vertical)
+
+const uid = amUid('am-segmented')
+
+const list = computed(() : AmSegmentedOption[] => {
+	const result : AmSegmentedOption[] = []
+	for (let i = 0; i < props.options.length; i++) {
+		const item = props.options[i]
+		if (typeof item == 'string' || typeof item == 'number') {
+			const option : AmSegmentedOption = { label: '' + item, value: item }
+			result.push(option)
+			continue
+		}
+		// 类型化的对象与对象字面量（UTSJSONObject）统一走 JSON
+		const object = JSON.parseObject(JSON.stringify(item) ?? '{}')
+		if (object == null) continue
+		const value = object.get('value')
+		if (value == null) continue
+		const option : AmSegmentedOption = {
+			label: object.getString('label') ?? ('' + value),
+			value: value,
+			icon: object.getString('icon'),
+			disabled: object.getBoolean('disabled') ?? false
+		}
+		result.push(option)
+	}
+	return result
+})
+
+/** 非受控时的值 */
+const inner = ref<any | null>(hasAmKey(props.defaultValue) ? props.defaultValue : null)
+const current = computed(() : any | null => {
+	if (hasAmKey(props.value)) return props.value
+	if (inner.value != null) return inner.value
+	return list.value.length > 0 ? list.value[0].value : null
+})
+const activeIndex = computed(() : number => list.value.findIndex((option) : boolean => sameAmKey(option.value, current.value)))
+
+const thumbLeft = ref(0)
+const thumbTop = ref(0)
+const thumbWidth = ref(0)
+const thumbHeight = ref(0)
+/** 量到了位置：滑块接管选中态 */
+const thumbReady = ref(false)
+/** 第一次就位之后才开过渡 */
+const animated = ref(false)
+
+const thumbStyle = computed(() : string => {
+	let text = 'width:' + thumbWidth.value + 'px;height:' + thumbHeight.value + 'px;transform:translate(' + thumbLeft.value + 'px,' + thumbTop.value + 'px);'
+	if (!thumbReady.value || activeIndex.value < 0) text += 'opacity:0;'
+	if (animated.value) text += amTransition('transform, width, height', AM_DURATION_SLOW)
+	return text
+})
+
+/** 各选项相对外框的位置（挂载、选项或尺寸变化时量一次；切换时直接取，滑块当帧就开始移动） */
+let rects : (AmRect | null)[] = []
+
+function apply() {
+	const index = activeIndex.value
+	const item = index >= 0 && index < rects.length ? rects[index] : null
+	if (item == null) return
+	thumbLeft.value = item.left
+	thumbTop.value = item.top
+	thumbWidth.value = item.width
+	thumbHeight.value = item.height
+	if (!thumbReady.value) {
+		thumbReady.value = true
+		setTimeout(() => { animated.value = true }, 30)
+	}
+}
+
+function measure() {
+	measureAllWithin(uid, uid + '-', list.value.length).then((result : (AmRect | null)[]) => {
+		rects = result
+		apply()
+	})
+}
+
+let measureTimer = 0
+function scheduleMeasure(delay : number) {
+	clearTimeout(measureTimer)
+	measureTimer = setTimeout(() => { measure() }, delay)
+}
+
+watch(() : number => activeIndex.value, () => {
+	// 新的选中项没有量到（选项刚变）时再量一次
+	const index = activeIndex.value
+	if (index >= 0 && index < rects.length && rects[index] != null) apply()
+	else measure()
+})
+// 选项、尺寸、方向变化时位置跟着变
+watch(() : AmSegmentedOption[] => list.value, () => { scheduleMeasure(30) })
+watch(() : string => size.value + (props.block ? '1' : '0') + (isVertical.value ? '1' : '0') + props.shape, () => { scheduleMeasure(30) })
+
+onMounted(() => { scheduleMeasure(50) })
+onUnmounted(() => { clearTimeout(measureTimer) })
+
+function pick(option : AmSegmentedOption) {
+	if (disabled.value || option.disabled == true || sameAmKey(option.value, current.value)) return
+	inner.value = option.value
+	emit('update:value', option.value)
+	emit('change', option.value)
+}
+
+const classes = computed(() : string[] => {
+	const names : string[] = ['am-segmented', 'am-segmented--' + props.shape]
+	if (isVertical.value) names.push('am-segmented--vertical')
+	if (props.block) names.push('am-segmented--block')
+	if (disabled.value) names.push('am-segmented--disabled')
+	if (props.rootClass.length > 0) names.push(props.rootClass)
+	return names
+})
+
+function itemClasses(option : AmSegmentedOption, index : number) : string[] {
+	const names : string[] = ['am-segmented__item', 'am-segmented__item--' + size.value, 'am-segmented__item--' + props.shape]
+	if (props.block && !isVertical.value) names.push('am-segmented__item--block')
+	if (!thumbReady.value && index == activeIndex.value) names.push('am-segmented__item--selected')
+	if (option.disabled == true) names.push('am-segmented__item--disabled')
+	return names
+}
+
+function iconColor(index : number) : string {
+	return index == activeIndex.value ? theme().colorText : theme().colorTextSecondary
+}
+const iconSize = computed(() : number => size.value == 'large' ? 18 : (size.value == 'small' ? 14 : 16))
+</script>
+
+<template>
+	<view :id="uid" :class="classes">
+		<!-- 滑块放在最前面，选项画在它上面 -->
+		<view :class="['am-segmented__thumb', 'am-segmented__thumb--' + shape]" :style="thumbStyle"></view>
+		<view
+			v-for="(option, index) in list"
+			:key="index"
+			:id="uid + '-' + index"
+			:class="itemClasses(option, index)"
+			@click="pick(option)"
+		>
+			<slot name="iconRender" :option="option" :label="option.label" :value="option.value" :icon="option.icon" :disabled="option.disabled">
+				<am-icon v-if="(option.icon ?? '').length > 0" :name="option.icon ?? ''" :size="iconSize" :color="iconColor(index)" :class="(option.label ?? '').length > 0 ? 'am-segmented__icon' : ''" />
+			</slot>
+			<slot name="labelRender" :option="option" :label="option.label" :value="option.value" :icon="option.icon" :disabled="option.disabled">
+				<text v-if="(option.label ?? '').length > 0" :class="['am-segmented__label', 'am-segmented__label--' + size, index == activeIndex ? 'am-segmented__label--selected' : '']">{{ option.label }}</text>
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-segmented {
+	flex-direction: row;
+	align-self: flex-start;
+	padding: 2px;
+	background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06));
+}
+.am-segmented--default {
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-segmented--round { border-radius: 999px; }
+.am-segmented--vertical { flex-direction: column; }
+.am-segmented--block { align-self: stretch; }
+.am-segmented--disabled { opacity: 0.5; }
+/* 滑块的位置相对外框（含 2px 内边距）：left / top 为 0，平移量就是量到的选项相对外框的位置 */
+.am-segmented__thumb {
+	position: absolute;
+	left: 0;
+	top: 0;
+	background-color: var(--am-color-bg-elevated, #ffffff);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.am-segmented__thumb--default { border-radius: 6px; }
+.am-segmented__thumb--round { border-radius: 999px; }
+.am-segmented__item {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-segmented__item--default { border-radius: 6px; }
+.am-segmented__item--round { border-radius: 999px; }
+.am-segmented__item--small { height: 22px; padding-left: var(--am-padding-xs, 8px); padding-right: var(--am-padding-xs, 8px); }
+.am-segmented__item--middle { height: 26px; }
+.am-segmented__item--large { height: 36px; }
+.am-segmented__item--block { flex: 1; }
+.am-segmented__item--selected { background-color: var(--am-color-bg-elevated, #ffffff); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.am-segmented__item--disabled { opacity: 0.4; }
+.am-segmented__icon { margin-right: 6px; }
+.am-segmented__label { color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-segmented__label--small { font-size: var(--am-font-size-sm, 12px); }
+.am-segmented__label--middle { font-size: var(--am-font-size, 14px); }
+.am-segmented__label--large { font-size: var(--am-font-size-lg, 16px); }
+.am-segmented__label--selected { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

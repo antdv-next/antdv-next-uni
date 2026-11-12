@@ -1,0 +1,70 @@
+<script setup lang="uts">
+const statuses : string[] = ['success', 'error', 'info', 'warning', '403', '404', '500']
+const status = ref('success')
+
+const TITLES = new Map<string, string>([
+	['success', '支付成功'], ['error', '提交失败'], ['info', '已提交审核'], ['warning', '账号存在风险'],
+	['403', '403'], ['404', '404'], ['500', '500']
+])
+const SUB_TITLES = new Map<string, string>([
+	['success', '订单已支付，预计 2 小时内发货'], ['error', '请核对信息后重新提交'], ['info', '审核结果将在 1–3 个工作日内通知你'],
+	['warning', '请尽快修改密码'], ['403', '抱歉，你无权访问该页面'], ['404', '抱歉，你访问的页面不存在'], ['500', '抱歉，服务器出错了']
+])
+
+const title = computed(() : string => TITLES.get(status.value) ?? '')
+const subTitle = computed(() : string => SUB_TITLES.get(status.value) ?? '')
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">状态</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in statuses" :key="item" class="demo__item" size="small" :type="status == item ? 'primary' : 'default'" :text="item" @click="status = item" />
+			</view>
+			<am-result :status="status" :title="title" :sub-title="subTitle">
+				<template #extra>
+					<am-button class="demo__action" type="primary" text="返回首页" />
+					<am-button text="查看详情" />
+				</template>
+			</am-result>
+		</view>
+
+		<text class="demo__title">补充说明（默认插槽）</text>
+		<view class="demo__card">
+			<am-result status="error" title="提交失败" sub-title="请核对并修改以下信息后，再重新提交">
+				<text class="demo__text demo__strong">你提交的内容有如下错误：</text>
+				<text class="demo__text">· 账户已被冻结</text>
+				<text class="demo__text">· 账户还不具备申请资格</text>
+			</am-result>
+		</view>
+
+		<text class="demo__title">自定义图标</text>
+		<view class="demo__card">
+			<am-result icon="gift" title="领取成功" sub-title="icon 是图标名，也可以用 icon 插槽" />
+			<am-result title="自定义图标的插槽">
+				<template #icon>
+					<am-avatar size="large" icon="robot" />
+				</template>
+			</am-result>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__action { margin-right: 12px; }
+.demo__strong { font-weight: bold; margin-bottom: 4px; }
+</style>

@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "showTotal": "UTS 的属性里不能放渲染函数，用 showTotal 插槽（参数 total、range）",
+    "itemRender": "同 showTotal，用 itemRender 插槽（参数 page、type）"
+  }
+}

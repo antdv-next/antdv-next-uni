@@ -1,0 +1,246 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { AM_DURATION_MID, amTransition, amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 下拉刷新（= antdv-next-mobile 的 PullToRefresh）：v-model:refreshing、pullingText / canReleaseText / refreshingText /
+// completeText、completeDelay、headHeight、threshold、disabled 同名同义；事件 update:refreshing、refresh、
+// change（{ status, distance }）；插槽 default、pulling、canRelease、refreshing、complete（参数 distance）。
+// 状态 status：normal、pulling（不够刷新）、canRelease（松手刷新）、refreshing、complete。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 它自己就是纵向的滚动区域：用 scroll-view 原生的下拉（各端原生的回弹与手感），只把头部换成自己的。
+//   放在页面根节点（am-config-provider）下或 flex: 1 的容器里，它告诉根节点“页面不滚动”、自己占满剩下的高度；
+//   **页面要在 pages.json 的 style 里设 "disableScroll": true**（不禁用时 iOS 上整页回弹、手势被页面拿走）；
+// - 各状态的文字是字符串（默认取语言包），不是渲染函数；自定义内容用同名插槽；
+// - 没有 duration：回弹是原生的；不想显示“刷新成功”时把 completeDelay 设为 0；
+// - 多一个事件 reachBottom（滚到底）：页面不滚，页面的 onReachBottom 不会触发；里面放 <am-infinite-scroll> 时它自己接着加载
+defineOptions({ name: 'AmPullToRefresh' })
+
+const props = defineProps({
+	refreshing: { type: Boolean, default: false },
+	/** 下拉过程中的文字，空为语言包的 PullToRefresh.pulling */
+	pullingText: { type: String, default: '' },
+	canReleaseText: { type: String, default: '' },
+	refreshingText: { type: String, default: '' },
+	completeText: { type: String, default: '' },
+	/** 完成提示停留的时长（毫秒），0 为不显示、直接收起 */
+	completeDelay: { type: Number, default: 500 },
+	/** 头部的高度（像素） */
+	headHeight: { type: Number, default: 50 },
+	/** 松手刷新的下拉距离（像素），0 为同 headHeight */
+	threshold: { type: Number, default: 0 },
+	disabled: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:refreshing', 'refresh', 'change', 'reachBottom'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+const uid = amUid('am-pull-to-refresh')
+
+/** 根节点的高度（量到之前为 0）：算离底部的距离用 */
+let viewportHeight = 0
+
+// 里面的 am-infinite-scroll 订阅滚动（页面不滚，页面的 onReachBottom 不会触发）：参数是内容底部离可视区域底部的距离
+const scrollListeners = new Map<number, (distance : number) => void>()
+let listenerSeed = 0
+provide('amScrollSubscribe', (listener : (distance : number) => void) : number => {
+	listenerSeed++
+	scrollListeners.set(listenerSeed, listener)
+	return listenerSeed
+})
+provide('amScrollUnsubscribe', (id : number) => { scrollListeners.delete(id) })
+provide('amScrollHost', () : string => uid)
+
+function notify(distance : number) {
+	scrollListeners.forEach((listener : (distance : number) => void) => { listener(distance) })
+}
+
+function onScroll(event : UniScrollEvent) {
+	if (viewportHeight <= 0 || scrollListeners.size == 0) return
+	notify(Math.max(0, event.detail.scrollHeight - event.detail.scrollTop - viewportHeight))
+}
+
+function onReachBottom() {
+	emit('reachBottom')
+	notify(0)
+}
+
+// 滚动区域必须有确定的高度，原生的下拉才会生效：App 端页面的根节点（am-config-provider）平时只有最小高度，
+// flex: 1 的 scroll-view 会跟着内容变高、变成页面在滚。所以告诉页面的根节点“页面不滚动”（amPageFill），
+// 根节点正好一屏高，这里 flex: 1 占满剩下的高度。
+// 没有 am-config-provider 时才量出自己的上边缘，高度定为到窗口底部（windowTop：Web 上导航栏也在页面坐标里）
+const pageFill = inject<(() => void) | null>('amPageFill', null)
+if (pageFill != null) pageFill()
+const fillHeight = ref(0)
+const rootStyle = computed(() : string => fillHeight.value > 0 ? 'flex:none;height:' + fillHeight.value + 'px;' : '')
+
+function measureFill() {
+	measureById(uid).then((rect : AmRect | null) => {
+		if (rect == null) return
+		viewportHeight = rect.height
+		if (pageFill != null) return
+		const info = uni.getWindowInfo()
+		const height = info.windowHeight + info.windowTop - rect.top
+		if (height > 100) {
+			fillHeight.value = height
+			viewportHeight = height
+		}
+	})
+}
+
+const status = ref('normal')
+const distance = ref(0)
+/** 交给 scroll-view：为 true 时停在刷新中，改回 false 时收起 */
+const triggered = ref(false)
+
+const mergedThreshold = computed(() : number => props.threshold > 0 ? props.threshold : props.headHeight)
+const maxDrag = computed(() : number => Math.max(mergedThreshold.value, props.headHeight) * 2.5)
+
+function setStatus(next : string) {
+	if (status.value == next) return
+	status.value = next
+	emit('change', { status: next, distance: distance.value })
+}
+
+function onPulling(event : UniRefresherEvent) {
+	if (status.value == 'refreshing' || status.value == 'complete') return
+	distance.value = event.detail.dy
+	setStatus(distance.value >= mergedThreshold.value ? 'canRelease' : 'pulling')
+}
+
+function onRefresh() {
+	if (status.value == 'refreshing') return
+	triggered.value = true
+	setStatus('refreshing')
+	emit('update:refreshing', true)
+	emit('refresh')
+}
+
+function onRestore() {
+	distance.value = 0
+	if (status.value != 'refreshing' && status.value != 'complete') setStatus('normal')
+}
+
+let completeTimer = 0
+
+watch(() : boolean => props.refreshing, (value : boolean) => {
+	if (value) {
+		// 使用方直接设成 true（进入页面就刷新）：头部停在刷新中
+		if (status.value != 'refreshing') {
+			clearTimeout(completeTimer)
+			distance.value = props.headHeight
+			setStatus('refreshing')
+			triggered.value = true
+		}
+		return
+	}
+	if (status.value != 'refreshing') return
+	if (props.completeDelay > 0) {
+		setStatus('complete')
+		clearTimeout(completeTimer)
+		completeTimer = setTimeout(() => {
+			triggered.value = false
+			setStatus('normal')
+		}, props.completeDelay)
+	} else {
+		triggered.value = false
+		setStatus('normal')
+	}
+})
+
+// 窗口高度在 Android 冷启动的第一个页面上会先给整屏的高度（见 am-config-provider）：页面显示时重新量（iOS 没有 uni.onWindowResize）
+onPageShow(() => { setTimeout(() => { measureFill() }, 30) })
+
+onMounted(() => {
+	setTimeout(() => { measureFill() }, 30)
+	setTimeout(() => { measureFill() }, 400)
+	if (props.refreshing) {
+		distance.value = props.headHeight
+		setStatus('refreshing')
+		setTimeout(() => { triggered.value = true }, 50)
+	}
+})
+
+onUnmounted(() => { clearTimeout(completeTimer) })
+
+const tipText = computed(() : string => {
+	const texts = locale().PullToRefresh
+	if (status.value == 'canRelease') return props.canReleaseText.length > 0 ? props.canReleaseText : texts.canRelease
+	if (status.value == 'refreshing') return props.refreshingText.length > 0 ? props.refreshingText : texts.refreshing
+	if (status.value == 'complete') return props.completeText.length > 0 ? props.completeText : texts.complete
+	return props.pullingText.length > 0 ? props.pullingText : texts.pulling
+})
+
+const headStyle = computed(() : string => 'height:' + props.headHeight + 'px;')
+const iconColor = computed(() : string => theme().colorTextTertiary)
+/** 箭头：拉过刷新距离时转向上（过渡） */
+const arrowStyle = computed(() : string => 'transform:rotate(' + (status.value == 'canRelease' ? 180 : 0) + 'deg);' + amTransition('transform', AM_DURATION_MID))
+const spinnerStyle = computed(() : string => 'width:16px;height:16px;border-color:' + theme().colorTextTertiary + ';')
+</script>
+
+<!-- 自定义的头部不能是 scroll-view 的第一个子节点（Android、iOS），放在最后（鸿蒙要求是最后一个） -->
+<template>
+	<view :id="uid" :class="['am-pull-to-refresh', rootClass]" :style="rootStyle">
+		<scroll-view
+			class="am-pull-to-refresh__scroll"
+			direction="vertical"
+			:refresher-enabled="!disabled"
+			refresher-default-style="none"
+			refresher-background="transparent"
+			:refresher-threshold="mergedThreshold"
+			:refresher-max-drag-distance="maxDrag"
+			:refresher-triggered="triggered"
+			:lower-threshold="50"
+			@refresherpulling="onPulling"
+			@refresherrefresh="onRefresh"
+			@refresherrestore="onRestore"
+			@refresherabort="onRestore"
+			@scroll="onScroll"
+			@scrolltolower="onReachBottom"
+		>
+			<slot></slot>
+			<view slot="refresher" class="am-pull-to-refresh__head" :style="headStyle">
+				<view v-if="status == 'refreshing'" class="am-pull-to-refresh__indicator">
+					<slot name="refreshing" :distance="distance">
+						<loading class="am-pull-to-refresh__icon" :style="spinnerStyle"></loading>
+						<text class="am-pull-to-refresh__text">{{ tipText }}</text>
+					</slot>
+				</view>
+				<view v-else-if="status == 'complete'" class="am-pull-to-refresh__indicator">
+					<slot name="complete" :distance="distance">
+						<am-icon name="check" :size="16" :color="iconColor" class="am-pull-to-refresh__icon" />
+						<text class="am-pull-to-refresh__text">{{ tipText }}</text>
+					</slot>
+				</view>
+				<view v-else-if="status == 'canRelease'" class="am-pull-to-refresh__indicator">
+					<slot name="canRelease" :distance="distance">
+						<view class="am-pull-to-refresh__icon" :style="arrowStyle">
+							<am-icon name="down" :size="16" :color="iconColor" />
+						</view>
+						<text class="am-pull-to-refresh__text">{{ tipText }}</text>
+					</slot>
+				</view>
+				<view v-else class="am-pull-to-refresh__indicator">
+					<slot name="pulling" :distance="distance">
+						<view class="am-pull-to-refresh__icon" :style="arrowStyle">
+							<am-icon name="down" :size="16" :color="iconColor" />
+						</view>
+						<text class="am-pull-to-refresh__text">{{ tipText }}</text>
+					</slot>
+				</view>
+			</view>
+		</scroll-view>
+	</view>
+</template>
+
+<style>
+.am-pull-to-refresh { flex: 1; }
+.am-pull-to-refresh__scroll { flex: 1; }
+.am-pull-to-refresh__head { width: 100%; justify-content: center; overflow: hidden; }
+.am-pull-to-refresh__indicator { flex-direction: row; align-items: center; justify-content: center; }
+.am-pull-to-refresh__icon { margin-right: 6px; }
+.am-pull-to-refresh__text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+</style>

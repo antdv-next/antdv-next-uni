@@ -1,0 +1,51 @@
+<script setup lang="uts">
+// 栅格行（= antdv-next-mobile 的 Row）：24 栅格，gutter（列之间的水平间距，像素）、
+// align（top / middle / bottom / stretch）、justify（start / end / center / space-around / space-between / space-evenly）、
+// wrap 同名同义。列（<am-col>）经 provide 拿到间距，各自左右（上下）留一半，行用负外边距抵消。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `gutter` 只有数字（UTS 的属性不能是 number | [水平, 垂直] 的联合类型）：垂直间距用多出的 `verticalGutter`；
+// - 不写 align 时是 top（同 antdv-next-mobile）
+defineOptions({ name: 'AmRow' })
+
+const props = defineProps({
+	gutter: { type: Number, default: 0 },
+	/** 行与行之间的垂直间距（像素）= antdv-next-mobile 的 gutter[1] */
+	verticalGutter: { type: Number, default: 0 },
+	align: { type: String, default: 'top' },
+	justify: { type: String, default: 'start' },
+	wrap: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+// 给 am-col 的是取值函数（UTS 的 inject 写不了 ComputedRef）
+provide('amRowGutter', () : number => props.gutter)
+provide('amRowVerticalGutter', () : number => props.verticalGutter)
+
+const JUSTIFY = new Map<string, string>([
+	['start', 'flex-start'], ['end', 'flex-end'], ['center', 'center'],
+	['space-between', 'space-between'], ['space-around', 'space-around'], ['space-evenly', 'space-evenly']
+])
+const ALIGN = new Map<string, string>([['top', 'flex-start'], ['middle', 'center'], ['bottom', 'flex-end'], ['stretch', 'stretch']])
+
+const style = computed(() : string => {
+	let text = 'justify-content:' + (JUSTIFY.get(props.justify) ?? 'flex-start') + ';align-items:' + (ALIGN.get(props.align) ?? 'flex-start') + ';'
+	text += 'flex-wrap:' + (props.wrap ? 'wrap' : 'nowrap') + ';'
+	const half = props.gutter / 2
+	if (half > 0) text += 'margin-left:-' + half + 'px;margin-right:-' + half + 'px;'
+	const halfY = props.verticalGutter / 2
+	if (halfY > 0) text += 'margin-top:-' + halfY + 'px;margin-bottom:-' + halfY + 'px;'
+	return text
+})
+</script>
+
+<template>
+	<view :class="['am-row', rootClass]" :style="style">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+/* App 端 view 默认裁剪超出的内容（overflow: hidden），布局容器与 Web 一致不裁剪（徽标、阴影会伸出子元素） */
+.am-row { flex-direction: row; overflow: visible; }
+</style>

@@ -1,0 +1,8 @@
+// am-dropdown-item 的 options 项（= antdv-next-mobile 的 DropdownOption）；label 是文字
+
+export type AmDropdownOption = {
+	label : string
+	/** 字符串或数字 */
+	value : any
+	disabled ?: boolean | null
+}

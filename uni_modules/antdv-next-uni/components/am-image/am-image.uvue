@@ -1,0 +1,137 @@
+<script setup lang="uts">
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 图片（= antdv-next-mobile 的 Image）：src、width、height、fallback（加载失败时换成的图片）、placeholder（加载中的占位）、
+// preview（点击全屏预览，默认 false）、fit（contain / cover / fill / none / scale-down）、lazy、radius、round 同名同义；
+// 事件 load、error、click、openChange；插槽 placeholder（加载中）、fallback（加载失败）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - width / height / radius 是像素数字；width 为 0 时铺满父元素的宽度，height 为 0 时按图片的比例定高度
+//   （此时 fit 不起作用：uvue 的 image 没有“原始尺寸”，要么给高度，要么按宽度定高）；
+// - 预览用系统的 uni.previewImage：`preview` 只有布尔值（没有 { open, src, maxScale… } 对象），
+//   `openChange` 只在打开时触发 true（系统的预览关闭时没有回调）；多张一起预览用 `previewList`
+//   （移动端库是 <am-image-preview-group>）；
+// - `placeholder` 只有布尔值（自定义占位用同名插槽）；没有 `alt` / `position` / `crossorigin` / `referrerpolicy`
+//   （uvue 的 image 没有这些属性）
+defineOptions({ name: 'AmImage' })
+
+const props = defineProps({
+	src: { type: String, default: '' },
+	width: { type: Number, default: 0 },
+	height: { type: Number, default: 0 },
+	fallback: { type: String, default: '' },
+	placeholder: { type: Boolean, default: true },
+	preview: { type: Boolean, default: false },
+	fit: { type: String, default: 'fill' },
+	lazy: { type: Boolean, default: false },
+	radius: { type: Number, default: 0 },
+	round: { type: Boolean, default: false },
+	/** 预览时可以左右切换的全部图片（不传时只预览这一张） */
+	previewList: { type: Array as PropType<string[]>, default: () : string[] => [] },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['load', 'error', 'click', 'openChange'])
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+
+const loaded = ref(false)
+/** src 加载失败 */
+const failed = ref(false)
+/** fallback 也加载失败 */
+const fallbackFailed = ref(false)
+
+watch(() : string => props.src + '|' + props.fallback, () => {
+	loaded.value = false
+	failed.value = false
+	fallbackFailed.value = false
+})
+
+const useFallback = computed(() : boolean => failed.value && props.fallback.length > 0 && !fallbackFailed.value)
+const broken = computed(() : boolean => props.src.length == 0 || (failed.value && !useFallback.value))
+const currentSrc = computed(() : string => useFallback.value ? props.fallback : props.src)
+
+const mode = computed(() : string => {
+	if (props.height <= 0) return 'widthFix'
+	if (props.fit == 'contain' || props.fit == 'scale-down') return 'aspectFit'
+	if (props.fit == 'cover') return 'aspectFill'
+	if (props.fit == 'none') return 'center'
+	return 'scaleToFill'
+})
+
+const rootStyle = computed(() : string => {
+	let text = ''
+	if (props.width > 0) text += 'width:' + props.width + 'px;'
+	if (props.height > 0) text += 'height:' + props.height + 'px;'
+	else if (broken.value || !loaded.value) text += 'height:' + (props.width > 0 ? props.width : 120) + 'px;'
+	if (props.round) text += 'border-radius:9999px;'
+	else if (props.radius > 0) text += 'border-radius:' + props.radius + 'px;'
+	return text
+})
+
+const imageStyle = computed(() : string => props.height > 0 ? 'height:' + props.height + 'px;' : '')
+const iconColor = computed(() : string => theme().colorTextQuaternary)
+const iconSize = computed(() : number => props.width > 0 && props.width < 64 ? 16 : 24)
+const failedText = computed(() : string => locale().Image.loadFailed)
+/** 小图里放不下文字 */
+const showFailedText = computed(() : boolean => props.width <= 0 || props.width >= 80)
+
+function onLoad(event : UniImageLoadEvent) {
+	loaded.value = true
+	emit('load', event)
+}
+
+function onError(event : UniImageErrorEvent) {
+	if (failed.value) {
+		fallbackFailed.value = true
+	} else {
+		failed.value = true
+		emit('error', event)
+	}
+}
+
+function onClick(event : UniPointerEvent) {
+	emit('click', event)
+	if (!props.preview || broken.value) return
+	const urls = props.previewList.length > 0 ? props.previewList : [props.src]
+	uni.previewImage({ urls: urls, current: props.src })
+	emit('openChange', true)
+}
+</script>
+
+<template>
+	<view :class="['am-image', width > 0 ? 'am-image--fixed' : '', rootClass]" :style="rootStyle" @click="onClick">
+		<image v-if="!broken" class="am-image__img" :style="imageStyle" :src="currentSrc" :mode="mode" :lazy-load="lazy" @load="onLoad" @error="onError" />
+		<view v-if="broken" class="am-image__placeholder">
+			<slot name="fallback">
+				<am-icon name="picture" :size="iconSize" :color="iconColor" />
+				<text v-if="showFailedText && src.length > 0" class="am-image__text">{{ failedText }}</text>
+			</slot>
+		</view>
+		<view v-else-if="!loaded && placeholder" class="am-image__placeholder">
+			<slot name="placeholder">
+				<am-icon name="picture" :size="iconSize" :color="iconColor" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-image { position: relative; overflow: hidden; }
+/* 有宽度时不被父元素拉伸 */
+.am-image--fixed { align-self: flex-start; }
+.am-image__img { width: 100%; }
+.am-image__placeholder {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-image__text { margin-top: 4px; font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+</style>

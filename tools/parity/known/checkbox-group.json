@@ -1,0 +1,8 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:value",
+    "name": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "role": "view 不支持无障碍属性",
+    "labelRender": "UTS 里不能把渲染函数当属性传；选项的文字只能是字符串，要自定义就在默认插槽里放 <am-checkbox>"
+  }
+}

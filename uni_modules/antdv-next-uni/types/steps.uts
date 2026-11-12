@@ -1,0 +1,14 @@
+// am-steps 的 items（= antdv-next-mobile 的 StepsItem）。
+// title / subTitle / content 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据），自定义图标用插槽 iconRender
+
+export type AmStepsItem = {
+	title ?: string | null
+	subTitle ?: string | null
+	/** 步骤的详情描述 */
+	content ?: string | null
+	/** 图标名（<am-icon> 的 name） */
+	icon ?: string | null
+	/** wait / process / finish / error；不写时按 current 推算 */
+	status ?: string | null
+	disabled ?: boolean | null
+}

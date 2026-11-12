@@ -1,0 +1,152 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 抽屉（= antdv-next-mobile 的 Drawer）：v-model:open、title、extra、placement（bottom 默认 / top / left / right）、
+// closable（默认 true）、closeIcon、mask、maskClosable、size（default / large）、width、height、destroyOnHidden、zIndex、
+// loading、round（默认 true）、safeArea 同名同义；事件 update:open、close（关闭图标、遮罩、Android 返回键）、afterOpenChange；
+// 插槽 default、title、extra、footer、closeIcon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / extra 是字符串，自定义内容用同名插槽；footer 只有插槽（底部通常是按钮，没有字符串的写法）；
+// - closable 只有布尔值，closeIcon 是图标名；
+// - size 只有 default（上下：按内容；左右：窗口宽度的 80%）与 large（上下：窗口高度的 90%；左右：整个宽度），
+//   自定义大小用 width / height（像素数）；
+// - 内容区：定了高度（height、size="large"、左右抽屉）时可以滚动；按内容定高时不滚动（最高为窗口的 90%）；
+// - 没有 keyboard、forceRender、lockScroll、swipeToClose、rootStyle
+defineOptions({ name: 'AmDrawer' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	title: { type: String, default: '' },
+	extra: { type: String, default: '' },
+	placement: { type: String, default: 'bottom' },
+	closable: { type: Boolean, default: true },
+	closeIcon: { type: String, default: 'close' },
+	mask: { type: Boolean, default: true },
+	maskClosable: { type: Boolean, default: true },
+	size: { type: String, default: 'default' },
+	width: { type: Number, default: 0 },
+	height: { type: Number, default: 0 },
+	destroyOnHidden: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	loading: { type: Boolean, default: false },
+	round: { type: Boolean, default: true },
+	safeArea: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'close', 'afterOpenChange'])
+
+const theme = useAmTheme()
+const closeColor = computed(() : string => theme().colorTextTertiary)
+
+const windowInfo = uni.getWindowInfo()
+const vertical = computed(() : boolean => props.placement == 'bottom' || props.placement == 'top')
+
+/** 上下抽屉的高度（0 为按内容） */
+const panelHeight = computed(() : number => {
+	if (!vertical.value) return 0
+	if (props.height > 0) return props.height
+	return props.size == 'large' ? Math.round(windowInfo.windowHeight * 0.9) : 0
+})
+
+/** 左右抽屉的宽度 */
+const panelWidth = computed(() : number => {
+	if (vertical.value) return 0
+	if (props.width > 0) return props.width
+	return props.size == 'large' ? windowInfo.windowWidth : Math.round(windowInfo.windowWidth * 0.8)
+})
+
+/** 有标题、右侧内容或关闭图标时才有头部（只用 title / extra 插槽、又关掉了 closable 时，传一个 title 占位） */
+const showHeader = computed(() : boolean => props.closable || props.title.length > 0 || props.extra.length > 0)
+
+/** 面板的高度是定下来的：内容区可以滚动 */
+const scrollable = computed(() : boolean => !vertical.value || panelHeight.value > 0)
+
+function close() {
+	emit('close')
+	emit('update:open', false)
+}
+
+function onOpen(open : boolean) {
+	if (!open) close()
+}
+
+function onAfterOpenChange(open : boolean) {
+	emit('afterOpenChange', open)
+}
+</script>
+
+<template>
+	<am-popup
+		:open="open"
+		:placement="placement"
+		:mask="mask"
+		:mask-closable="maskClosable"
+		:round="round"
+		:safe-area="safeArea"
+		:destroy-on-hidden="destroyOnHidden"
+		:z-index="zIndex"
+		:width="panelWidth"
+		:height="panelHeight"
+		:root-class="rootClass"
+		@update:open="onOpen"
+		@after-open-change="onAfterOpenChange"
+	>
+		<view v-if="showHeader" class="am-drawer__header">
+			<view class="am-drawer__title">
+				<slot name="title">
+					<text class="am-drawer__title-text">{{ title }}</text>
+				</slot>
+			</view>
+			<view class="am-drawer__extra">
+				<slot name="extra">
+					<text v-if="extra.length > 0" class="am-drawer__extra-text">{{ extra }}</text>
+				</slot>
+			</view>
+			<view v-if="closable" class="am-drawer__close" @click="close">
+				<slot name="closeIcon">
+					<am-icon :name="closeIcon" :size="18" :color="closeColor" />
+				</slot>
+			</view>
+		</view>
+		<view v-if="loading" class="am-drawer__loading"><am-loading /></view>
+		<scroll-view v-else-if="scrollable" class="am-drawer__body am-drawer__body--scroll" direction="vertical">
+			<slot></slot>
+		</scroll-view>
+		<view v-else class="am-drawer__body">
+			<slot></slot>
+		</view>
+		<slot name="footer"></slot>
+	</am-popup>
+</template>
+
+<style>
+.am-drawer__header {
+	flex-direction: row;
+	align-items: center;
+	min-height: 52px;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-drawer__title { flex: 1; flex-direction: row; align-items: center; }
+.am-drawer__title-text {
+	flex: 1;
+	font-size: var(--am-font-size-lg, 16px);
+	font-weight: bold;
+	line-height: 24px;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-drawer__extra { flex-direction: row; align-items: center; margin-left: 8px; }
+.am-drawer__extra-text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-drawer__close { padding: 8px; margin-left: 4px; }
+.am-drawer__body { }
+.am-drawer__body--scroll { flex: 1; }
+.am-drawer__loading { flex: 1; min-height: 120px; align-items: center; justify-content: center; }
+</style>

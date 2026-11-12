@@ -1,0 +1,62 @@
+import { useAmDisabled } from './config.uts'
+
+// 字段（输入框、选择器、开关…）与 <am-form> / <am-form-item> 的约定（= antdv-next-mobile 的 form/context.ts）。
+// 表单与表单项用 provide 给出取值函数，字段用下面的 useAmFieldXxx 读取——它们也返回取值函数，在 computed 里调用：
+//
+//   amFormDisabled    () => boolean   表单的 disabled
+//   amFormVariant     () => string    表单的 variant（表单里默认 'borderless'：表单项已经画了单元格）
+//   amFormItemStatus  () => string    表单项的校验状态：'' / 'error' / 'warning' / 'success' / 'validating'
+//   amFormItemChange  () => void      字段的值变化之后调用（表单项按 change 触发校验）
+//   amFormItemBlur    () => void      字段失焦时调用（表单项按 blur 触发校验）
+//
+// 字段里的写法：
+//   const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+//   const disabled = computed(() : boolean => disabledOf())
+//   const notifyChange = useAmFieldChange()
+//   emit('update:value', next); emit('change', next); notifyChange()
+
+/** 是否禁用：自己的 `disabled`、ConfigProvider 的 `componentDisabled`、所在表单的 `disabled` 任一为 true */
+export function useAmFieldDisabled(own : () => boolean) : () => boolean {
+	const configDisabled = useAmDisabled(own)
+	const formDisabled = inject<(() => boolean) | null>('amFormDisabled', null)
+	return () : boolean => {
+		if (configDisabled()) return true
+		return formDisabled != null ? formDisabled() : false
+	}
+}
+
+/** 校验状态：自己的 `status` > 所在表单项的校验状态。只有 error / warning 会画出来，其余按空处理 */
+export function useAmFieldStatus(own : () => string) : () => string {
+	const itemStatus = inject<(() => string) | null>('amFormItemStatus', null)
+	return () : string => {
+		let status = own()
+		if (status.length == 0 && itemStatus != null) status = itemStatus()
+		return status == 'error' || status == 'warning' ? status : ''
+	}
+}
+
+/** 变体：自己的 `variant`（空字符串表示没传）> 所在表单的 `variant` > 'outlined' */
+export function useAmFieldVariant(own : () => string) : () => string {
+	const formVariant = inject<(() => string) | null>('amFormVariant', null)
+	return () : string => {
+		let variant = own()
+		if (variant.length == 0 && formVariant != null) variant = formVariant()
+		return variant.length == 0 ? 'outlined' : variant
+	}
+}
+
+/** 值变化后通知表单项的函数（不在表单项里时什么也不做）。在发出 update:value / change 之后调用 */
+export function useAmFieldChange() : () => void {
+	const notify = inject<(() => void) | null>('amFormItemChange', null)
+	return () => {
+		if (notify != null) notify()
+	}
+}
+
+/** 失焦时通知表单项的函数（不在表单项里时什么也不做） */
+export function useAmFieldBlur() : () => void {
+	const notify = inject<(() => void) | null>('amFormItemBlur', null)
+	return () => {
+		if (notify != null) notify()
+	}
+}

@@ -1,0 +1,5 @@
+{
+  "missingProps": {
+    "direction": "待实现：向上加载（聊天记录）要在插入内容后保持滚动位置，scroll-view 上还没有验证"
+  }
+}

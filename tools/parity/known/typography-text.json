@@ -1,0 +1,15 @@
+{
+  "extraProps": {
+    "text": "<text> 里不能放插槽，样式也不继承，文字用属性传",
+    "rows": "= ellipsis.rows：UTS 的属性不能是 boolean | 对象 的联合类型，ellipsis 只有布尔值，配置拆成平铺的属性",
+    "expandable": "= ellipsis.expandable（展开一次），原因同 rows",
+    "collapsible": "= ellipsis.expandable 为 collapsible（展开后还能收起），原因同 rows",
+    "expanded": "= ellipsis.expanded（v-model:expanded），原因同 rows",
+    "copyText": "= copyable.text，copyable 只有布尔值，原因同 rows"
+  },
+  "extraEmits": {
+    "expand": "移动端库有这个事件，但声明在 TypographyBaseEmits 上（没有 TypographyXxxEmits），对齐工具读不到",
+    "update:expanded": "同 expand",
+    "copy": "同 expand"
+  }
+}

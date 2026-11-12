@@ -1,0 +1,159 @@
+<script setup lang="uts">
+import { AmActionSheetAction } from '../../types/action-sheet.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 动作面板（= antdv-next-mobile 的 ActionSheet）：底部弹出的一组操作 + 取消。v-model:open、
+// actions（{ key, text, description, icon, danger, bold, disabled }）、title、extra（标题下方的说明）、cancelText、
+// showCancel、closeOnAction（默认 true）、maskClosable、round、safeArea、destroyOnHidden、zIndex 同名同义；
+// 事件 update:open、action（操作、下标）、cancel（点了取消按钮）、close（要关闭：操作、取消、遮罩、Android 返回键）、
+// afterOpenChange；插槽 default（标题与操作之间的自定义内容）、title、extra。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / extra / cancelText 是字符串（cancelText 默认取语言包；不要取消按钮用 `:show-cancel="false"`），
+//   action 的 text / description 是字符串、icon 是图标名；没有 cancelText、action 插槽；
+// - actions 的项没有 onClick（UTS 的数据里不放函数），用 action 事件；
+// - 没有 keyboard、forceRender；没有静态方法 ActionSheet.show()（不能动态挂载组件），只要文字选项时可以用 uni.showActionSheet
+defineOptions({ name: 'AmActionSheet' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	actions: { type: Array as PropType<AmActionSheetAction[]>, default: () : AmActionSheetAction[] => [] },
+	title: { type: String, default: '' },
+	extra: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	showCancel: { type: Boolean, default: true },
+	closeOnAction: { type: Boolean, default: true },
+	maskClosable: { type: Boolean, default: true },
+	round: { type: Boolean, default: true },
+	safeArea: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'action', 'cancel', 'close', 'afterOpenChange'])
+
+const locale = useAmLocale()
+const theme = useAmTheme()
+const cancelLabel = computed(() : string => props.cancelText.length > 0 ? props.cancelText : locale().ActionSheet.cancelText)
+
+function close() {
+	emit('close')
+	emit('update:open', false)
+}
+
+function iconColor(action : AmActionSheetAction) : string {
+	if (action.danger == true) return theme().colorError
+	return action.bold == true ? theme().colorPrimary : theme().colorText
+}
+
+function onAction(index : number) {
+	const action = props.actions[index]
+	if (action.disabled == true) return
+	emit('action', action, index)
+	if (props.closeOnAction) close()
+}
+
+function onCancel(event : UniPointerEvent) {
+	emit('cancel', event)
+	close()
+}
+
+function onOpen(open : boolean) {
+	if (!open) close()
+}
+
+function onAfterOpenChange(open : boolean) {
+	emit('afterOpenChange', open)
+}
+</script>
+
+<template>
+	<am-popup
+		:open="open"
+		placement="bottom"
+		:round="round"
+		:safe-area="safeArea"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		:z-index="zIndex"
+		:root-class="rootClass"
+		@update:open="onOpen"
+		@after-open-change="onAfterOpenChange"
+	>
+		<view v-if="title.length > 0 || extra.length > 0" class="am-action-sheet__header">
+			<slot name="title">
+				<text v-if="title.length > 0" class="am-action-sheet__title">{{ title }}</text>
+			</slot>
+			<slot name="extra">
+				<text v-if="extra.length > 0" class="am-action-sheet__extra">{{ extra }}</text>
+			</slot>
+		</view>
+		<slot></slot>
+		<view
+			v-for="(action, index) in actions"
+			:key="action.key"
+			:class="[
+				'am-action-sheet__item',
+				index > 0 ? 'am-action-sheet__item--split' : '',
+				action.disabled == true ? 'am-action-sheet__item--disabled' : ''
+			]"
+			:hover-class="action.disabled == true ? 'none' : 'am-action-sheet__item--active'"
+			@click="onAction(index)"
+		>
+			<view class="am-action-sheet__main">
+				<am-icon v-if="(action.icon ?? '').length > 0" class="am-action-sheet__icon" :name="action.icon ?? ''" :size="18" :color="iconColor(action)" />
+				<text
+					:class="[
+						'am-action-sheet__text',
+						action.bold == true ? 'am-action-sheet__text--bold' : '',
+						action.danger == true ? 'am-action-sheet__text--danger' : ''
+					]"
+				>{{ action.text }}</text>
+			</view>
+			<text v-if="(action.description ?? '').length > 0" class="am-action-sheet__description">{{ action.description }}</text>
+		</view>
+		<view v-if="showCancel" class="am-action-sheet__gap"></view>
+		<view v-if="showCancel" class="am-action-sheet__item" hover-class="am-action-sheet__item--active" @click="onCancel">
+			<text class="am-action-sheet__text">{{ cancelLabel }}</text>
+		</view>
+	</am-popup>
+</template>
+
+<style>
+.am-action-sheet__header {
+	align-items: center;
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-action-sheet__title { font-size: var(--am-font-size, 14px); line-height: 22px; text-align: center; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-action-sheet__extra { margin-top: 2px; font-size: var(--am-font-size-sm, 12px); line-height: 20px; text-align: center; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-action-sheet__item {
+	align-items: center;
+	justify-content: center;
+	padding-top: 14px;
+	padding-bottom: 14px;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-action-sheet__item--split {
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-action-sheet__item--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-action-sheet__item--disabled { opacity: 0.4; }
+.am-action-sheet__main { flex-direction: row; align-items: center; justify-content: center; }
+.am-action-sheet__icon { margin-right: 8px; }
+.am-action-sheet__text { font-size: var(--am-font-size-lg, 16px); line-height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-action-sheet__text--bold { font-weight: bold; color: var(--am-color-primary, #1677ff); }
+.am-action-sheet__text--danger { color: var(--am-color-error, #ff4d4f); }
+.am-action-sheet__description { margin-top: 2px; font-size: var(--am-font-size-sm, 12px); line-height: 20px; text-align: center; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-action-sheet__gap { height: 8px; background-color: var(--am-color-bg-layout, #f5f5f5); }
+</style>

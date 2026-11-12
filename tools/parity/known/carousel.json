@@ -1,0 +1,17 @@
+{
+  "missingProps": {
+    "effect": "基于内置 swiper，只有滑动切换，没有淡入淡出",
+    "slideSize": "uni-app x 的 swiper 没有露出相邻页的 previous-margin / next-margin",
+    "trackOffset": "同 slideSize",
+    "stuckAtBoundary": "同 slideSize",
+    "indicator": "指示点是 swiper 自带的；拿不到插槽里有几页，画不了自定义指示器（可用 afterChange 自己画）",
+    "stopPropagation": "手势由原生 swiper 处理，嵌套时不需要也拦不了"
+  },
+  "extraProps": {
+    "height": "swiper 必须有确定的高度（像素）",
+    "images": "图片轮播的简写：默认插槽里每页都要包一层 <swiper-item>，只放图片时直接传地址数组"
+  },
+  "extraEmits": {
+    "click": "配合 images：点了第几张图（插槽方式在自己的节点上绑 click）"
+  }
+}

@@ -1,0 +1,123 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { AmPickerChangeInfo } from '../../types/picker.uts'
+import { pickerIndexes } from '../../utils/picker-option.uts'
+
+// 滚轮（= antdv-next-mobile 的 PickerView）：columns（AmOption[][]，每列一组选项）、v-model:value（每列一个值）、
+// loading、itemHeight、visibleItemCount 同名同义；事件 update:value、change（值、{ items, columnIndex }）；插槽 loading。
+// 没有值（或值找不到）的列显示第一个没禁用的选项。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 基于原生的 picker-view / picker-view-column（各端原生的滚动与回弹），所以没有 virtual、optionRender / option 插槽；
+// - columns 只能是数组，不能是函数（联动的列请在 change 里自己换 columns）；选项是 AmOption，没有 fieldNames；
+// - 没有 defaultValue（UTS 里分不出“没传”），请用 v-model:value；
+// - picker-view 的 indicator-style 不支持 CSS 变量，选中框的高度在 UTS 里拼
+defineOptions({ name: 'AmPickerView' })
+
+const props = defineProps({
+	columns: { type: Array as PropType<AmOption[][]>, default: () : AmOption[][] => [] },
+	value: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	loading: { type: Boolean, default: false },
+	itemHeight: { type: Number, default: 44 },
+	visibleItemCount: { type: Number, default: 5 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change'])
+
+/** 每一列选中的下标（交给 picker-view） */
+const indexes = ref<number[]>([])
+
+function sameIndexes(a : number[], b : number[]) : boolean {
+	if (a.length != b.length) return false
+	for (let i = 0; i < a.length; i++) if (a[i] != b[i]) return false
+	return true
+}
+
+watch(
+	() : number[] => pickerIndexes(props.columns, props.value),
+	(list : number[]) => {
+		if (!sameIndexes(list, indexes.value)) indexes.value = list
+	},
+	{ immediate: true }
+)
+
+const rootStyle = computed(() : string => 'height:' + (props.itemHeight * props.visibleItemCount) + 'px;')
+const indicatorStyle = computed(() : string => 'height:' + props.itemHeight + 'px;')
+const itemStyle = computed(() : string => 'height:' + props.itemHeight + 'px;')
+
+function onChange(event : UniPickerViewChangeEvent) {
+	const picked = event.detail.value
+	const before = indexes.value
+	const landed : number[] = []
+	const accepted : number[] = []
+	let moved = -1
+	for (let i = 0; i < props.columns.length; i++) {
+		const column = props.columns[i]
+		let index = i < picked.length ? picked[i] : 0
+		if (index > column.length - 1) index = column.length - 1
+		if (index < 0) index = 0
+		landed.push(index)
+		const previous = i < before.length ? before[i] : 0
+		// 停在禁用的选项上：这一列退回原来的位置
+		if (index < column.length && column[index].disabled == true) index = previous
+		if (index != previous && moved < 0) moved = i
+		accepted.push(index)
+	}
+	indexes.value = landed
+	if (!sameIndexes(landed, accepted)) {
+		// 先让数据与滚轮停的位置一致，下一帧再改回去，滚轮才会滚回原处
+		nextTick(() => {
+			indexes.value = accepted
+		})
+	}
+	if (moved < 0) return
+	const values : any[] = []
+	const items : (AmOption | null)[] = []
+	for (let i = 0; i < props.columns.length; i++) {
+		const column = props.columns[i]
+		if (accepted[i] < column.length) {
+			const option = column[accepted[i]]
+			items.push(option)
+			if (option.value != null) values.push(option.value!)
+		} else {
+			items.push(null)
+		}
+	}
+	const info : AmPickerChangeInfo = { items: items, columnIndex: moved }
+	emit('update:value', values)
+	emit('change', values, info)
+}
+</script>
+
+<template>
+	<view :class="['am-picker-view', rootClass]" :style="rootStyle">
+		<view v-if="loading" class="am-picker-view__loading">
+			<slot name="loading">
+				<am-loading />
+			</slot>
+		</view>
+		<picker-view v-else class="am-picker-view__wheel" :style="rootStyle" :value="indexes" :indicator-style="indicatorStyle" @change="onChange">
+			<picker-view-column v-for="(column, columnIndex) in columns" :key="columnIndex">
+				<view v-for="(option, index) in column" :key="index" class="am-picker-view__item" :style="itemStyle">
+					<text :class="['am-picker-view__text', option.disabled == true ? 'am-picker-view__text--disabled' : '']">{{ option.label }}</text>
+				</view>
+			</picker-view-column>
+		</picker-view>
+	</view>
+</template>
+
+<style>
+.am-picker-view { }
+.am-picker-view__wheel { }
+.am-picker-view__loading { flex: 1; align-items: center; justify-content: center; }
+.am-picker-view__item { align-items: center; justify-content: center; padding-left: 4px; padding-right: 4px; }
+.am-picker-view__text {
+	font-size: var(--am-font-size-lg, 16px);
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-picker-view__text--disabled { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+</style>

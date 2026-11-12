@@ -1,0 +1,21 @@
+{
+  "missingProps": {
+    "defaultChecked": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:checked",
+    "checkedValue": "checked 只有布尔值（属性的类型要确定）",
+    "unCheckedValue": "同 checkedValue",
+    "name": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "id": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "title": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "tabIndex": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "autoFocus": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "required": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "skipGroup": "放在 <am-checkbox-group> 里的复选框总是受组控制"
+  },
+  "extraProps": {
+    "label": "文字用属性传：uvue 的样式不继承，默认插槽里的文字拿不到字号与颜色"
+  },
+  "missingEmits": {
+    "focus": "不是原生的可聚焦元素，没有焦点事件",
+    "blur": "不是原生的可聚焦元素，没有焦点事件"
+  }
+}

@@ -1,0 +1,100 @@
+<script setup lang="uts">
+const statuses : string[] = ['success', 'processing', 'default', 'error', 'warning']
+const colors : string[] = ['blue', 'green', 'purple', 'orange', '#13c2c2']
+const count = ref(5)
+const dot = ref(true)
+const offset : number[] = [10, 10]
+
+function add() {
+	count.value++
+}
+
+function minus() {
+	if (count.value > 0) count.value--
+}
+
+function toggle() {
+	dot.value = !dot.value
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card demo__row">
+			<am-badge class="demo__badge" :count="5"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" :count="0" show-zero><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" :count="100"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" :count="1000" :overflow-count="999"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" dot><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" dot><am-icon name="bell" :size="24" /></am-badge>
+		</view>
+
+		<text class="demo__title">动态</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-badge class="demo__badge" :count="count"><view class="demo__box"></view></am-badge>
+				<am-badge class="demo__badge" :dot="dot"><view class="demo__box"></view></am-badge>
+			</view>
+			<view class="demo__row">
+				<am-button class="demo__item" size="small" icon="minus" @click="minus" />
+				<am-button class="demo__item" size="small" icon="plus" @click="add" />
+				<am-button class="demo__item" size="small" text="切换红点" @click="toggle" />
+			</view>
+		</view>
+
+		<text class="demo__title">尺寸、颜色与偏移</text>
+		<view class="demo__card demo__row">
+			<am-badge class="demo__badge" :count="5" size="small"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" :count="5" color="blue"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" :count="5" color="#52c41a"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" :count="5" :offset="offset"><view class="demo__box"></view></am-badge>
+			<am-badge class="demo__badge" status="success"><view class="demo__box"></view></am-badge>
+		</view>
+
+		<text class="demo__title">自定义角标（count 插槽）</text>
+		<view class="demo__card demo__row">
+			<am-badge class="demo__badge">
+				<view class="demo__box"></view>
+				<template #count>
+					<am-icon name="clock" :size="16" color="#ff4d4f" />
+				</template>
+			</am-badge>
+		</view>
+
+		<text class="demo__title">独立使用</text>
+		<view class="demo__card demo__row">
+			<am-badge class="demo__item" :count="25" />
+			<am-badge class="demo__item" :count="4" color="blue" />
+			<am-badge class="demo__item" :count="109" color="#52c41a" />
+			<am-badge class="demo__item" :count="8" size="small" />
+		</view>
+
+		<text class="demo__title">状态点</text>
+		<view class="demo__card">
+			<am-badge v-for="status in statuses" :key="status" class="demo__line" :status="status" :text="status" />
+			<view class="demo__row">
+				<am-badge v-for="color in colors" :key="color" class="demo__item" :color="color" :text="color" />
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__badge { margin-right: 28px; margin-bottom: 12px; }
+.demo__box { width: 40px; height: 40px; border-radius: 8px; background-color: var(--am-color-fill, rgba(0, 0, 0, 0.15)); }
+.demo__line { margin-bottom: 8px; }
+</style>

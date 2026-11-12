@@ -1,0 +1,5 @@
+{
+  "missingProps": {
+    "expandIcon": "是函数（返回节点），UTS 里函数不能返回节点；用同名插槽 expandIcon（参数 panelKey、isActive）"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:value",
+    "keyboard": "没有硬件键盘的方向键事件",
+    "id": "没有原生的表单元素（用 view 画的），这个属性没有意义"
+  },
+  "missingEmits": {
+    "focus": "不是原生的可聚焦元素，没有焦点事件",
+    "blur": "不是原生的可聚焦元素，没有焦点事件",
+    "keydown": "没有按键事件"
+  }
+}

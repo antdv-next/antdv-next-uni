@@ -1,0 +1,187 @@
+<script setup lang="uts">
+import { AmOption } from '@/uni_modules/antdv-next-uni/types/index.uts'
+import { AmFormRule, AmFormValidateError } from '@/uni_modules/antdv-next-uni/types/form.uts'
+
+// 表单的数据是响应式的 UTSJSONObject：字段上写 v-model:value="model['字段名']"
+const model = reactive<UTSJSONObject>({
+	username: '',
+	phone: '',
+	password: '',
+	gender: '',
+	hobbies: [],
+	age: 18,
+	score: 0,
+	notify: true,
+	remark: '',
+	agree: false
+})
+
+// 表单级的规则（纯数据）：必填、长度、正则（pattern 是字符串）
+const rules = {
+	username: [
+		{ required: true, message: '请输入用户名' },
+		{ min: 3, max: 12, message: '用户名为 3-12 个字符' }
+	],
+	phone: [
+		{ required: true },
+		{ pattern: '^1[3-9]\\d{9}$', message: '手机号格式不正确' }
+	],
+	password: [
+		{ required: true },
+		{ min: 6, message: '密码至少 6 位', trigger: 'blur' }
+	],
+	gender: [{ required: true, message: '请选择性别' }],
+	hobbies: [{ type: 'array', max: 2, message: '最多选 2 项', warningOnly: true }],
+	score: [{ type: 'number', min: 1, message: '请打分' }]
+} as UTSJSONObject
+
+// 自定义校验只能写在表单项上（函数放不进 JSON）：返回错误说明，通过时返回空字符串
+const agreeRules : AmFormRule[] = [
+	{ validator: (value : any | null) : string => value == true ? '' : '请先阅读并同意协议' }
+]
+
+const genders : AmOption[] = [{ label: '男', value: 'male' }, { label: '女', value: 'female' }]
+const hobbyOptions : AmOption[] = [{ label: '阅读', value: 'read' }, { label: '运动', value: 'sport' }, { label: '音乐', value: 'music' }]
+
+const formRef = ref<AmFormComponentPublicInstance | null>(null)
+const result = ref('')
+const vertical = ref(false)
+const disabled = ref(false)
+
+function onFinish(values : UTSJSONObject) {
+	result.value = 'finish：' + (JSON.stringify(values) ?? '')
+}
+
+function onFinishFailed(info : AmFormValidateError) {
+	result.value = 'finishFailed：' + info.errorFields.length + ' 项没通过，第一条：' + info.message
+}
+
+function submit() {
+	formRef.value?.submit()
+}
+
+function reset() {
+	formRef.value?.resetFields()
+	result.value = ''
+}
+
+function validateName() {
+	const form = formRef.value
+	if (form == null) return
+	form.validateFields(['username']).then((_ : UTSJSONObject) => {
+		result.value = 'validateFields([username])：通过'
+	}).catch((_ : any | null) => {
+		result.value = 'validateFields([username])：没通过'
+	})
+}
+
+function clearValidate() {
+	formRef.value?.clearValidate()
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">校验：必填、长度、正则、自定义</text>
+		<am-form
+			ref="formRef"
+			:model="model"
+			:rules="rules"
+			mode="card"
+			:layout="vertical ? 'vertical' : 'horizontal'"
+			:disabled="disabled"
+			scroll-to-first-error
+			@finish="onFinish"
+			@finishFailed="onFinishFailed"
+		>
+			<am-form-item name="username" label="用户名">
+				<am-input v-model:value="model['username']" variant="borderless" placeholder="3-12 个字符" allow-clear />
+			</am-form-item>
+			<am-form-item name="phone" label="手机号">
+				<am-input v-model:value="model['phone']" variant="borderless" type="tel" placeholder="11 位手机号" />
+			</am-form-item>
+			<am-form-item name="password" label="密码" extra="失焦时校验长度">
+				<am-input-password v-model:value="model['password']" placeholder="至少 6 位" />
+			</am-form-item>
+			<am-form-item name="gender" label="性别">
+				<am-radio-group v-model:value="model['gender']" :options="genders" />
+			</am-form-item>
+			<am-form-item name="hobbies" label="爱好" extra="超过 2 项只是警告，不阻止提交">
+				<am-checkbox-group v-model:value="model['hobbies']" :options="hobbyOptions" />
+			</am-form-item>
+			<am-form-item name="age" label="年龄">
+				<am-input-number v-model:value="model['age']" :min="1" :max="120" />
+			</am-form-item>
+			<am-form-item name="score" label="评分" has-feedback>
+				<am-rate v-model:value="model['score']" />
+			</am-form-item>
+			<am-form-item name="notify" label="接收通知" content-align="end">
+				<am-switch v-model:checked="model['notify']" />
+			</am-form-item>
+			<am-form-item name="remark" label="备注" layout="vertical">
+				<am-textarea v-model:value="model['remark']" placeholder="选填" :maxlength="100" show-count auto-size />
+			</am-form-item>
+			<am-form-item name="agree" :rules="agreeRules" :bordered="false">
+				<am-checkbox v-model:checked="model['agree']" label="已阅读并同意《用户协议》" />
+			</am-form-item>
+			<template #footer>
+				<view class="demo__actions">
+					<am-button class="demo__block" type="primary" block text="提交（submit）" @click="submit" />
+					<am-button block text="重置（resetFields）" @click="reset" />
+				</view>
+			</template>
+		</am-form>
+		<view class="demo__card">
+			<text class="demo__hint">{{ result.length > 0 ? result : '点“提交”后在这里显示 finish / finishFailed 的参数' }}</text>
+			<text class="demo__hint">当前值：{{ JSON.stringify(model) }}</text>
+		</view>
+
+		<text class="demo__title">布局、禁用与方法</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<text class="demo__label">标签在上</text>
+				<am-switch v-model:checked="vertical" />
+			</view>
+			<view class="demo__row">
+				<text class="demo__label">禁用表单</text>
+				<am-switch v-model:checked="disabled" />
+			</view>
+			<am-button class="demo__block" block text="只校验用户名（validateFields）" @click="validateName" />
+			<am-button block text="清除校验结果（clearValidate）" @click="clearValidate" />
+		</view>
+
+		<text class="demo__title">requiredMark="optional"、手写的状态与说明</text>
+		<am-form required-mark="optional" :label-width="72">
+			<am-form-item label="昵称" required>
+				<am-input variant="borderless" placeholder="必填项不带标记" />
+			</am-form-item>
+			<am-form-item label="签名">
+				<am-input variant="borderless" placeholder="非必填项显示“（可选）”" />
+			</am-form-item>
+			<am-form-item label="邮箱" validate-status="error" help="邮箱已被占用" has-feedback>
+				<am-input variant="borderless" value="taken@example.com" />
+			</am-form-item>
+			<am-form-item label="城市" clickable :bordered="false">
+				<text class="demo__value">点击整行（clickable）</text>
+			</am-form-item>
+		</am-form>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__row { flex-direction: row; align-items: center; margin-bottom: 12px; }
+.demo__label { width: 96px; font-size: 14px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__footer { height: 40px; }
+.demo__actions { padding: 16px 12px 0 12px; }
+.demo__value { font-size: 16px; color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+</style>

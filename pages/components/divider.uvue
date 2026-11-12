@@ -1,0 +1,70 @@
+<script setup lang="uts">
+const variants : string[] = ['solid', 'dashed', 'dotted']
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<text class="demo__text">默认是一条水平的分割线，上下各留 12px。</text>
+			<am-divider />
+			<text class="demo__text">下面是虚线。</text>
+			<am-divider dashed />
+			<text class="demo__text">分割线之后的内容。</text>
+		</view>
+
+		<text class="demo__title">带标题</text>
+		<view class="demo__card">
+			<am-divider text="居中的标题" />
+			<am-divider text="靠左" title-placement="start" />
+			<am-divider text="靠右" title-placement="end" />
+			<am-divider text="加粗的标题" :plain="false" />
+			<am-divider>
+				<am-icon name="star-fill" :size="16" color="#faad14" />
+			</am-divider>
+		</view>
+
+		<text class="demo__title">线型</text>
+		<view class="demo__card">
+			<am-divider v-for="variant in variants" :key="variant" :variant="variant" :text="variant" />
+		</view>
+
+		<text class="demo__title">间距</text>
+		<view class="demo__card">
+			<text class="demo__text">small（8px）</text>
+			<am-divider size="small" />
+			<text class="demo__text">middle（12px）</text>
+			<am-divider size="middle" />
+			<text class="demo__text">large（16px）</text>
+			<am-divider size="large" />
+			<text class="demo__text">结束</text>
+		</view>
+
+		<text class="demo__title">垂直分割线</text>
+		<view class="demo__card demo__row">
+			<text class="demo__text">文字</text>
+			<am-divider vertical />
+			<text class="demo__text">链接</text>
+			<am-divider orientation="vertical" dashed />
+			<text class="demo__text">更多</text>
+			<am-divider type="vertical" variant="dotted" />
+			<text class="demo__text">设置</text>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+</style>

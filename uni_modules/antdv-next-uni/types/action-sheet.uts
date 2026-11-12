@@ -1,0 +1,14 @@
+// ActionSheet 的类型（= antdv-next-mobile 的 action-sheet/interface.ts）
+
+/** 动作面板的一项（= ActionSheetAction）：没有 onClick（UTS 的数据里不放函数），用组件的 action 事件 */
+export type AmActionSheetAction = {
+	key : string
+	text : string
+	/** 文字下方的说明 */
+	description ?: string | null
+	/** 文字前的图标名（<am-icon> 的 name） */
+	icon ?: string | null
+	danger ?: boolean | null
+	bold ?: boolean | null
+	disabled ?: boolean | null
+}

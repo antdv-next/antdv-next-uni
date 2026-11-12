@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "indicator": "指示器是内置 loading（App 端没有 @keyframes，图标转不起来）；自定义指示器用 indicator 插槽",
+    "percent": "内置 loading 画不了进度；要进度用 <am-progress type=\"circle\">"
+  }
+}

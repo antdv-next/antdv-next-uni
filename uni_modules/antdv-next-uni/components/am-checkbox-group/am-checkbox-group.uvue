@@ -1,0 +1,61 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { normalizeOptions, toggleValue } from '../../utils/option.uts'
+import { toArray } from '../../utils/value.uts'
+
+// 多选组（= antdv-next-mobile 的 CheckboxGroup）：v-model:value（数组）、options、disabled、max（最多选几项，
+// 选满后其余的不能再选）、block（列表式：每项占一行）、shape 同名同义；事件 update:value、change（选中的值）；
+// 选项用 `options`，或在默认插槽里放 <am-checkbox value="…">（两者可以同时用）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `options` 的每一项是 AmOption（{ label, value, disabled }）、字符串或数字；label 只能是文字，没有 labelRender；
+// - 没有 defaultValue（用 v-model:value）、name、role
+defineOptions({ name: 'AmCheckboxGroup' })
+
+const props = defineProps({
+	value: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	options: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	disabled: { type: Boolean, default: false },
+	/** 最多选几项；0 为不限 */
+	max: { type: Number, default: 0 },
+	block: { type: Boolean, default: false },
+	shape: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change'])
+
+const notifyChange = useAmFieldChange()
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const list = computed(() : AmOption[] => normalizeOptions(props.options, null))
+const values = computed(() : any[] => toArray(props.value))
+
+provide('amCheckboxGroupValue', () : any[] => values.value)
+provide('amCheckboxGroupDisabled', () : boolean => disabled.value)
+provide('amCheckboxGroupFull', () : boolean => props.max > 0 && values.value.length >= props.max)
+provide('amCheckboxGroupShape', () : string => props.shape)
+provide('amCheckboxGroupBlock', () : boolean => props.block)
+provide('amCheckboxGroupToggle', (value : any | null) => {
+	if (disabled.value) return
+	const next = toggleValue(values.value, value)
+	if (props.max > 0 && next.length > props.max) return
+	emit('update:value', next)
+	emit('change', next)
+	notifyChange()
+})
+</script>
+
+<template>
+	<view :class="['am-checkbox-group', block ? 'am-checkbox-group--block' : 'am-checkbox-group--inline', rootClass]">
+		<!-- 方框用 am-checkbox（勾选的动画只写一份）：它从这里的 provide 取选中状态，点击也交回这里 -->
+		<am-checkbox v-for="(option, index) in list" :key="index" :value="option.value" :label="option.label" :disabled="option.disabled == true" />
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-checkbox-group--inline { flex-direction: row; flex-wrap: wrap; }
+</style>

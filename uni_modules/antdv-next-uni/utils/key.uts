@@ -1,0 +1,13 @@
+// 选中值 / key 的比较：值可以是字符串或数字（UTS 里是 any），'1' 与 1 视为同一个值；null 只等于 null
+
+export function sameAmKey(a : any | null, b : any | null) : boolean {
+	if (a == null || b == null) return a == null && b == null
+	return ('' + a) == ('' + b)
+}
+
+/** 有没有值：null 与空字符串算“没传”（UTS 的属性没有 undefined） */
+export function hasAmKey(value : any | null) : boolean {
+	if (value == null) return false
+	if (typeof value == 'string') return (value as string).length > 0
+	return true
+}

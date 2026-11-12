@@ -1,0 +1,12 @@
+{
+  "missingProps": {
+    "href": "uni-app x 里没有 a 标签的跳转，用 click 事件 + uni.navigateTo",
+    "target": "同 href"
+  },
+  "extraProps": {
+    "text": "uvue 的样式不继承，默认插槽里的文字拿不到标签的颜色与字号，所以文字用属性传"
+  },
+  "extraEmits": {
+    "click": "uvue 里组件上没声明的事件不会落到根节点，要显式声明（移动端库靠 attrs 透传）"
+  }
+}

@@ -1,0 +1,218 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmPickerField } from '../../utils/picker-field.uts'
+import { AmDateParts, copyDateParts, formatDateParts, nowDateParts, numberRange, padDatePart, parseDateParts } from '../../utils/picker-date.uts'
+
+// 时间选择（= antdv-next-mobile 的 TimePicker）：触发区 + 底部弹层 + 滚轮，点“确定”才提交。
+// v-model:value、v-model:open、format（显示的格式，也决定有哪几列：HH:mm:ss / HH:mm / mm:ss）、valueFormat（值的格式，
+// 默认同 format）、hourStep / minuteStep / secondStep、defaultOpenValue、itemHeight、visibleItemCount，以及选择类字段共有的
+// placeholder、disabled、allowClear、status、variant、size、trigger、suffixIcon、title、okText、cancelText、zIndex、
+// maskClosable、destroyOnHidden 同名同义；事件 update:value、update:open、openChange、change（值、显示的文字）、
+// select（拨动滚轮，尚未提交）、confirm、cancel、clear；插槽 header、footer。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - **值是字符串**（uni-app x 上没有 dayjs）：格式为 valueFormat，空字符串表示没有值；defaultOpenValue 也是这个格式；
+//   格式只认 HH mm ss 三个占位符，所以没有 use12Hours（h / a）；
+// - 显示哪几列只看 format，没有 showHour / showMinute / showSecond（UTS 的布尔属性分不出“没传”）；
+// - 没有 disabledTime / filter / renderLabel（函数属性）、virtual、defaultValue / defaultOpen、id；
+// - 自定义触发区用 `:trigger="false"` + `v-model:open`；title、suffixIcon 是字符串，没有同名插槽
+defineOptions({ name: 'AmTimePicker' })
+
+const props = defineProps({
+	value: { type: String, default: '' },
+	open: { type: Boolean, default: false },
+	format: { type: String, default: 'HH:mm:ss' },
+	valueFormat: { type: String, default: '' },
+	hourStep: { type: Number, default: 1 },
+	minuteStep: { type: Number, default: 1 },
+	secondStep: { type: Number, default: 1 },
+	defaultOpenValue: { type: String, default: '' },
+	itemHeight: { type: Number, default: 44 },
+	visibleItemCount: { type: Number, default: 5 },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	trigger: { type: Boolean, default: true },
+	suffixIcon: { type: String, default: '' },
+	title: { type: String, default: '' },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'update:open', 'openChange', 'change', 'select', 'confirm', 'cancel', 'clear'])
+
+const locale = useAmLocale()
+const field = useAmPickerField()
+
+const valueFormat = computed(() : string => props.valueFormat.length > 0 ? props.valueFormat : props.format)
+
+/** 滚轮的列：format 里出现的 hour / minute / second */
+const keys = computed(() : string[] => {
+	const list : string[] = []
+	if (props.format.indexOf('HH') >= 0) list.push('hour')
+	if (props.format.indexOf('mm') >= 0) list.push('minute')
+	if (props.format.indexOf('ss') >= 0) list.push('second')
+	return list
+})
+
+/** 按步长取整；没有的列归零 */
+function normalize(parts : AmDateParts) : AmDateParts {
+	const next = copyDateParts(parts)
+	const names = keys.value
+	if (names.indexOf('hour') < 0) next.hour = 0
+	else if (props.hourStep > 1) next.hour -= next.hour % props.hourStep
+	if (names.indexOf('minute') < 0) next.minute = 0
+	else if (props.minuteStep > 1) next.minute -= next.minute % props.minuteStep
+	if (names.indexOf('second') < 0) next.second = 0
+	else if (props.secondStep > 1) next.second -= next.second % props.secondStep
+	return next
+}
+
+/** 打开时滚轮上的时间：已有的值 > defaultOpenValue > 现在 */
+function initial() : AmDateParts {
+	const parts = parseDateParts(props.value, valueFormat.value) ?? parseDateParts(props.defaultOpenValue, valueFormat.value) ?? nowDateParts()
+	return normalize(parts)
+}
+
+/** 弹层的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+/** 弹层里滚轮上的时间，确定时才提交 */
+const draft = ref<AmDateParts>(initial())
+
+watch(() : boolean => props.open, (open : boolean) => {
+	opened.value = open
+})
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	if (open) draft.value = initial()
+	else field.blur()
+})
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().TimePicker.placeholder)
+
+const label = computed(() : string => {
+	const parts = parseDateParts(props.value, valueFormat.value)
+	return parts == null ? '' : formatDateParts(parts, props.format)
+})
+
+function optionsOf(values : number[], unit : string) : AmOption[] {
+	const list : AmOption[] = []
+	for (let i = 0; i < values.length; i++) {
+		const option : AmOption = { label: padDatePart(values[i]) + unit, value: values[i] }
+		list.push(option)
+	}
+	return list
+}
+
+const columns = computed(() : AmOption[][] => {
+	const units = locale().DatePicker
+	const list : AmOption[][] = []
+	const names = keys.value
+	for (let i = 0; i < names.length; i++) {
+		if (names[i] == 'hour') list.push(optionsOf(numberRange(0, 23, props.hourStep), units.hour))
+		else if (names[i] == 'minute') list.push(optionsOf(numberRange(0, 59, props.minuteStep), units.minute))
+		else list.push(optionsOf(numberRange(0, 59, props.secondStep), units.second))
+	}
+	return list
+})
+
+const wheelValue = computed(() : any[] => {
+	const list : any[] = []
+	const names = keys.value
+	for (let i = 0; i < names.length; i++) {
+		if (names[i] == 'hour') list.push(draft.value.hour)
+		else if (names[i] == 'minute') list.push(draft.value.minute)
+		else list.push(draft.value.second)
+	}
+	return list
+})
+
+function onWheel(value : any[]) {
+	const next = copyDateParts(draft.value)
+	const names = keys.value
+	for (let i = 0; i < names.length && i < value.length; i++) {
+		const part = value[i] as number
+		if (names[i] == 'hour') next.hour = part
+		else if (names[i] == 'minute') next.minute = part
+		else next.second = part
+	}
+	draft.value = next
+	emit('select', formatDateParts(next, valueFormat.value), formatDateParts(next, props.format))
+}
+
+function onTrigger() {
+	setOpen(!opened.value)
+}
+
+function onOk() {
+	const value = formatDateParts(draft.value, valueFormat.value)
+	const text = formatDateParts(draft.value, props.format)
+	if (value != props.value) {
+		emit('update:value', value)
+		emit('change', value, text)
+		field.change()
+	}
+	emit('confirm', value, text)
+	setOpen(false)
+}
+
+function onCancel() {
+	emit('cancel')
+	setOpen(false)
+}
+
+function onClear() {
+	emit('update:value', '')
+	emit('change', '', '')
+	emit('clear')
+	field.change()
+}
+</script>
+
+<template>
+	<am-picker-trigger
+		v-if="trigger"
+		:label="label"
+		:placeholder="placeholderText"
+		:open="opened"
+		:disabled="disabled"
+		:allow-clear="allowClear"
+		:status="status"
+		:variant="variant"
+		:size="size"
+		:suffix-icon="suffixIcon"
+		:root-class="rootClass"
+		@click="onTrigger"
+		@clear="onClear"
+	/>
+	<am-picker-popup
+		:open="opened"
+		:title="title"
+		:ok-text="okText"
+		:cancel-text="cancelText"
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		@ok="onOk"
+		@cancel="onCancel"
+	>
+		<slot name="header"></slot>
+		<am-picker-view :columns="columns" :value="wheelValue" :item-height="itemHeight" :visible-item-count="visibleItemCount" @change="onWheel" />
+		<slot name="footer"></slot>
+	</am-picker-popup>
+</template>

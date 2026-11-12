@@ -1,0 +1,116 @@
+<script setup lang="uts">
+import { presetColor } from '../../utils/color.uts'
+
+// 徽标（= antdv-next-mobile 的 Badge）：count、dot、overflowCount、showZero、offset（[右, 上] 的偏移，像素）、
+// color（预设色名或颜色值）、status（success / processing / default / error / warning）、text、size（default / small）
+// 同名同义；插槽 default（被包住的内容）、count（自定义角标）、text。
+// 包着内容时角标压在右上角；没有内容时角标单独显示；没有内容且写了 status / color（没有 count 或有 text）时是状态点 + 文字。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `count` 只有数字，`text` 是字符串；文字或自定义节点用 count / text 插槽；
+// - `offset` 的两项只有数字（像素）；
+// - 没有 `title`（view 没有原生的 title 提示）；状态点没有 processing 的呼吸动画（没有 @keyframes）；
+// - 角标要伸出内容的右上角：外层容器如果裁剪内容（App 端 view 默认 overflow: hidden），在容器上写 overflow: visible
+defineOptions({ name: 'AmBadge' })
+
+const props = defineProps({
+	count: { type: Number, default: 0 },
+	dot: { type: Boolean, default: false },
+	overflowCount: { type: Number, default: 99 },
+	showZero: { type: Boolean, default: false },
+	offset: { type: Array as PropType<number[]>, default: () : number[] => [] as number[] },
+	color: { type: String, default: '' },
+	status: { type: String, default: '' },
+	text: { type: String, default: '' },
+	size: { type: String, default: 'default' },
+	rootClass: { type: String, default: '' }
+})
+
+const hasStatus = computed(() : boolean => props.status.length > 0 || props.color.length > 0)
+/** 有没有要显示的数字 */
+const hasCount = computed(() : boolean => props.count > 0 || props.showZero)
+/** 没有被包住的内容时，是否显示成“状态点 + 文字” */
+const statusMode = computed(() : boolean => hasStatus.value && (!hasCount.value || props.text.length > 0))
+/** 包着内容、只写了 status / color 时显示成小圆点 */
+const isDot = computed(() : boolean => props.dot || (hasStatus.value && !hasCount.value))
+const visible = computed(() : boolean => isDot.value || hasCount.value)
+
+const countText = computed(() : string => props.count > props.overflowCount ? props.overflowCount + '+' : props.count.toString())
+
+const colorStyle = computed(() : string => props.color.length > 0 ? 'background-color:' + presetColor(props.color) + ';' : '')
+
+/** 角标的位置：默认中心压在右上角，offset 在此基础上向左 / 向下移动 */
+const cornerStyle = computed(() : string => {
+	if (props.offset.length < 2) return colorStyle.value
+	return colorStyle.value + 'right:' + (0 - props.offset[0]) + 'px;margin-top:' + props.offset[1] + 'px;'
+})
+
+const markClasses = computed(() : string[] => {
+	const list : string[] = ['am-badge__mark']
+	if (isDot.value) list.push('am-badge__mark--dot')
+	else if (props.size == 'small') list.push('am-badge__mark--small')
+	if (props.status.length > 0) list.push('am-badge__mark--' + props.status)
+	return list
+})
+</script>
+
+<template>
+	<view v-if="$slots['default'] == null && statusMode" :class="['am-badge-status', rootClass]">
+		<view :class="['am-badge-status__dot', status.length > 0 ? 'am-badge__mark--' + status : '']" :style="colorStyle"></view>
+		<text v-if="text.length > 0" class="am-badge-status__text">{{ text }}</text>
+		<slot name="text"></slot>
+	</view>
+	<view v-else-if="$slots['default'] == null" :class="['am-badge', rootClass]">
+		<slot name="count">
+			<view v-if="visible" :class="markClasses" :style="colorStyle">
+				<text v-if="!isDot" :class="['am-badge__text', size == 'small' ? 'am-badge__text--small' : '']">{{ countText }}</text>
+			</view>
+		</slot>
+	</view>
+	<view v-else :class="['am-badge', rootClass]">
+		<slot></slot>
+		<view v-if="$slots['count'] != null" class="am-badge__corner" :style="cornerStyle">
+			<slot name="count"></slot>
+		</view>
+		<view v-else-if="visible" :class="[...markClasses, 'am-badge__corner', 'am-badge__mark--outlined']" :style="cornerStyle">
+			<text v-if="!isDot" :class="['am-badge__text', size == 'small' ? 'am-badge__text--small' : '']">{{ countText }}</text>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-badge { position: relative; align-self: flex-start; overflow: visible; }
+/* 中心压在内容的右上角 */
+.am-badge__corner { position: absolute; top: 0; right: 0; z-index: 1; transform: translateX(50%) translateY(-50%); }
+.am-badge__mark {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background-color: var(--am-color-error, #ff4d4f);
+}
+/* 描一圈容器色的边，和内容分开（宽高含边框） */
+.am-badge__mark--outlined { border-width: 1px; border-style: solid; border-color: var(--am-color-bg-container, #ffffff); }
+.am-badge__mark--small { min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; }
+.am-badge__mark--dot { min-width: 8px; width: 8px; height: 8px; padding: 0; border-radius: 4px; }
+.am-badge__mark--success { background-color: var(--am-color-success, #52c41a); }
+.am-badge__mark--processing { background-color: var(--am-color-info, #1677ff); }
+.am-badge__mark--error { background-color: var(--am-color-error, #ff4d4f); }
+.am-badge__mark--warning { background-color: var(--am-color-warning, #faad14); }
+.am-badge__mark--default { background-color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.am-badge__text { font-size: 12px; line-height: 16px; color: var(--am-color-text-light-solid, #ffffff); }
+.am-badge__text--small { font-size: 10px; line-height: 12px; }
+
+.am-badge-status { flex-direction: row; align-items: center; align-self: flex-start; }
+.am-badge-status__dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 3px;
+	margin-right: 8px;
+	background-color: var(--am-color-error, #ff4d4f);
+}
+.am-badge-status__text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

@@ -1,0 +1,156 @@
+import { AmFieldNames, AmOption } from '../types/index.uts'
+
+// 选择器（picker / select / cascader）用的选项工具：值在 UTS 中是 any（字符串、数字、布尔），
+// 比较时一方是数字就按数字比（接口返回的 id 常常一边是数字、一边是字符串）
+
+/** 转成数字：数字、非空的数字字符串；其余为 null */
+function numberOrNull(value : any | null) : number | null {
+	if (value == null) return null
+	if (typeof value == 'number') {
+		const n = value as number
+		return isFinite(n) ? n : null
+	}
+	if (typeof value == 'string') {
+		const text = (value as string).trim()
+		if (text.length == 0) return null
+		const n = parseFloat(text)
+		return isNaN(n) || !/^-?\d+(\.\d+)?$/.test(text) ? null : n
+	}
+	return null
+}
+
+/** 两个选项值是否相等 */
+export function sameOptionValue(a : any | null, b : any | null) : boolean {
+	if (a == null || b == null) return a == null && b == null
+	if (typeof a == 'number' || typeof b == 'number') {
+		const x = numberOrNull(a)
+		const y = numberOrNull(b)
+		return x != null && y != null && x == y
+	}
+	if (typeof a == 'string' && typeof b == 'string') return (a as string) == (b as string)
+	if (typeof a == 'boolean' && typeof b == 'boolean') return (a as boolean) == (b as boolean)
+	return false
+}
+
+/** 转成数组：已经是数组时复制一份，空值（null、空字符串）为空数组，其他值为单元素数组 */
+export function optionValues(value : any | null) : any[] {
+	if (value == null) return []
+	if (Array.isArray(value)) return [...(value as any[])]
+	if (typeof value == 'string' && (value as string).length == 0) return []
+	return [value]
+}
+
+export function includesOptionValue(list : any[], value : any | null) : boolean {
+	for (let i = 0; i < list.length; i++) if (sameOptionValue(list[i], value)) return true
+	return false
+}
+
+/** 多选：切换一个值，返回新数组 */
+export function toggleOptionValue(values : any[], value : any | null) : any[] {
+	if (includesOptionValue(values, value)) return values.filter((item) : boolean => !sameOptionValue(item, value))
+	const next : any[] = [...values]
+	if (value != null) next.push(value)
+	return next
+}
+
+/** 按 fieldNames 把任意 JSON 数组（或 AmOption[]）转成选项（数据来自接口时字段名不同，同 Antdv Next 的 fieldNames） */
+export function normalizeAmOptions(list : any[] | null, names : AmFieldNames | null) : AmOption[] {
+	if (list == null) return []
+	const labelKey = names?.label ?? 'label'
+	const valueKey = names?.value ?? 'value'
+	const childrenKey = names?.children ?? 'children'
+	const result : AmOption[] = []
+	for (let i = 0; i < list.length; i++) {
+		const item = list[i]
+		if (item == null) continue
+		if (typeof item == 'string' || typeof item == 'number') {
+			const plain : AmOption = { label: '' + item, value: item }
+			result.push(plain)
+			continue
+		}
+		const object = JSON.parseObject(JSON.stringify(item) ?? '{}') ?? ({} as UTSJSONObject)
+		const children = object.getArray(childrenKey)
+		const value = object.get(valueKey)
+		const option : AmOption = {
+			label: object.getString(labelKey) ?? (value == null ? '' : '' + value),
+			value: value,
+			disabled: object.getBoolean('disabled') ?? false,
+			description: object.getString('description'),
+			isLeaf: object.getBoolean('isLeaf'),
+			children: children == null ? null : normalizeAmOptions(children, names)
+		}
+		result.push(option)
+	}
+	return result
+}
+
+/** 按值找选项（只找这一层） */
+export function findAmOption(options : AmOption[], value : any | null) : AmOption | null {
+	for (let i = 0; i < options.length; i++) if (sameOptionValue(options[i].value, value)) return options[i]
+	return null
+}
+
+/** 值在这一层的下标，找不到为 -1 */
+export function indexOfAmOption(options : AmOption[], value : any | null) : number {
+	for (let i = 0; i < options.length; i++) if (sameOptionValue(options[i].value, value)) return i
+	return -1
+}
+
+/** 按关键字筛选（标签包含关键字，不区分大小写） */
+export function filterAmOptions(options : AmOption[], keyword : string) : AmOption[] {
+	const text = keyword.trim().toLowerCase()
+	if (text.length == 0) return options
+	return options.filter((option : AmOption) : boolean => option.label.toLowerCase().indexOf(text) >= 0)
+}
+
+/** 级联的路径：按值数组逐级找到选项（找不到的一级停止） */
+export function cascadeAmOptions(options : AmOption[], values : any[]) : AmOption[] {
+	const path : AmOption[] = []
+	let level = options
+	for (let i = 0; i < values.length; i++) {
+		const option = findAmOption(level, values[i])
+		if (option == null) break
+		path.push(option)
+		level = option.children ?? []
+	}
+	return path
+}
+
+/** 滚轮每一列选中的下标：值找不到（或没有值）时取这一列第一个没禁用的选项 */
+export function pickerIndexes(columns : AmOption[][], value : any[]) : number[] {
+	const list : number[] = []
+	for (let i = 0; i < columns.length; i++) {
+		const column = columns[i]
+		let index = i < value.length ? indexOfAmOption(column, value[i]) : -1
+		if (index < 0) {
+			index = 0
+			for (let j = 0; j < column.length; j++) {
+				if (column[j].disabled != true) {
+					index = j
+					break
+				}
+			}
+		}
+		list.push(index)
+	}
+	return list
+}
+
+/** 滚轮每一列选中的选项（空的列为 null） */
+export function pickerItems(columns : AmOption[][], value : any[]) : (AmOption | null)[] {
+	const indexes = pickerIndexes(columns, value)
+	const items : (AmOption | null)[] = []
+	for (let i = 0; i < columns.length; i++) items.push(indexes[i] < columns[i].length ? columns[i][indexes[i]] : null)
+	return items
+}
+
+/** 滚轮显示的值（每列一个；没有值的列取默认选中的那个选项的值） */
+export function pickerValues(columns : AmOption[][], value : any[]) : any[] {
+	const items = pickerItems(columns, value)
+	const values : any[] = []
+	for (let i = 0; i < items.length; i++) {
+		const item = items[i]
+		if (item != null && item.value != null) values.push(item.value!)
+	}
+	return values
+}

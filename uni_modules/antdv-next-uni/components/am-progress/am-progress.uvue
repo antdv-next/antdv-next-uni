@@ -1,0 +1,195 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { AM_PROGRESS_NO_SUCCESS, AmProgressSuccess } from '../../types/progress.uts'
+
+// 进度条（= antdv-next-mobile 的 Progress）：type（line / circle）、percent、status（success / exception / normal / active，
+// 到 100 自动变 success）、showInfo、strokeWidth、strokeLinecap、strokeColor、railColor（trailColor 为旧名）、
+// success（{ percent, strokeColor } 已完成的分段）、size、steps（分段的条数）同名同义；默认插槽是自定义的进度文字
+// （参数 percent、successPercent）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - uvue 没有 SVG：圆形进度用两个半圆旋转实现（每个半边裁一半，里面的半圆环按比例转进来），所以没有缺口
+//   （`gapDegree` / `gapPlacement`，`type="dashboard"` 画成整圆）、圆形的端点不是圆头、`strokeWidth` 在圆形里是像素；
+// - `strokeColor` 只能是一个颜色（App 端的 view 没有渐变的圆环；steps 也不能每段一个颜色）；
+// - `size` 是字符串：small / medium / default，或像素数字（线形为粗细、圆形为直径），没有 [宽, 高] 与对象形式；
+// - `steps` 只有数字；`format` / `rounding` 是函数，UTS 里函数不能返回节点：自定义文字用默认插槽；
+// - 没有 `percentPosition`（文字固定在线的末端外侧）；`status="active"` 没有扫光动画（App 端没有 @keyframes）
+defineOptions({ name: 'AmProgress' })
+
+const props = defineProps({
+	type: { type: String, default: 'line' },
+	percent: { type: Number, default: 0 },
+	status: { type: String, default: '' },
+	showInfo: { type: Boolean, default: true },
+	strokeWidth: { type: Number, default: 0 },
+	strokeLinecap: { type: String, default: 'round' },
+	strokeColor: { type: String, default: '' },
+	railColor: { type: String, default: '' },
+	trailColor: { type: String, default: '' },
+	success: { type: Object as PropType<AmProgressSuccess>, default: () : AmProgressSuccess => AM_PROGRESS_NO_SUCCESS },
+	size: { type: String, default: 'default' },
+	steps: { type: Number, default: 0 },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+function clampPercent(value : number) : number {
+	return isNaN(value) ? 0 : Math.max(0, Math.min(100, value))
+}
+
+const isCircle = computed(() : boolean => props.type == 'circle' || props.type == 'dashboard')
+const value = computed(() : number => clampPercent(props.percent))
+const successValue = computed(() : number => clampPercent(props.success.percent ?? 0))
+const mergedStatus = computed(() : string => {
+	if (props.status.length > 0) return props.status
+	return Math.max(value.value, successValue.value) >= 100 ? 'success' : 'normal'
+})
+
+/** 进度的颜色：strokeColor > 状态色 */
+const color = computed(() : string => {
+	if (props.strokeColor.length > 0) return props.strokeColor
+	const current = theme()
+	if (mergedStatus.value == 'exception') return current.colorError
+	if (mergedStatus.value == 'success') return current.colorSuccess
+	return current.colorPrimary
+})
+const successColor = computed(() : string => props.success.strokeColor ?? theme().colorSuccess)
+const railColorValue = computed(() : string => {
+	if (props.railColor.length > 0) return props.railColor
+	if (props.trailColor.length > 0) return props.trailColor
+	return theme().colorFillSecondary
+})
+const statusColor = computed(() : string => mergedStatus.value == 'exception' ? theme().colorError : theme().colorSuccess)
+
+/** size 写成数字时的像素值；不是数字为 0 */
+const sizeNumber = computed(() : number => {
+	const n = parseFloat(props.size)
+	return isNaN(n) ? 0 : n
+})
+
+// ---------- 线形 ----------
+const lineHeight = computed(() : number => {
+	if (sizeNumber.value > 0) return sizeNumber.value
+	if (props.strokeWidth > 0) return props.strokeWidth
+	return props.size == 'small' ? 6 : 8
+})
+const lineRadius = computed(() : number => props.strokeLinecap == 'round' ? lineHeight.value / 2 : 0)
+const railStyle = computed(() : string => 'height:' + lineHeight.value + 'px;border-radius:' + lineRadius.value + 'px;background-color:' + railColorValue.value + ';')
+const trackStyle = computed(() : string => 'width:' + value.value + '%;height:' + lineHeight.value + 'px;border-radius:' + lineRadius.value + 'px;background-color:' + color.value + ';')
+const successTrackStyle = computed(() : string => 'width:' + successValue.value + '%;height:' + lineHeight.value + 'px;border-radius:' + lineRadius.value + 'px;background-color:' + successColor.value + ';')
+
+// ---------- 分段 ----------
+const stepList = computed(() : boolean[] => {
+	const list : boolean[] = []
+	const count = Math.max(Math.floor(props.steps), 0)
+	const current = Math.round(count * (value.value / 100))
+	for (let i = 0; i < count; i++) list.push(i < current)
+	return list
+})
+
+function stepStyle(active : boolean, index : number) : string {
+	const width = props.size == 'small' ? 2 : 14
+	return 'width:' + width + 'px;height:' + lineHeight.value + 'px;background-color:' + (active ? color.value : railColorValue.value) + ';' + (index > 0 ? 'margin-left:2px;' : '')
+}
+
+// ---------- 圆形 ----------
+const diameter = computed(() : number => {
+	if (sizeNumber.value > 0) return sizeNumber.value
+	return props.size == 'small' ? 60 : 120
+})
+const ring = computed(() : number => props.strokeWidth > 0 ? props.strokeWidth : Math.max(3, Math.round(diameter.value * 0.06)))
+
+/** 半圆环：right 为右半边（0–50%），否则为左半边（50–100%） */
+function halfStyle(right : boolean, percent : number, stroke : string) : string {
+	const d = diameter.value
+	const part = right ? Math.min(percent, 50) : Math.max(percent - 50, 0)
+	const angle = -135 + (part / 50) * 180
+	let text = 'width:' + d + 'px;height:' + d + 'px;border-radius:' + d / 2 + 'px;border-width:' + ring.value + 'px;'
+	text += right ? 'left:-' + d / 2 + 'px;' : 'left:0px;'
+	text += 'transform:rotate(' + angle + 'deg);'
+	text += right ? 'border-top-color:' + stroke + ';border-right-color:' + stroke + ';' : 'border-bottom-color:' + stroke + ';border-left-color:' + stroke + ';'
+	return text
+}
+
+const circleStyle = computed(() : string => 'width:' + diameter.value + 'px;height:' + diameter.value + 'px;')
+const circleRailStyle = computed(() : string => {
+	const d = diameter.value
+	return 'width:' + d + 'px;height:' + d + 'px;border-radius:' + d / 2 + 'px;border-width:' + ring.value + 'px;border-color:' + railColorValue.value + ';'
+})
+const clipStyle = computed(() : string => 'width:' + diameter.value / 2 + 'px;height:' + diameter.value + 'px;left:0px;')
+const rightClipStyle = computed(() : string => 'width:' + diameter.value / 2 + 'px;height:' + diameter.value + 'px;left:' + diameter.value / 2 + 'px;')
+const circleFont = computed(() : number => Math.round(diameter.value * 0.15 + 6))
+const circleTextStyle = computed(() : string => 'font-size:' + circleFont.value + 'px;')
+
+const info = computed(() : string => Math.round(value.value) + '%')
+const infoIcon = computed(() : string => {
+	if (mergedStatus.value == 'success') return isCircle.value ? 'check' : 'success-fill'
+	if (mergedStatus.value == 'exception') return isCircle.value ? 'close' : 'error-fill'
+	return ''
+})
+</script>
+
+<template>
+	<view v-if="isCircle" :class="['am-progress-circle', rootClass]" :style="circleStyle">
+		<view class="am-progress-circle__rail" :style="circleRailStyle"></view>
+		<view class="am-progress-circle__clip" :style="rightClipStyle">
+			<view class="am-progress-circle__half" :style="halfStyle(true, value, color)"></view>
+		</view>
+		<view class="am-progress-circle__clip" :style="clipStyle">
+			<view class="am-progress-circle__half" :style="halfStyle(false, value, color)"></view>
+		</view>
+		<view v-if="successValue > 0" class="am-progress-circle__clip" :style="rightClipStyle">
+			<view class="am-progress-circle__half" :style="halfStyle(true, successValue, successColor)"></view>
+		</view>
+		<view v-if="successValue > 50" class="am-progress-circle__clip" :style="clipStyle">
+			<view class="am-progress-circle__half" :style="halfStyle(false, successValue, successColor)"></view>
+		</view>
+		<view v-if="showInfo" class="am-progress-circle__info">
+			<slot :percent="value" :successPercent="successValue">
+				<am-icon v-if="infoIcon.length > 0" :name="infoIcon" :size="Math.round(circleFont * 1.3)" :color="statusColor" />
+				<text v-else class="am-progress-circle__text" :style="circleTextStyle">{{ info }}</text>
+			</slot>
+		</view>
+	</view>
+	<view v-else :class="['am-progress', rootClass]">
+		<view v-if="steps > 0" class="am-progress__steps">
+			<view v-for="(active, index) in stepList" :key="index" :style="stepStyle(active, index)"></view>
+		</view>
+		<view v-else class="am-progress__rail" :style="railStyle">
+			<view class="am-progress__track" :style="trackStyle"></view>
+			<view v-if="successValue > 0" class="am-progress__track am-progress__track--success" :style="successTrackStyle"></view>
+		</view>
+		<view v-if="showInfo" class="am-progress__info">
+			<slot :percent="value" :successPercent="successValue">
+				<am-icon v-if="infoIcon.length > 0" :name="infoIcon" :size="size == 'small' ? 14 : 16" :color="statusColor" />
+				<text v-else :class="['am-progress__text', size == 'small' ? 'am-progress__text--small' : '']">{{ info }}</text>
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-progress { flex-direction: row; align-items: center; }
+.am-progress__rail { flex: 1; position: relative; overflow: hidden; }
+.am-progress__track { transition-property: width; transition-duration: 300ms; transition-timing-function: cubic-bezier(0.645, 0.045, 0.355, 1); }
+.am-progress__track--success { position: absolute; left: 0; top: 0; }
+.am-progress__steps { flex-direction: row; align-items: center; }
+.am-progress__info { min-width: 28px; margin-left: 8px; flex-direction: row; align-items: center; }
+.am-progress__text { font-size: var(--am-font-size, 14px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-progress__text--small { font-size: var(--am-font-size-sm, 12px); }
+.am-progress-circle { position: relative; }
+.am-progress-circle__rail { position: absolute; left: 0; top: 0; border-style: solid; }
+.am-progress-circle__clip { position: absolute; top: 0; overflow: hidden; }
+.am-progress-circle__half {
+	position: absolute;
+	top: 0;
+	border-style: solid;
+	border-color: transparent;
+	transition-property: transform;
+	transition-duration: 300ms;
+	transition-timing-function: cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+.am-progress-circle__info { position: absolute; left: 0; right: 0; top: 0; bottom: 0; align-items: center; justify-content: center; }
+.am-progress-circle__text { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+</style>

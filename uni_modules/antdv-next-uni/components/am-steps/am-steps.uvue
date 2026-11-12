@@ -1,0 +1,177 @@
+<script setup lang="uts">
+import { AmStepsItem } from '../../types/steps.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 步骤条（= antdv-next-mobile 的 Steps）：items（title、subTitle、content、icon、status、disabled）、v-model:current、
+// initial、status（当前步的状态：wait / process / finish / error）、orientation（horizontal / vertical）、
+// size（default / small）、type（default / dot）、titlePlacement（horizontal / vertical，只对横向步骤条有效）同名同义；
+// 事件 update:current、change；插槽 iconRender（item、index、status、active）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 步骤的 title / subTitle / content 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据）；自定义图标用 iconRender 插槽；
+// - 多一个 `clickable`：移动端库是“监听了 change 或用了 v-model:current 才可点击”，这里拿不到有没有监听；
+// - 没有已废弃的 direction / labelPlacement / progressDot，步骤没有 description（用 content）、class / style
+defineOptions({ name: 'AmSteps' })
+
+const props = defineProps({
+	items: { type: Array as PropType<AmStepsItem[]>, default: () : AmStepsItem[] => [] },
+	/** 当前步骤，从 initial 开始计数 */
+	current: { type: Number, default: 0 },
+	/** 第一步的序号 */
+	initial: { type: Number, default: 0 },
+	status: { type: String, default: 'process' },
+	orientation: { type: String, default: 'horizontal' },
+	size: { type: String, default: 'default' },
+	type: { type: String, default: 'default' },
+	/** 标题相对图标的位置：横向步骤条默认 vertical（标题在图标下方） */
+	titlePlacement: { type: String, default: 'vertical' },
+	/** 点击步骤可以切换（发出 update:current / change） */
+	clickable: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:current', 'change'])
+
+const theme = useAmTheme()
+
+const vertical = computed(() : boolean => props.orientation == 'vertical')
+const small = computed(() : boolean => props.size == 'small')
+const dot = computed(() : boolean => props.type == 'dot')
+/** 布局：v（竖向步骤条）、hv（横向，标题在图标下方）、hh（横向，标题在图标右侧） */
+const layout = computed(() : string => vertical.value ? 'v' : (props.titlePlacement == 'horizontal' && !dot.value ? 'hh' : 'hv'))
+
+function statusOf(item : AmStepsItem, index : number) : string {
+	const own = item.status ?? ''
+	if (own.length > 0) return own
+	const step = index + props.initial
+	if (step < props.current) return 'finish'
+	if (step == props.current) return props.status
+	return 'wait'
+}
+
+/** 这一步之后的连接线是否已经走过 */
+function passed(index : number) : boolean {
+	return index + props.initial < props.current
+}
+
+function onClick(item : AmStepsItem, index : number) {
+	const step = index + props.initial
+	if (!props.clickable || item.disabled == true || step == props.current) return
+	emit('update:current', step)
+	emit('change', step)
+}
+
+/** 自定义图标的颜色（图标不继承颜色） */
+function iconColor(status : string) : string {
+	const current = theme()
+	if (status == 'error') return current.colorError
+	if (status == 'wait') return current.colorTextTertiary
+	return current.colorPrimary
+}
+const solidColor = computed(() : string => theme().colorTextLightSolid)
+
+function iconClasses(status : string) : string[] {
+	if (dot.value) return ['am-steps__dot', 'am-steps__dot--' + status]
+	return ['am-steps__icon', small.value ? 'am-steps__icon--small' : 'am-steps__icon--default', 'am-steps__icon--' + status]
+}
+
+function railClasses(done : boolean, hidden : boolean) : string[] {
+	const list : string[] = ['am-steps__rail']
+	if (hidden) list.push('am-steps__rail--hidden')
+	else if (done) list.push('am-steps__rail--done')
+	return list
+}
+
+function titleClasses(status : string) : string[] {
+	return ['am-steps__title', small.value ? 'am-steps__title--small' : '', 'am-steps__title--' + status]
+}
+</script>
+
+<template>
+	<view :class="['am-steps', 'am-steps--' + layout, rootClass]">
+		<view
+			v-for="(item, index) in items"
+			:key="index"
+			:class="['am-steps__item', 'am-steps__item--' + layout, layout == 'hh' && index == items.length - 1 ? 'am-steps__item--last' : '', item.disabled == true ? 'am-steps__item--disabled' : '']"
+			@click="onClick(item, index)"
+		>
+			<view :class="['am-steps__head', 'am-steps__head--' + layout]">
+				<view v-if="layout == 'hv'" :class="railClasses(index > 0 && passed(index - 1), index == 0)"></view>
+				<slot name="iconRender" :item="item" :index="index" :status="statusOf(item, index)" :active="index + initial == current">
+					<view v-if="dot" :class="iconClasses(statusOf(item, index))"></view>
+					<am-icon v-else-if="(item.icon ?? '').length > 0" :name="item.icon ?? ''" :size="small ? 18 : 22" :color="iconColor(statusOf(item, index))" />
+					<view v-else :class="iconClasses(statusOf(item, index))">
+						<am-icon v-if="statusOf(item, index) == 'finish'" name="check" :size="small ? 11 : 13" :color="solidColor" />
+						<am-icon v-else-if="statusOf(item, index) == 'error'" name="close" :size="small ? 11 : 13" :color="solidColor" />
+						<text v-else :class="['am-steps__number', small ? 'am-steps__number--small' : '', 'am-steps__number--' + statusOf(item, index)]">{{ index + initial + 1 }}</text>
+					</view>
+				</slot>
+				<view v-if="layout == 'hv'" :class="railClasses(passed(index), index == items.length - 1)"></view>
+				<view v-if="layout == 'v' && index < items.length - 1" :class="['am-steps__tail', passed(index) ? 'am-steps__rail--done' : '']"></view>
+			</view>
+			<view :class="['am-steps__section', 'am-steps__section--' + layout]">
+				<view :class="['am-steps__header', 'am-steps__header--' + layout]">
+					<text v-if="(item.title ?? '').length > 0" :class="titleClasses(statusOf(item, index))">{{ item.title }}</text>
+					<text v-if="(item.subTitle ?? '').length > 0" :class="['am-steps__sub-title', layout == 'hv' ? '' : 'am-steps__sub-title--inline']">{{ item.subTitle }}</text>
+					<view v-if="layout == 'hh' && index < items.length - 1" :class="['am-steps__rail', 'am-steps__rail--inline', passed(index) ? 'am-steps__rail--done' : '']"></view>
+				</view>
+				<text v-if="(item.content ?? '').length > 0" :class="['am-steps__content', layout == 'hv' ? 'am-steps__content--center' : '']">{{ item.content }}</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-steps--hv { flex-direction: row; }
+.am-steps--hh { flex-direction: row; }
+.am-steps__item--hv { flex: 1; align-items: center; }
+.am-steps__item--hh { flex: 1; flex-direction: row; }
+.am-steps__item--last { flex: none; }
+.am-steps__item--v { flex-direction: row; }
+.am-steps__item--disabled { opacity: 0.6; }
+
+/* 图标一栏 */
+.am-steps__head--hv { flex-direction: row; align-items: center; align-self: stretch; }
+.am-steps__head--hh { height: 28px; justify-content: center; margin-right: 8px; }
+.am-steps__head--v { align-items: center; margin-right: 12px; }
+.am-steps__icon { align-items: center; justify-content: center; border-width: 1px; border-style: solid; }
+.am-steps__icon--default { width: 28px; height: 28px; border-radius: 14px; }
+.am-steps__icon--small { width: 22px; height: 22px; border-radius: 11px; }
+.am-steps__icon--wait { border-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-steps__icon--process { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-primary, #1677ff); }
+.am-steps__icon--finish { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-primary, #1677ff); }
+.am-steps__icon--error { border-color: var(--am-color-error, #ff4d4f); background-color: var(--am-color-error, #ff4d4f); }
+.am-steps__number { font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-steps__number--small { font-size: var(--am-font-size-sm, 12px); }
+.am-steps__number--process { color: var(--am-color-text-light-solid, #ffffff); }
+.am-steps__dot { width: 8px; height: 8px; border-radius: 4px; margin-top: 7px; margin-bottom: 7px; }
+.am-steps__dot--wait { background-color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.am-steps__dot--process { background-color: var(--am-color-primary, #1677ff); }
+.am-steps__dot--finish { background-color: var(--am-color-primary, #1677ff); }
+.am-steps__dot--error { background-color: var(--am-color-error, #ff4d4f); }
+
+/* 连接线 */
+.am-steps__rail { flex: 1; height: 1px; margin-left: 6px; margin-right: 6px; background-color: var(--am-color-border, #d9d9d9); }
+.am-steps__rail--inline { min-width: 12px; margin-left: 8px; margin-right: 8px; }
+.am-steps__rail--hidden { background-color: transparent; }
+.am-steps__rail--done { background-color: var(--am-color-primary, #1677ff); }
+.am-steps__tail { flex: 1; width: 1px; margin-top: 6px; margin-bottom: 6px; background-color: var(--am-color-border, #d9d9d9); }
+
+/* 标题与描述 */
+.am-steps__section--hv { margin-top: 6px; align-items: center; align-self: stretch; padding-left: 4px; padding-right: 4px; }
+.am-steps__section--hh { flex: 1; }
+.am-steps__section--v { flex: 1; padding-bottom: var(--am-padding, 16px); }
+.am-steps__header--hv { align-items: center; }
+.am-steps__header--hh { flex-direction: row; align-items: center; height: 28px; }
+.am-steps__header--v { flex-direction: row; align-items: center; }
+.am-steps__title { font-size: var(--am-font-size, 14px); line-height: 22px; text-align: center; }
+.am-steps__title--small { font-size: var(--am-font-size-sm, 12px); line-height: 20px; }
+.am-steps__title--wait { color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-steps__title--process { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); font-weight: bold; }
+.am-steps__title--finish { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-steps__title--error { color: var(--am-color-error, #ff4d4f); }
+.am-steps__sub-title { font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); text-align: center; }
+.am-steps__sub-title--inline { margin-left: 8px; }
+.am-steps__content { margin-top: 2px; font-size: var(--am-font-size-sm, 12px); line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-steps__content--center { text-align: center; }
+</style>

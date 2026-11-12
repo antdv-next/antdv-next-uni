@@ -1,0 +1,98 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 结果（= antdv-next-mobile 的 Result）：status（success / error / info / warning / 403 / 404 / 500）、icon、title、subTitle
+// 同名同义；插槽 default（补充说明，带浅色底）、icon、title、subTitle、extra（操作区）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / subTitle 是字符串，`icon` 是图标名（<am-icon> 的 name）；自定义内容用同名插槽；
+// - 没有 `extra` 属性（操作区是按钮等节点，放不进数据），只有 extra 插槽；
+// - `status` 是字符串（403 写成 status="403"）；403 / 404 / 500 是主题色的图标，不是插画（App 端没有内联 SVG）
+defineOptions({ name: 'AmResult' })
+
+const props = defineProps({
+	status: { type: String, default: 'info' },
+	icon: { type: String, default: '' },
+	title: { type: String, default: '' },
+	subTitle: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+const ICONS = new Map<string, string>([
+	['success', 'success-fill'], ['error', 'error-fill'], ['info', 'info-fill'], ['warning', 'warning-fill'],
+	['403', 'lock'], ['404', 'question'], ['500', 'warning']
+])
+
+const iconName = computed(() : string => props.icon.length > 0 ? props.icon : (ICONS.get(props.status) ?? 'info-fill'))
+
+/** 子组件上的类盖不过它自己的样式，图标的颜色用属性传 */
+const iconColor = computed(() : string => {
+	const current = theme()
+	if (props.status == 'success') return current.colorSuccess
+	if (props.status == 'error') return current.colorError
+	if (props.status == 'warning') return current.colorWarning
+	if (props.status == 'info') return current.colorInfo
+	return current.colorPrimary
+})
+</script>
+
+<template>
+	<view :class="['am-result', rootClass]">
+		<view class="am-result__icon">
+			<slot name="icon">
+				<am-icon :name="iconName" :size="64" :color="iconColor" />
+			</slot>
+		</view>
+		<text v-if="title.length > 0" class="am-result__title">{{ title }}</text>
+		<slot name="title"></slot>
+		<text v-if="subTitle.length > 0" class="am-result__sub-title">{{ subTitle }}</text>
+		<slot name="subTitle"></slot>
+		<view v-if="$slots['default'] != null" class="am-result__body">
+			<slot></slot>
+		</view>
+		<view v-if="$slots['extra'] != null" class="am-result__extra">
+			<slot name="extra"></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-result {
+	align-items: center;
+	padding-top: var(--am-padding-xl, 32px);
+	padding-bottom: var(--am-padding-xl, 32px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-result__icon { margin-bottom: 20px; flex-direction: row; align-items: center; justify-content: center; }
+.am-result__title {
+	font-size: 20px;
+	line-height: 28px;
+	font-weight: bold;
+	text-align: center;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+}
+.am-result__sub-title {
+	margin-top: 8px;
+	font-size: var(--am-font-size, 14px);
+	line-height: 22px;
+	text-align: center;
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-result__body {
+	align-self: stretch;
+	margin-top: 24px;
+	padding-top: var(--am-padding, 16px);
+	padding-bottom: var(--am-padding, 16px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	background-color: var(--am-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-result__extra { margin-top: 24px; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; }
+</style>

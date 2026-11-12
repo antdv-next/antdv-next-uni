@@ -1,0 +1,27 @@
+// Timeline 的类型（= antdv-next-mobile timeline/interface.ts）
+
+/** 时间轴的节点（= TimelineItemType）：title / content 是文字，自定义内容用 labelRender / contentRender 插槽 */
+export type AmTimelineItem = {
+	key ?: string
+	/** blue / red / green / gray，或任意颜色值 */
+	color ?: string
+	/** 内容在轴的哪一侧：start / end；不写时跟随 mode */
+	placement ?: string
+	/** 节点显示为加载中 */
+	loading ?: boolean
+	/** 显示在内容对侧的文字（如时间） */
+	title ?: string
+	content : string
+	/** 自定义节点的图标名（<am-icon> 的 name） */
+	icon ?: string
+}
+
+/** 内部用：排好顺序、算好位置的节点 */
+export type AmTimelineNode = {
+	key : string
+	item : AmTimelineItem
+	/** 在 items 中的序号（pending 节点为 items.length） */
+	index : number
+	pending : boolean
+	placement : string
+}

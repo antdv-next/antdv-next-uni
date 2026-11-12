@@ -1,0 +1,5 @@
+{
+  "extraProps": {
+    "itemKey": "uni-app x 的组件里拿不到 vnode 的 key，这一项的 key 用属性传（不写时按顺序为 '0'、'1'……）"
+  }
+}

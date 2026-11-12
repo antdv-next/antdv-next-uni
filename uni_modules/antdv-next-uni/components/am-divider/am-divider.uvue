@@ -1,0 +1,114 @@
+<script setup lang="uts">
+import { useAmSize } from '../../utils/config.uts'
+
+// 分割线（= antdv-next-mobile 的 Divider）：orientation（horizontal / vertical，type 是它的别名，vertical 是简写）、
+// titlePlacement（start / center / end，left / right 同 start / end）、variant（solid / dashed / dotted，dashed 是简写）、
+// size（水平分割线上下的间距：small 8 / middle 12 / large 16）、plain 同名同义；插槽 default（标题处的自定义内容）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 标题用 `text` 属性：uvue 的样式不继承，写在默认插槽里的文字拿不到分割线的颜色与字号（插槽仍可放自定义内容）；
+// - 垂直分割线的高度是固定的 14px（没有 em 单位），要别的高度写在 style 上
+defineOptions({ name: 'AmDivider' })
+
+const props = defineProps({
+	orientation: { type: String, default: '' },
+	type: { type: String, default: '' },
+	vertical: { type: Boolean, default: false },
+	titlePlacement: { type: String, default: 'center' },
+	dashed: { type: Boolean, default: false },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	plain: { type: Boolean, default: true },
+	/** 标题的文字 */
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+
+const isVertical = computed(() : boolean => {
+	if (props.vertical) return true
+	return (props.orientation.length > 0 ? props.orientation : props.type) == 'vertical'
+})
+
+const mergedVariant = computed(() : string => props.variant.length > 0 ? props.variant : (props.dashed ? 'dashed' : 'solid'))
+
+const placement = computed(() : string => {
+	if (props.titlePlacement == 'left') return 'start'
+	if (props.titlePlacement == 'right') return 'end'
+	return props.titlePlacement
+})
+
+const startRail = computed(() : string[] => [
+	'am-divider__rail',
+	'am-divider__rail--' + mergedVariant.value,
+	placement.value == 'start' ? 'am-divider__rail--short' : ''
+])
+const endRail = computed(() : string[] => [
+	'am-divider__rail',
+	'am-divider__rail--' + mergedVariant.value,
+	placement.value == 'end' ? 'am-divider__rail--short' : ''
+])
+</script>
+
+<template>
+	<view v-if="isVertical" :class="['am-divider--vertical', 'am-divider--vertical-' + mergedVariant, rootClass]"></view>
+	<view v-else-if="text.length > 0 || $slots['default'] != null" :class="['am-divider', 'am-divider--' + size, rootClass]">
+		<view :class="startRail"></view>
+		<view class="am-divider__content">
+			<text v-if="text.length > 0" :class="['am-divider__text', plain ? 'am-divider__text--plain' : '']">{{ text }}</text>
+			<slot></slot>
+		</view>
+		<view :class="endRail"></view>
+	</view>
+	<view v-else :class="['am-divider', 'am-divider--' + size, rootClass]">
+		<view :class="['am-divider__rail', 'am-divider__rail--' + mergedVariant]"></view>
+	</view>
+</template>
+
+<style>
+.am-divider { flex-direction: row; align-items: center; }
+.am-divider--small { margin-top: 8px; margin-bottom: 8px; }
+.am-divider--middle { margin-top: 12px; margin-bottom: 12px; }
+.am-divider--large { margin-top: 16px; margin-bottom: 16px; }
+.am-divider__rail {
+	flex: 1;
+	height: 0;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-divider__rail--dashed { border-top-style: dashed; }
+.am-divider__rail--dotted { border-top-style: dotted; }
+/* 标题靠边时，这一侧的线只留一小段（antdv-next-mobile 是 5%，这里是固定的 24px） */
+.am-divider__rail--short { flex: 0; width: 24px; }
+.am-divider__content {
+	flex-direction: row;
+	align-items: center;
+	flex-shrink: 1;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-divider__text {
+	font-size: var(--am-font-size-lg, 16px);
+	font-weight: bold;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+}
+.am-divider__text--plain {
+	font-size: var(--am-font-size, 14px);
+	font-weight: normal;
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-divider--vertical {
+	width: 0;
+	height: 14px;
+	margin-left: 8px;
+	margin-right: 8px;
+	border-left-width: 1px;
+	border-left-style: solid;
+	border-left-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-divider--vertical-dashed { border-left-style: dashed; }
+.am-divider--vertical-dotted { border-left-style: dotted; }
+</style>

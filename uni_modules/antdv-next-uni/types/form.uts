@@ -1,0 +1,54 @@
+// 表单的类型（= antdv-next-mobile 的 form/interface.ts）。只属于 Form / FormItem，所以不放在 types/index.uts 里。
+// UTS 的对象 type 会编译成运行时的类：使用方 `import { AmFormRule } from '@/uni_modules/antdv-next-uni/types/form.uts'`
+
+/**
+ * 校验规则（= antdv-next-mobile 的 FormRuleObject）。与它的差异：
+ * - `pattern` 是字符串（正则的源码，如 '^1[3-9]\\d{9}$'）：规则常常来自接口 / JSON，UTS 的类型里也放不了 RegExp；
+ * - `validator` 是同步函数：收到当前值，返回错误说明，通过时返回空字符串（没有 callback / Promise 形式）；
+ * - `trigger` 是字符串：'change'（默认）、'blur'、'change,blur'；
+ * - 没有 `enum`（Kotlin / Swift 的关键字）、`transform`、`defaultField`
+ */
+export type AmFormRule = {
+	/** string（默认）/ number / integer / float / boolean / array / email / url / tel / hex */
+	type ?: string
+	required ?: boolean
+	message ?: string
+	/** 字符串的长度、数字的值、数组的项数 */
+	len ?: number
+	min ?: number
+	max ?: number
+	pattern ?: string
+	/** 只有空白字符的字符串也算没填 */
+	whitespace ?: boolean
+	/** 不阻止提交，只显示为警告 */
+	warningOnly ?: boolean
+	trigger ?: string
+	validator ?: ((value : any | null) => string) | null
+}
+
+/** 一个字段的校验结果（= FormFieldError；name 是点分隔的路径，如 'user.email'） */
+export type AmFormFieldError = {
+	name : string
+	errors : string[]
+	warnings : string[]
+}
+
+/** 校验失败的信息（= FormValidateErrorEntity）：validate() 的 reject 值、finishFailed 事件的参数 */
+export type AmFormValidateError = {
+	message : string
+	values : UTSJSONObject
+	errorFields : AmFormFieldError[]
+}
+
+/** <am-form-item> 登记给 <am-form> 的内容（内部用） */
+export type AmFormItemEntry = {
+	/** 表单项根节点的 id（校验结果按它存，滚动到出错的字段也用它） */
+	id : string
+	name : string
+	label : string
+	rules : AmFormRule[]
+	/** 表单项自己写的 required（没有规则时也按必填校验） */
+	required : boolean
+	/** 表单项自己的 validateTrigger；空为沿用表单的 */
+	trigger : string
+}

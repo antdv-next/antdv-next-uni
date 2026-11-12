@@ -1,0 +1,78 @@
+<script setup lang="uts">
+// 标题（= antdv-next-mobile 的 TypographyTitle）：level（1–5，字号 32 / 26 / 22 / 18 / 16）+ 文本的全部属性，
+// 下方留字号一半的间距。属性、事件与差异同 <am-typography-text>（见它顶部的注释）：
+// 文字用 `text` 属性；ellipsis / copyable 只有布尔值，配置拆成 rows / expandable / collapsible / expanded / copyText。
+//
+// 与 antdv-next-mobile 的差异：没有“紧跟在其他排版后面的标题上方留 1.2em”（没有相邻选择器），要间距自己写 margin
+defineOptions({ name: 'AmTypographyTitle' })
+
+const props = defineProps({
+	level: { type: Number, default: 1 },
+	type: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	mark: { type: Boolean, default: false },
+	code: { type: Boolean, default: false },
+	keyboard: { type: Boolean, default: false },
+	underline: { type: Boolean, default: false },
+	delete: { type: Boolean, default: false },
+	strong: { type: Boolean, default: false },
+	italic: { type: Boolean, default: false },
+	ellipsis: { type: Boolean, default: false },
+	/** 省略时最多几行（= ellipsis.rows） */
+	rows: { type: Number, default: 1 },
+	/** 省略后可以展开一次（= ellipsis.expandable） */
+	expandable: { type: Boolean, default: false },
+	/** 展开后还能收起（= ellipsis.expandable 为 'collapsible'） */
+	collapsible: { type: Boolean, default: false },
+	/** 是否已展开，支持 v-model:expanded（= ellipsis.expanded） */
+	expanded: { type: Boolean, default: false },
+	copyable: { type: Boolean, default: false },
+	/** 复制的内容，空为显示的文字（= copyable.text） */
+	copyText: { type: String, default: '' },
+	/** 显示的文字 */
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['expand', 'update:expanded', 'copy'])
+
+function onExpand(expanded : boolean, event : UniPointerEvent) {
+	emit('expand', expanded, event)
+}
+
+function onExpandedChange(expanded : boolean) {
+	emit('update:expanded', expanded)
+}
+
+function onCopy(event : UniPointerEvent) {
+	emit('copy', event)
+}
+</script>
+
+<template>
+	<am-typography-base
+		variant="title"
+		:level="level"
+		:text="text"
+		:type="type"
+		:disabled="disabled"
+		:mark="mark"
+		:code="code"
+		:keyboard="keyboard"
+		:underline="underline"
+		:delete="props.delete"
+		:strong="strong"
+		:italic="italic"
+		:ellipsis="ellipsis"
+		:rows="rows"
+		:expandable="expandable"
+		:collapsible="collapsible"
+		:expanded="expanded"
+		:copyable="copyable"
+		:copy-text="copyText"
+		:root-class="rootClass"
+		@expand="onExpand"
+		@update:expanded="onExpandedChange"
+		@copy="onCopy"
+	/>
+</template>

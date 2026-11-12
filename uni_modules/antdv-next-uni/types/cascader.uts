@@ -1,0 +1,12 @@
+import { AmOption } from './index.uts'
+
+// Cascader 的类型（= antdv-next-mobile 的 cascader/interface.ts）。选项是公共的 AmOption（children、isLeaf）
+
+/**
+ * 逐级加载（= CascaderProps.loadData）：参数是已选的路径（最后一个是刚点的选项），返回它的下级。
+ * 与移动端库的差异：那边是“把 children 写到选项上”，UTS 里选项是类的实例、props 是只读的，这里改成返回下级
+ */
+export type AmCascaderLoadData = (selectedOptions : AmOption[]) => Promise<AmOption[]>
+
+/** 触发区文字的渲染函数（= CascaderProps.displayRender）：返回字符串（UTS 里不能返回节点，自定义节点用 displayRender 插槽） */
+export type AmCascaderDisplayRender = (labels : string[], selectedOptions : AmOption[]) => string

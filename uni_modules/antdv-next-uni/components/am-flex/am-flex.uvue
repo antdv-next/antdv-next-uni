@@ -1,0 +1,42 @@
+<script setup lang="uts">
+// 弹性布局（= antdv-next-mobile 的 Flex）：vertical、orientation（horizontal / vertical）、wrap、justify、align、
+// flex（容器自己的 flex）同名同义；justify / align 是 CSS 的值（flex-start / center / space-between …）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 没有 `gap`：App 端没有 CSS 的 gap，也没有后代选择器，容器没法给插槽里的子元素加外边距
+//   （行内换行时还要用负外边距抵消，更做不到）。间距写在子元素自己的 margin 上；
+// - `wrap` 只有布尔值（true = wrap），没有 `component`（根节点只能是 view）；
+// - 不写 align 时子元素拉伸（uvue 的 view 默认 align-items: stretch，与 CSS 的 normal 表现相同）
+defineOptions({ name: 'AmFlex' })
+
+const props = defineProps({
+	vertical: { type: Boolean, default: false },
+	orientation: { type: String, default: '' },
+	wrap: { type: Boolean, default: false },
+	justify: { type: String, default: '' },
+	align: { type: String, default: '' },
+	flex: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const style = computed(() : string => {
+	const vertical = props.vertical || props.orientation == 'vertical'
+	let text = 'flex-direction:' + (vertical ? 'column' : 'row') + ';'
+	if (props.justify.length > 0) text += 'justify-content:' + props.justify + ';'
+	if (props.align.length > 0) text += 'align-items:' + props.align + ';'
+	if (props.wrap) text += 'flex-wrap:wrap;'
+	if (props.flex.length > 0) text += 'flex:' + props.flex + ';'
+	return text
+})
+</script>
+
+<template>
+	<view :class="['am-flex', rootClass]" :style="style">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+/* App 端 view 默认裁剪超出的内容（overflow: hidden），布局容器与 Web 一致不裁剪（徽标、阴影会伸出子元素） */
+.am-flex { overflow: visible; }
+</style>

@@ -1,0 +1,117 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+
+// 头像（= antdv-next-mobile 的 Avatar）：src、icon、shape（circle / square）、size（small 28 / middle 40 / large 56 或像素）、
+// gap（文字到两边的距离，放不下时缩小字号）、fit（cover / contain / fill / none / scale-down）同名同义；事件 error
+// （图片加载失败，退回图标 / 文字）；插槽 default（自定义内容）、icon、src。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字头像用 `text` 属性：uvue 的样式不继承，默认插槽里的文字拿不到头像的颜色与字号；
+// - `src` 是图片地址，`icon` 是图标名（<am-icon> 的 name）；自定义内容用同名插槽；
+// - `size` 是字符串：像素写成 size="64"（UTS 的属性不能是 string | number 的联合类型）；
+// - 文字的宽度量不了，`gap` 按字数估算（中文算一个字宽，其他算 0.6 个）；
+// - 没有 srcSet、alt、draggable、crossOrigin（image 组件没有这些属性）
+defineOptions({ name: 'AmAvatar' })
+
+const props = defineProps({
+	src: { type: String, default: '' },
+	icon: { type: String, default: '' },
+	shape: { type: String, default: 'circle' },
+	size: { type: String, default: '' },
+	gap: { type: Number, default: 4 },
+	fit: { type: String, default: 'cover' },
+	/** 文字头像的文字 */
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['error'])
+
+const theme = useAmTheme()
+
+/** size 是数字（像素）时的值，否则为 0 */
+const customSize = computed(() : number => {
+	const n = parseFloat(props.size)
+	return isNaN(n) ? 0 : n
+})
+const sizeOf = useAmSize(() : string => customSize.value > 0 ? 'middle' : props.size)
+const size = computed(() : string => sizeOf())
+
+const failed = ref(false)
+watch(() : string => props.src, () => { failed.value = false })
+
+function onError(event : UniImageErrorEvent) {
+	failed.value = true
+	emit('error', event)
+}
+
+const pixels = computed(() : number => {
+	if (customSize.value > 0) return customSize.value
+	return size.value == 'small' ? 28 : (size.value == 'large' ? 56 : 40)
+})
+
+const iconSize = computed(() : number => {
+	if (customSize.value > 0) return Math.round(customSize.value / 2)
+	return size.value == 'small' ? 14 : (size.value == 'large' ? 28 : 20)
+})
+
+const iconColor = computed(() : string => theme().colorTextLightSolid)
+
+const style = computed(() : string => {
+	const current = theme()
+	let radius = pixels.value / 2
+	if (props.shape == 'square') {
+		radius = current.borderRadius
+		if (customSize.value == 0 && size.value == 'small') radius = current.borderRadiusSM
+		if (customSize.value == 0 && size.value == 'large') radius = current.borderRadiusLG
+	}
+	return 'width:' + pixels.value + 'px;height:' + pixels.value + 'px;border-radius:' + radius + 'px;'
+})
+
+/** 文字放不下（两边各留 gap）时按比例缩小字号；宽度按字数估算 */
+const textStyle = computed(() : string => {
+	let fontSize = Math.round(pixels.value * 0.45)
+	if (customSize.value == 0) fontSize = size.value == 'small' ? 14 : (size.value == 'large' ? 24 : 18)
+	let units = 0
+	for (let i = 0; i < props.text.length; i++) {
+		const code = props.text.charCodeAt(i)
+		units += code > 255 ? 1 : 0.6
+	}
+	const available = pixels.value - props.gap * 2
+	const width = units * fontSize
+	if (available > 0 && width > available) fontSize = Math.max(8, Math.floor(fontSize * available / width))
+	return 'font-size:' + fontSize + 'px;line-height:' + pixels.value + 'px;'
+})
+
+const FITS = new Map<string, string>([
+	['cover', 'aspectFill'], ['contain', 'aspectFit'], ['fill', 'scaleToFill'], ['none', 'center'], ['scale-down', 'aspectFit']
+])
+const mode = computed(() : string => FITS.get(props.fit) ?? 'aspectFill')
+</script>
+
+<template>
+	<view :class="['am-avatar', src.length > 0 && !failed ? 'am-avatar--image' : '', rootClass]" :style="style">
+		<slot v-if="$slots['src'] != null" name="src"></slot>
+		<image v-else-if="src.length > 0 && !failed" class="am-avatar__image" :src="src" :mode="mode" @error="onError" />
+		<slot v-else-if="$slots['icon'] != null" name="icon"></slot>
+		<am-icon v-else-if="icon.length > 0" :name="icon" :size="iconSize" :color="iconColor" />
+		<text v-else-if="text.length > 0" class="am-avatar__text" :style="textStyle">{{ text }}</text>
+		<slot v-else></slot>
+	</view>
+</template>
+
+<style>
+.am-avatar {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	align-self: flex-start;
+	flex-shrink: 0;
+	overflow: hidden;
+	background-color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25));
+}
+.am-avatar--image { background-color: transparent; }
+.am-avatar__image { width: 100%; height: 100%; }
+.am-avatar__text { color: var(--am-color-text-light-solid, #ffffff); white-space: nowrap; text-align: center; }
+</style>

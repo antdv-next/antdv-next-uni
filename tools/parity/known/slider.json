@@ -1,0 +1,22 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:value",
+    "marks": "用内置的 slider 组件（各端原生的拖动），不是自己画的轨道，画不了刻度",
+    "dots": "同 marks",
+    "included": "同 marks",
+    "reverse": "内置的 slider 没有反向",
+    "vertical": "内置的 slider 只有横向",
+    "orientation": "同 vertical",
+    "keyboard": "没有硬件键盘的方向键事件",
+    "tooltip": "内置的 slider 没有拖动时的气泡；用 showValue 在右侧显示当前值",
+    "id": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "ariaLabelForHandle": "不支持无障碍属性"
+  },
+  "extraProps": {
+    "showValue": "在右侧显示当前值，代替 tooltip"
+  },
+  "missingEmits": {
+    "focus": "不是原生的可聚焦元素，没有焦点事件",
+    "blur": "不是原生的可聚焦元素，没有焦点事件"
+  }
+}

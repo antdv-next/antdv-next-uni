@@ -1,0 +1,9 @@
+{
+  "missingProps": {
+    "format": "是函数（返回节点），UTS 里函数不能返回节点；用同名插槽（默认插槽，参数 percent、successPercent）",
+    "gapDegree": "uvue 没有 SVG，圆形进度用两个半圆旋转实现，画不了缺口（dashboard 画成整圆）",
+    "gapPlacement": "同 gapDegree",
+    "percentPosition": "文字固定在线的末端外侧；内嵌的文字要按进度定位，待有需求再加",
+    "rounding": "UTS 的属性里传函数在 App 端不可靠；分段固定用 Math.round"
+  }
+}

@@ -1,0 +1,69 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { normalizeOptions } from '../../utils/option.uts'
+import { sameValue } from '../../utils/value.uts'
+
+// 单选组（= antdv-next-mobile 的 RadioGroup）：v-model:value、options、optionType（default / button）、
+// buttonStyle（outline / solid）、size（按钮样式的尺寸）、disabled、block（占满宽度：default 时每项是一行，
+// button 时按钮平分）、vertical / orientation（竖排）同名同义；事件 update:value、change；
+// 选项用 `options`，或在默认插槽里放 <am-radio value="…">（两者可以同时用）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `options` 的每一项是 AmOption（{ label, value, disabled }）、字符串或数字；label 只能是文字，没有 labelRender；
+// - change 的参数是选中的值，不是事件对象；
+// - 按钮样式的按钮之间有间距（各自带圆角），不是连成一条：没有相邻 / 首尾选择器，连在一起时边框会重叠；
+// - 没有 defaultValue（用 v-model:value）、name、id
+defineOptions({ name: 'AmRadioGroup' })
+
+const props = defineProps({
+	value: { type: [String, Number, Boolean] as PropType<any | null>, default: null },
+	options: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	optionType: { type: String, default: 'default' },
+	buttonStyle: { type: String, default: 'outline' },
+	size: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	block: { type: Boolean, default: false },
+	vertical: { type: Boolean, default: false },
+	/** horizontal / vertical；优先于 vertical */
+	orientation: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change'])
+
+const notifyChange = useAmFieldChange()
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const list = computed(() : AmOption[] => normalizeOptions(props.options, null))
+const vertical = computed(() : boolean => props.orientation.length > 0 ? props.orientation == 'vertical' : props.vertical)
+/** 是否一项一行：竖排，或 default 样式占满宽度（列表式） */
+const stacked = computed(() : boolean => vertical.value || (props.block && props.optionType != 'button'))
+
+provide('amRadioGroupValue', () : any | null => props.value)
+provide('amRadioGroupDisabled', () : boolean => disabled.value)
+provide('amRadioGroupOptionType', () : string => props.optionType)
+provide('amRadioGroupButtonStyle', () : string => props.buttonStyle)
+provide('amRadioGroupBlock', () : boolean => props.block)
+provide('amRadioGroupVertical', () : boolean => vertical.value)
+provide('amRadioGroupSize', () : string => props.size)
+provide('amRadioGroupSelect', (value : any | null) => {
+	if (disabled.value || sameValue(value, props.value)) return
+	emit('update:value', value)
+	emit('change', value)
+	notifyChange()
+})
+</script>
+
+<template>
+	<view :class="['am-radio-group', stacked ? 'am-radio-group--stacked' : 'am-radio-group--inline', rootClass]">
+		<!-- 圆圈 / 按钮用 am-radio（选中的动画只写一份）：它从这里的 provide 取选中状态，点击也交回这里 -->
+		<am-radio v-for="(option, index) in list" :key="index" :value="option.value" :label="option.label" :disabled="option.disabled == true" />
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-radio-group--inline { flex-direction: row; flex-wrap: wrap; }
+</style>

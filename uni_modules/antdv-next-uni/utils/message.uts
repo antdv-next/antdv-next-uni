@@ -1,0 +1,102 @@
+// 全局提示：amMessage（= antdv-next-mobile 的 message）与 amToast（= Toast）。
+// uni-app x 不能动态挂载组件，两者都用原生的 uni.showToast / uni.showLoading（各端都有，不需要在页面里放宿主组件）。
+//
+// 与 antdv-next-mobile 的差异（原生提示做不到的）：
+// - 内容只能是字符串；同一时刻只有一个提示（新的顶掉旧的），没有 key、maxCount、top、position、自定义图标；
+// - info / warning 没有对应的图标，只显示文字；toast 的 fail 用原生的 error 图标；
+// - 返回值不是关闭句柄（没有 then）：要提前关闭调用 amMessage.destroy() / amToast.clear()；
+// - duration 为 0 表示一直显示：loading 用 uni.showLoading（直到 destroy / clear），其余类型原生提示必须有时长，按一天算。
+// 时长的单位与移动端库相同：amMessage 是**秒**（同 PC 的 message，默认 3），amToast 是**毫秒**（默认 2000）
+
+const MESSAGE_DURATION = 3
+const TOAST_DURATION = 2000
+/** 原生提示没有“一直显示”：duration 为 0 时用一天 */
+const FOREVER = 86400000
+
+let loadingTimer = 0
+
+function hideAll() : void {
+	clearTimeout(loadingTimer)
+	uni.hideLoading()
+	uni.hideToast()
+}
+
+/** 显示一个原生提示；milliseconds 为 0 时一直显示 */
+function showNative(content : string, icon : string, milliseconds : number, mask : boolean) : void {
+	hideAll()
+	const duration = milliseconds > 0 ? milliseconds : FOREVER
+	if (icon == 'success') uni.showToast({ title: content, icon: 'success', duration: duration, mask: mask })
+	else if (icon == 'error') uni.showToast({ title: content, icon: 'error', duration: duration, mask: mask })
+	else uni.showToast({ title: content, icon: 'none', duration: duration, mask: mask })
+}
+
+/** 显示加载中；milliseconds 大于 0 时到时间自动关闭 */
+function showNativeLoading(content : string, milliseconds : number) : void {
+	hideAll()
+	uni.showLoading({ title: content, mask: true })
+	if (milliseconds > 0) {
+		loadingTimer = setTimeout(() => {
+			uni.hideLoading()
+		}, milliseconds)
+	}
+}
+
+export class AmMessageApi {
+	/** duration 的单位是秒，0 为一直显示 */
+	success(content : string, duration : number = MESSAGE_DURATION) : void {
+		showNative(content, 'success', duration * 1000, false)
+	}
+
+	error(content : string, duration : number = MESSAGE_DURATION) : void {
+		showNative(content, 'error', duration * 1000, false)
+	}
+
+	info(content : string, duration : number = MESSAGE_DURATION) : void {
+		showNative(content, 'none', duration * 1000, false)
+	}
+
+	warning(content : string, duration : number = MESSAGE_DURATION) : void {
+		showNative(content, 'none', duration * 1000, false)
+	}
+
+	/** 加载中：默认一直显示到 destroy()；duration（秒）大于 0 时到时间自动关闭 */
+	loading(content : string, duration : number = 0) : void {
+		showNativeLoading(content, duration * 1000)
+	}
+
+	/** 关闭当前的提示 */
+	destroy() : void {
+		hideAll()
+	}
+}
+
+export class AmToastApi {
+	/** 纯文字的轻提示；duration 的单位是毫秒，0 为一直显示 */
+	show(content : string, duration : number = TOAST_DURATION) : void {
+		showNative(content, 'none', duration, false)
+	}
+
+	success(content : string, duration : number = TOAST_DURATION) : void {
+		showNative(content, 'success', duration, false)
+	}
+
+	fail(content : string, duration : number = TOAST_DURATION) : void {
+		showNative(content, 'error', duration, false)
+	}
+
+	/** 加载中（挡住页面的操作）：默认一直显示到 clear()；duration（毫秒）大于 0 时到时间自动关闭 */
+	loading(content : string = '', duration : number = 0) : void {
+		showNativeLoading(content, duration)
+	}
+
+	/** 关闭当前的轻提示 */
+	clear() : void {
+		hideAll()
+	}
+}
+
+/** 全局提示（= antdv-next-mobile 的 message）：amMessage.success('已保存') */
+export const amMessage = new AmMessageApi()
+
+/** 轻提示（= antdv-next-mobile 的 Toast）：amToast.show('已复制') */
+export const amToast = new AmToastApi()

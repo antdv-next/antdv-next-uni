@@ -1,0 +1,3 @@
+{
+  "uniOnly": "= 移动端库内部的 TypographyBase（不导出）：am-typography-text / title / paragraph 的公共实现，不直接使用"
+}

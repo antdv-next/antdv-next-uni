@@ -1,0 +1,369 @@
+<script setup lang="uts">
+import { AmFormFieldError, AmFormItemEntry, AmFormRule, AmFormValidateError } from '../../types/form.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { ruleHasTrigger, toAmFormRules, toJSONObject, validateAmRule } from '../../utils/form-rules.uts'
+import { getPath } from '../../utils/value.uts'
+
+// 表单（= antdv-next-mobile 的 Form）：model、rules、layout（horizontal / vertical）、labelAlign、labelWidth、labelWrap、
+// colon、disabled、size、variant（表单里的字段默认 borderless）、requiredMark（true / false / 'optional'）、
+// validateTrigger、scrollToFirstError、mode（default / card）、contentAlign、header、footer 同名同义；
+// 事件 finish（值）、finishFailed（AmFormValidateError）、validate（字段名、是否通过、错误）、valuesChange；
+// 方法 validate / validateFields、resetFields、clearValidate、submit、getFieldValue、getFieldsValue、
+// setFieldValue、setFieldsValue、getFieldError、getFieldsError、scrollToField。表单项用 <am-form-item>。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `model` 是 UTSJSONObject（`reactive<UTSJSONObject>({ name: '' })`，字段上写 `v-model:value="model['name']"`）：
+//   带类型的对象在 App 端不能按字段名读写，重置时也写不回去；
+// - `rules` 是 UTSJSONObject（`{ name: [{ required: true }] }`，纯数据）；规则的 `pattern` 是字符串，
+//   `validator` 是同步函数、只能写在 <am-form-item :rules> 上（类型见 types/form.uts 的 AmFormRule）；
+// - 校验是同步的（没有异步的 validator、validateDebounce），validate() 仍返回 Promise；
+// - 字段名是字符串（嵌套用 'user.name'），不是数组；`labelWidth` 是像素数（0 为默认的 90）；
+// - header / footer 是字符串，自定义内容用同名插槽；`validateTrigger` 是字符串：'change' / 'blur' / 'change,blur' / 'none'；
+// - 没有原生表单：没有 submit / reset 事件、name、autocomplete，提交调用 submit()（校验后发出 finish / finishFailed）；
+// - 没有 validateMessages：提示文字用规则的 message，或语言包 / utils/form-rules.uts 里的模板
+defineOptions({ name: 'AmForm' })
+
+const props = defineProps({
+	/** 表单数据（响应式的 UTSJSONObject）。校验、重置、finish 都靠它 */
+	model: { type: Object as PropType<UTSJSONObject>, default: () : UTSJSONObject => ({}) },
+	/** 表单级的规则：字段名 → 规则数组，与表单项自己的 rules 合并 */
+	rules: { type: Object as PropType<UTSJSONObject>, default: () : UTSJSONObject => ({}) },
+	layout: { type: String, default: 'horizontal' },
+	labelAlign: { type: String, default: 'start' },
+	/** 横排时标签列的宽度（像素；0 为默认的 90） */
+	labelWidth: { type: Number, default: 0 },
+	labelWrap: { type: Boolean, default: false },
+	colon: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	/** 里面的字段的变体；空为 borderless */
+	variant: { type: String, default: '' },
+	/** true：必填的字段显示星号；false：不显示；'optional'：非必填的字段显示“（可选）” */
+	requiredMark: { type: [Boolean, String], default: true },
+	validateTrigger: { type: String, default: 'change' },
+	scrollToFirstError: { type: Boolean, default: false },
+	mode: { type: String, default: 'default' },
+	contentAlign: { type: String, default: 'start' },
+	header: { type: String, default: '' },
+	footer: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['finish', 'finishFailed', 'validate', 'valuesChange'])
+
+const locale = useAmLocale()
+
+// ---------- 给字段的上下文 ----------
+const parentSize = inject<(() => string) | null>('amConfigSize', null)
+const parentDisabled = inject<(() => boolean) | null>('amConfigDisabled', null)
+
+provide('amFormDisabled', () : boolean => props.disabled)
+provide('amFormVariant', () : string => props.variant.length > 0 ? props.variant : 'borderless')
+// 尺寸、禁用同时经 ConfigProvider 的键给出：useAmSize / useAmDisabled 读的是它们，还没有接入表单约定的组件也能生效
+provide('amConfigSize', () : string => {
+	if (props.size.length > 0) return props.size
+	return parentSize != null ? parentSize() : ''
+})
+provide('amConfigDisabled', () : boolean => {
+	if (props.disabled) return true
+	return parentDisabled != null ? parentDisabled() : false
+})
+
+// ---------- 给表单项的上下文 ----------
+provide('amFormLayout', () : string => props.layout)
+provide('amFormLabelAlign', () : string => props.labelAlign)
+provide('amFormLabelWidth', () : number => props.labelWidth)
+provide('amFormLabelWrap', () : boolean => props.labelWrap)
+provide('amFormColon', () : boolean => props.colon)
+provide('amFormContentAlign', () : string => props.contentAlign)
+provide('amFormRequiredMark', () : string => {
+	const mark = props.requiredMark
+	if (typeof mark == 'string') return mark as string
+	return mark == false ? 'false' : 'true'
+})
+
+/** 表单的值（model 的 JSON 副本；model 里任何字段变化都会重新算） */
+const values = computed(() : UTSJSONObject => toJSONObject(props.model))
+/** 挂载时的值：resetFields 回到这里 */
+const initialText = JSON.stringify(props.model) ?? '{}'
+
+/** 登记的表单项（id → 内容），只是记账，不参与渲染 */
+const entries = new Map<string, AmFormItemEntry>()
+/** 校验结果：表单项的 id → 说明 */
+const errors = ref(new Map<string, string[]>())
+const warnings = ref(new Map<string, string[]>())
+/** 重置后的那一次值变化不校验 */
+const skipChange = new Map<string, boolean>()
+
+function formRules(name : string) : AmFormRule[] {
+	if (name.length == 0) return []
+	return toAmFormRules(getPath(toJSONObject(props.rules), name))
+}
+
+function entryRules(entry : AmFormItemEntry) : AmFormRule[] {
+	const list : AmFormRule[] = [...formRules(entry.name), ...entry.rules]
+	if (entry.required) {
+		let found = false
+		for (let i = 0; i < list.length; i++) if (list[i].required == true) found = true
+		if (!found) {
+			const rule : AmFormRule = { required: true }
+			list.unshift(rule)
+		}
+	}
+	return list
+}
+
+function setResult(id : string, fieldErrors : string[], fieldWarnings : string[]) {
+	const nextErrors = new Map<string, string[]>(errors.value)
+	if (fieldErrors.length > 0) nextErrors.set(id, fieldErrors)
+	else nextErrors.delete(id)
+	errors.value = nextErrors
+	const nextWarnings = new Map<string, string[]>(warnings.value)
+	if (fieldWarnings.length > 0) nextWarnings.set(id, fieldWarnings)
+	else nextWarnings.delete(id)
+	warnings.value = nextWarnings
+}
+
+/** 校验一个表单项；trigger 为空时用全部规则，否则只用在这个时机校验的规则 */
+function runEntry(entry : AmFormItemEntry, trigger : string) : AmFormFieldError {
+	const fallback = entry.trigger.length > 0 ? entry.trigger : props.validateTrigger
+	const value = getPath(values.value, entry.name)
+	const label = entry.label.length > 0 ? entry.label : entry.name
+	const current = locale()
+	const zh = current.locale.toLowerCase().startsWith('zh')
+	const rules = entryRules(entry)
+	const fieldErrors : string[] = []
+	const fieldWarnings : string[] = []
+	for (let i = 0; i < rules.length; i++) {
+		const rule = rules[i]
+		if (trigger.length > 0 && !ruleHasTrigger(rule, trigger, fallback)) continue
+		const message = validateAmRule(rule, value, label, current.Form.required, zh)
+		if (message.length == 0) continue
+		if (rule.warningOnly == true) fieldWarnings.push(message)
+		else fieldErrors.push(message)
+	}
+	setResult(entry.id, fieldErrors, fieldWarnings)
+	emit('validate', entry.name, fieldErrors.length == 0, fieldErrors)
+	const result : AmFormFieldError = { name: entry.name, errors: fieldErrors, warnings: fieldWarnings }
+	return result
+}
+
+function hasTriggerRule(entry : AmFormItemEntry, trigger : string) : boolean {
+	const fallback = entry.trigger.length > 0 ? entry.trigger : props.validateTrigger
+	const rules = entryRules(entry)
+	for (let i = 0; i < rules.length; i++) if (ruleHasTrigger(rules[i], trigger, fallback)) return true
+	return false
+}
+
+function findEntry(name : string) : AmFormItemEntry | null {
+	let found : AmFormItemEntry | null = null
+	entries.forEach((entry : AmFormItemEntry, _ : string) => {
+		if (found == null && entry.name == name) found = entry
+	})
+	return found
+}
+
+provide('amFormRules', (name : string) : AmFormRule[] => formRules(name))
+provide('amFormValue', (name : string) : any | null => name.length == 0 ? null : getPath(values.value, name))
+provide('amFormErrors', (id : string) : string[] => errors.value.get(id) ?? ([] as string[]))
+provide('amFormWarnings', (id : string) : string[] => warnings.value.get(id) ?? ([] as string[]))
+provide('amFormRegister', (entry : AmFormItemEntry) => {
+	entries.set(entry.id, entry)
+})
+provide('amFormUnregister', (id : string) => {
+	entries.delete(id)
+	skipChange.delete(id)
+	if (errors.value.has(id) || warnings.value.has(id)) setResult(id, [], [])
+})
+// 表单项在字段的值变化（'change'）、失焦（'blur'）时调用；fromControl：变化来自字段的操作（发出 valuesChange）
+provide('amFormTrigger', (id : string, trigger : string, fromControl : boolean) => {
+	const entry = entries.get(id)
+	if (entry == null || entry.name.length == 0) return
+	if (trigger == 'change') {
+		if (fromControl) {
+			const changed = {} as UTSJSONObject
+			changed.set(entry.name, getPath(values.value, entry.name))
+			emit('valuesChange', changed, values.value)
+		}
+		if (skipChange.has(id)) {
+			skipChange.delete(id)
+			return
+		}
+	}
+	if (hasTriggerRule(entry, trigger)) runEntry(entry, trigger)
+})
+
+// ---------- 方法（= FormInstance） ----------
+
+function getFieldsValue() : UTSJSONObject {
+	return toJSONObject(props.model)
+}
+
+function getFieldValue(name : string) : any | null {
+	return getPath(values.value, name)
+}
+
+/** 按路径把值写回 model（就地修改：model 是使用方的响应式对象） */
+function setFieldValue(name : string, value : any | null) {
+	const keys = name.split('.')
+	let target : UTSJSONObject = props.model
+	for (let i = 0; i < keys.length - 1; i++) {
+		const next = target.getJSON(keys[i])
+		if (next == null) return
+		target = next
+	}
+	target.set(keys[keys.length - 1], value)
+}
+
+function setFieldsValue(next : UTSJSONObject) {
+	toJSONObject(next).toMap().forEach((value : any | null, key : string) => {
+		setFieldValue(key, value)
+	})
+}
+
+function getFieldError(name : string) : string[] {
+	const entry = findEntry(name)
+	return entry == null ? [] : (errors.value.get(entry.id) ?? ([] as string[]))
+}
+
+function getFieldsError() : AmFormFieldError[] {
+	const list : AmFormFieldError[] = []
+	entries.forEach((entry : AmFormItemEntry, _ : string) => {
+		if (entry.name.length == 0) return
+		const item : AmFormFieldError = {
+			name: entry.name,
+			errors: errors.value.get(entry.id) ?? ([] as string[]),
+			warnings: warnings.value.get(entry.id) ?? ([] as string[])
+		}
+		list.push(item)
+	})
+	return list
+}
+
+function scrollToField(name : string) {
+	const entry = findEntry(name)
+	if (entry == null) return
+	uni.pageScrollTo({ selector: '#' + entry.id, duration: 200, fail: (_) => {} })
+}
+
+/** 校验全部（或 nameList 里的）字段，返回没通过的 */
+function runAll(nameList : string[] | null) : AmFormFieldError[] {
+	const failed : AmFormFieldError[] = []
+	entries.forEach((entry : AmFormItemEntry, _ : string) => {
+		if (entry.name.length == 0) return
+		if (nameList != null && nameList.indexOf(entry.name) < 0) return
+		const result = runEntry(entry, '')
+		if (result.errors.length > 0) failed.push(result)
+	})
+	return failed
+}
+
+function errorInfo(failed : AmFormFieldError[]) : AmFormValidateError {
+	const info : AmFormValidateError = {
+		message: failed[0].errors[0],
+		values: getFieldsValue(),
+		errorFields: failed
+	}
+	return info
+}
+
+/** 校验：通过时 resolve 表单的值，失败时 reject AmFormValidateError（{ message, values, errorFields }） */
+function validateFields(nameList : string[] | null = null) : Promise<UTSJSONObject> {
+	const failed = runAll(nameList)
+	if (failed.length == 0) return Promise.resolve(getFieldsValue())
+	return Promise.reject(errorInfo(failed))
+}
+
+/** validateFields 的别名 */
+function validate(nameList : string[] | null = null) : Promise<UTSJSONObject> {
+	return validateFields(nameList)
+}
+
+function clearValidate(nameList : string[] | null = null) {
+	if (nameList == null) {
+		errors.value = new Map<string, string[]>()
+		warnings.value = new Map<string, string[]>()
+		return
+	}
+	entries.forEach((entry : AmFormItemEntry, _ : string) => {
+		if (nameList.indexOf(entry.name) >= 0) setResult(entry.id, [], [])
+	})
+}
+
+/** 把字段的值恢复成表单挂载时的值，并清除校验结果 */
+function resetFields(nameList : string[] | null = null) {
+	const initial = JSON.parseObject(initialText) ?? ({} as UTSJSONObject)
+	entries.forEach((entry : AmFormItemEntry, _ : string) => {
+		if (entry.name.length == 0) return
+		if (nameList != null && nameList.indexOf(entry.name) < 0) return
+		const before = getPath(values.value, entry.name)
+		const after = getPath(initial, entry.name)
+		if ((JSON.stringify(before) ?? '') != (JSON.stringify(after) ?? '')) {
+			skipChange.set(entry.id, true)
+			setFieldValue(entry.name, after)
+		}
+	})
+	clearValidate(nameList)
+}
+
+/** 提交：校验通过发出 finish（表单的值），否则发出 finishFailed（AmFormValidateError） */
+function submit() {
+	const failed = runAll(null)
+	if (failed.length == 0) {
+		emit('finish', getFieldsValue())
+		return
+	}
+	emit('finishFailed', errorInfo(failed))
+	if (props.scrollToFirstError) scrollToField(failed[0].name)
+}
+
+defineExpose({
+	validate, validateFields, resetFields, clearValidate, submit,
+	getFieldValue, getFieldsValue, setFieldValue, setFieldsValue, getFieldError, getFieldsError, scrollToField
+})
+</script>
+
+<template>
+	<view :class="['am-form', rootClass]">
+		<text v-if="header.length > 0" :class="['am-form__header', mode == 'card' ? 'am-form__header--card' : '']">{{ header }}</text>
+		<slot name="header"></slot>
+		<view :class="['am-form__body', mode == 'card' ? 'am-form__body--card' : '']">
+			<slot></slot>
+		</view>
+		<text v-if="footer.length > 0" :class="['am-form__footer', mode == 'card' ? 'am-form__footer--card' : '']">{{ footer }}</text>
+		<slot name="footer"></slot>
+	</view>
+</template>
+
+<style>
+.am-form__header {
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	font-size: var(--am-font-size, 14px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-form__header--card { padding-left: 28px; padding-right: 28px; }
+.am-form__body {
+	background-color: var(--am-color-bg-container, #ffffff);
+	overflow: hidden;
+}
+.am-form__body--card {
+	margin-left: 12px;
+	margin-right: 12px;
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+.am-form__footer {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	font-size: var(--am-font-size-sm, 12px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-form__footer--card { padding-left: 28px; padding-right: 28px; }
+</style>

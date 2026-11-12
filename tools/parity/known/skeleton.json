@@ -1,0 +1,9 @@
+{
+  "extraProps": {
+    "avatarSize": "avatar 只能是布尔值（UTS 的属性不能是“布尔或对象”），对象里的 size 拆成单独的属性",
+    "avatarShape": "同 avatarSize：avatar.shape",
+    "titleWidth": "同 avatarSize：title.width",
+    "rows": "同 avatarSize：paragraph.rows",
+    "rowWidth": "同 avatarSize：paragraph.width（最后一行的宽度）"
+  }
+}

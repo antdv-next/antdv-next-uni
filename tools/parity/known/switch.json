@@ -1,0 +1,17 @@
+{
+  "missingProps": {
+    "defaultChecked": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:checked",
+    "defaultValue": "UTS 里分不出“没传”和初始值，非受控用法请用 v-model:value",
+    "checkedValue": "checked / value 只有布尔值（属性的类型要确定）",
+    "unCheckedValue": "同 checkedValue",
+    "autoFocus": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "title": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "tabIndex": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "id": "没有原生的表单元素（用 view 画的），这个属性没有意义",
+    "beforeChange": "函数属性暂不提供；要在切换前确认时不用 v-model，在 change 里自己决定要不要改值（配合 loading）"
+  },
+  "missingEmits": {
+    "focus": "不是原生的可聚焦元素，没有焦点事件",
+    "blur": "不是原生的可聚焦元素，没有焦点事件"
+  }
+}

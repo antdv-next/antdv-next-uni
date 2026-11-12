@@ -1,0 +1,276 @@
+<script setup lang="uts">
+import { AmFieldNames, AmOption } from '../../types/index.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmPickerField } from '../../utils/picker-field.uts'
+import { filterAmOptions, findAmOption, includesOptionValue, normalizeAmOptions, optionValues, sameOptionValue, toggleOptionValue } from '../../utils/picker-option.uts'
+
+// 选择器（= antdv-next-mobile 的 Select）：触发区 + 底部弹层的选项列表。单选点一下即选中并关闭；
+// `mode="multiple"` 是带“确定”的多选。options、fieldNames、v-model:value（单选为值，多选为数组）、v-model:open、mode、
+// showSearch、filterOption、notFoundContent、maxCount、maxTagCount、loading、listHeight，以及选择类字段共有的 placeholder、
+// disabled、allowClear、status、variant、size、trigger、suffixIcon、title、okText、cancelText、zIndex、maskClosable、
+// destroyOnHidden 同名同义；事件 update:value、update:open、openChange、change（值、选中的选项）、select / deselect
+// （点了某一项；多选时尚未提交）、search、confirm、cancel、clear；插槽 notFoundContent。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - options 是 AmOption[]，或任意 JSON 数组配合 fieldNames（label / value）；没有分组（`options` 嵌套）；
+// - 没有值：单选是 null（空字符串也当作没有值），多选是空数组；
+// - showSearch、filterOption 只有布尔值（filterOption 为 false 时不在本地筛选，自己在 search 事件里换 options）；
+// - listHeight 是像素数；notFoundContent 是字符串，自定义内容用同名插槽；
+// - 没有 labelInValue、optionRender / labelRender / maxTagPlaceholder（节点 / 函数属性）、virtual、listItemHeight、
+//   defaultValue / defaultOpen、id；自定义触发区用 `:trigger="false"` + `v-model:open`；title、suffixIcon 是字符串
+defineOptions({ name: 'AmSelect' })
+
+const props = defineProps({
+	options: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	fieldNames: { type: Object as PropType<AmFieldNames | null>, default: null },
+	value: { type: [String, Number, Boolean, Array] as PropType<any | null>, default: null },
+	open: { type: Boolean, default: false },
+	mode: { type: String, default: '' },
+	showSearch: { type: Boolean, default: false },
+	filterOption: { type: Boolean, default: true },
+	notFoundContent: { type: String, default: '' },
+	maxCount: { type: Number, default: 0 },
+	maxTagCount: { type: Number, default: 0 },
+	loading: { type: Boolean, default: false },
+	listHeight: { type: Number, default: 360 },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	trigger: { type: Boolean, default: true },
+	suffixIcon: { type: String, default: '' },
+	title: { type: String, default: '' },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'update:open', 'openChange', 'change', 'select', 'deselect', 'search', 'confirm', 'cancel', 'clear'])
+
+const locale = useAmLocale()
+const theme = useAmTheme()
+const field = useAmPickerField()
+
+const multiple = computed(() : boolean => props.mode == 'multiple')
+const list = computed(() : AmOption[] => normalizeAmOptions(props.options, props.fieldNames))
+const committed = computed(() : any[] => optionValues(props.value))
+
+/** 弹层的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+/** 多选时弹层里勾选的值，确定时才提交 */
+const draft = ref<any[]>([])
+const keyword = ref('')
+
+const shown = computed(() : AmOption[] => props.filterOption ? filterAmOptions(list.value, keyword.value) : list.value)
+const checkColor = computed(() : string => theme().colorPrimary)
+const listStyle = computed(() : string => 'max-height:' + props.listHeight + 'px;')
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().Select.placeholder)
+const emptyText = computed(() : string => props.notFoundContent.length > 0 ? props.notFoundContent : locale().Select.notFoundContent)
+const searchPlaceholder = computed(() : string => locale().InputSearch.placeholder)
+
+watch(() : boolean => props.open, (open : boolean) => {
+	opened.value = open
+})
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	if (open) {
+		draft.value = committed.value
+		if (keyword.value.length > 0) onSearch('')
+	} else {
+		field.blur()
+	}
+})
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+/** 值对应的文字：没有对应的选项时显示值本身 */
+function labelOf(value : any) : string {
+	const option = findAmOption(list.value, value)
+	return option == null ? '' + value : option.label
+}
+
+const label = computed(() : string => {
+	const values = committed.value
+	const labels : string[] = []
+	const limit = multiple.value && props.maxTagCount > 0 ? props.maxTagCount : values.length
+	for (let i = 0; i < values.length && i < limit; i++) labels.push(labelOf(values[i]))
+	let text = labels.join('、')
+	if (values.length > limit) text += ' +' + (values.length - limit)
+	return text
+})
+
+function selected(option : AmOption) : boolean {
+	return includesOptionValue(multiple.value ? draft.value : committed.value, option.value)
+}
+
+/** 多选达到 maxCount 后，没勾选的项不能再选 */
+function blocked(option : AmOption) : boolean {
+	if (option.disabled == true) return true
+	return multiple.value && props.maxCount > 0 && draft.value.length >= props.maxCount && !selected(option)
+}
+
+function optionsOf(values : any[]) : AmOption[] {
+	const options : AmOption[] = []
+	for (let i = 0; i < values.length; i++) {
+		const option = findAmOption(list.value, values[i])
+		if (option != null) options.push(option)
+	}
+	return options
+}
+
+function sameValues(a : any[], b : any[]) : boolean {
+	if (a.length != b.length) return false
+	for (let i = 0; i < a.length; i++) if (!sameOptionValue(a[i], b[i])) return false
+	return true
+}
+
+function commitMultiple(values : any[]) {
+	emit('update:value', values)
+	emit('change', values, optionsOf(values))
+	field.change()
+}
+
+function commitSingle(value : any | null, option : AmOption | null) {
+	emit('update:value', value)
+	emit('change', value, option)
+	field.change()
+}
+
+function onTrigger() {
+	setOpen(!opened.value)
+}
+
+function pick(option : AmOption) {
+	if (blocked(option)) return
+	if (!multiple.value) {
+		emit('select', option.value, option)
+		if (!includesOptionValue(committed.value, option.value)) commitSingle(option.value, option)
+		emit('confirm', option.value)
+		setOpen(false)
+		return
+	}
+	const checked = selected(option)
+	draft.value = toggleOptionValue(draft.value, option.value)
+	if (checked) emit('deselect', option.value, option)
+	else emit('select', option.value, option)
+}
+
+function onOk() {
+	const values : any[] = [...draft.value]
+	if (!sameValues(values, committed.value)) commitMultiple(values)
+	emit('confirm', values)
+	setOpen(false)
+}
+
+function onCancel() {
+	emit('cancel')
+	setOpen(false)
+}
+
+function onClear() {
+	if (multiple.value) commitMultiple([] as any[])
+	else commitSingle(null, null)
+	emit('clear')
+}
+
+function onSearch(value : string) {
+	keyword.value = value
+	emit('search', value)
+}
+</script>
+
+<template>
+	<am-picker-trigger
+		v-if="trigger"
+		:label="label"
+		:placeholder="placeholderText"
+		:open="opened"
+		:disabled="disabled"
+		:allow-clear="allowClear"
+		:status="status"
+		:variant="variant"
+		:size="size"
+		:suffix-icon="suffixIcon"
+		:loading="loading"
+		:root-class="rootClass"
+		@click="onTrigger"
+		@clear="onClear"
+	/>
+	<am-picker-popup
+		:open="opened"
+		:title="title"
+		:ok-text="okText"
+		:cancel-text="cancelText"
+		:show-confirm="multiple"
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		@ok="onOk"
+		@cancel="onCancel"
+	>
+		<view v-if="showSearch" class="am-select__search">
+			<am-input :value="keyword" variant="filled" prefix="search" allow-clear :placeholder="searchPlaceholder" @update:value="onSearch" />
+		</view>
+		<scroll-view class="am-select__list" direction="vertical" :style="listStyle">
+			<view
+				v-for="(option, index) in shown"
+				:key="index"
+				:class="['am-select__option', blocked(option) ? 'am-select__option--disabled' : '']"
+				:hover-class="blocked(option) ? 'none' : 'am-select__option--active'"
+				@click="pick(option)"
+			>
+				<view class="am-select__main">
+					<text :class="['am-select__label', selected(option) ? 'am-select__label--selected' : '']">{{ option.label }}</text>
+					<text v-if="(option.description ?? '').length > 0" class="am-select__description">{{ option.description }}</text>
+				</view>
+				<am-icon v-if="selected(option)" name="check" :size="16" :color="checkColor" />
+			</view>
+			<view v-if="loading" class="am-select__empty"><am-loading /></view>
+			<view v-else-if="shown.length == 0" class="am-select__empty">
+				<slot name="notFoundContent">
+					<text class="am-select__empty-text">{{ emptyText }}</text>
+				</slot>
+			</view>
+		</scroll-view>
+	</am-picker-popup>
+</template>
+
+<style>
+.am-select__search {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-select__list { }
+.am-select__option {
+	flex-direction: row;
+	align-items: center;
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-select__option--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-select__option--disabled { opacity: 0.4; }
+.am-select__main { flex: 1; }
+.am-select__label { font-size: var(--am-font-size-lg, 16px); line-height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-select__label--selected { color: var(--am-color-primary, #1677ff); font-weight: bold; }
+.am-select__description { margin-top: 2px; font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-select__empty { height: 120px; align-items: center; justify-content: center; }
+.am-select__empty-text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+</style>

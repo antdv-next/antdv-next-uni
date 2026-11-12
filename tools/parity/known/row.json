@@ -1,0 +1,5 @@
+{
+  "extraProps": {
+    "verticalGutter": "= gutter[1]（垂直间距）：UTS 的属性不能是 number | [水平, 垂直] 的联合类型，gutter 只有数字"
+  }
+}

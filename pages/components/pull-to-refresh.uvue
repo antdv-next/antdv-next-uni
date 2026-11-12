@@ -1,0 +1,119 @@
+<script setup lang="uts">
+// 下拉刷新：基础（文字 + 箭头 + 刷新成功）、自定义头部（各状态的插槽按 distance 画）、配合无限滚动。
+// 这个页面在 pages.json 里要设 "disableScroll": true（下拉刷新自己是滚动区域）
+const mode = ref('基础')
+const refreshing = ref(false)
+const rows = ref<number[]>([])
+const round = ref(0)
+const statusText = ref('normal')
+
+function fill() {
+	const list : number[] = []
+	for (let i = 0; i < 20; i++) list.push(round.value * 100 + i + 1)
+	rows.value = list
+}
+fill()
+
+function onRefresh() {
+	setTimeout(() => {
+		round.value++
+		fill()
+		refreshing.value = false
+	}, 1200)
+}
+
+function onStatus(info : UTSJSONObject) {
+	statusText.value = info.getString('status') ?? ''
+}
+
+function more() {
+	const list = [...rows.value]
+	const start = list.length
+	for (let i = 0; i < 10; i++) list.push(round.value * 100 + start + i + 1)
+	rows.value = list
+}
+
+// 配合无限滚动：每页 10 条，4 页后没有更多
+const listRows = ref<number[]>([])
+const listLoading = ref(false)
+const listFinished = ref(false)
+let listPage = 0
+
+function loadList() {
+	setTimeout(() => {
+		const list = [...listRows.value]
+		for (let i = 0; i < 10; i++) list.push(listPage * 10 + i + 1)
+		listRows.value = list
+		listPage++
+		listLoading.value = false
+		listFinished.value = listPage >= 4
+	}, 800)
+}
+
+function refreshList() {
+	setTimeout(() => {
+		listRows.value = []
+		listPage = 0
+		listFinished.value = false
+		refreshing.value = false
+		// 重新从第一页加载（加载完 am-infinite-scroll 会检查是否铺满、接着加载）
+		listLoading.value = true
+		loadList()
+	}, 800)
+}
+
+/** 自定义头部：一个圆随下拉放大、旋转 */
+function ballStyle(distance : number) : string {
+	const progress = Math.min(1, distance / 64)
+	const size = 8 + progress * 16
+	return 'width:' + size + 'px;height:' + size + 'px;border-radius:' + size / 2 + 'px;transform:rotate(' + progress * 360 + 'deg);'
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<view class="demo__bar">
+			<am-segmented v-model:value="mode" :options="['基础', '自定义头部', '无限滚动']" block />
+			<text class="demo__bar-text">status = {{ statusText }}</text>
+		</view>
+		<!-- 三种用法各是一个组件：App 端不支持按条件传插槽（<template v-if #pulling>），条件放在组件上 -->
+		<am-pull-to-refresh v-if="mode == '基础'" v-model:refreshing="refreshing" @refresh="onRefresh" @change="onStatus" @reach-bottom="more">
+			<view v-for="row in rows" :key="row" class="demo__row">
+				<text class="demo__row-text">第 {{ round + 1 }} 次加载 · 第 {{ row % 100 }} 条</text>
+			</view>
+		</am-pull-to-refresh>
+		<am-pull-to-refresh v-else-if="mode == '自定义头部'" v-model:refreshing="refreshing" :head-height="64" :complete-delay="0" @refresh="onRefresh" @change="onStatus" @reach-bottom="more">
+			<template #pulling="{ distance }">
+				<view class="demo__ball" :style="ballStyle(distance)"></view>
+				<text class="demo__ball-text">下拉 {{ Math.round(distance) }}px</text>
+			</template>
+			<template #canRelease="{ distance }">
+				<view class="demo__ball demo__ball--ready" :style="ballStyle(distance)"></view>
+				<text class="demo__ball-text">松开刷新</text>
+			</template>
+			<template #refreshing>
+				<am-loading text="正在刷新" />
+			</template>
+			<view v-for="row in rows" :key="row" class="demo__row">
+				<text class="demo__row-text">第 {{ round + 1 }} 次加载 · 第 {{ row % 100 }} 条</text>
+			</view>
+		</am-pull-to-refresh>
+		<am-pull-to-refresh v-else v-model:refreshing="refreshing" complete-text="已刷新" @refresh="refreshList" @change="onStatus">
+			<am-infinite-scroll v-model:loading="listLoading" :finished="listFinished" @load="loadList">
+				<view v-for="row in listRows" :key="row" class="demo__row">
+					<text class="demo__row-text">第 {{ row }} 条</text>
+				</view>
+			</am-infinite-scroll>
+		</am-pull-to-refresh>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__bar { padding: 8px 12px; background-color: var(--am-color-bg-container, #ffffff); }
+.demo__bar-text { margin-top: 6px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__row { height: 52px; padding: 0 16px; justify-content: center; background-color: var(--am-color-bg-container, #ffffff); border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06)); }
+.demo__row-text { font-size: 14px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__ball { margin-right: 8px; background-color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.demo__ball--ready { background-color: var(--am-color-primary, #1677ff); }
+.demo__ball-text { font-size: 12px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+</style>

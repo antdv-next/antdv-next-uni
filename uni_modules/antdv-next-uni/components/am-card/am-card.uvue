@@ -1,0 +1,174 @@
+<script setup lang="uts">
+import { useAmSize } from '../../utils/config.uts'
+
+// 卡片（= antdv-next-mobile 的 Card）：title、extra、cover、footer、loading、variant（outlined / borderless）、
+// bordered（variant 的别名，false = borderless）、size（default / middle / small）、type（inner）、clickable 同名同义；
+// 插槽 default、title、extra、cover、footer、actions。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / extra / footer 是字符串，`cover` 是图片地址；自定义内容用同名插槽；
+// - 没有 `actions` 属性（节点数组放不进数据）：操作写在 actions 插槽里，每项自己写 flex: 1；
+// - `loading` 的骨架是几条静态的色块（没有 @keyframes，闪动不起来）；
+// - 多出 click 事件（组件上没声明的事件不会落到根节点），写了 clickable 才有按下的反馈；
+// - 头部固定高度（App 端的 min-height 不含内边距），标题只显示一行
+defineOptions({ name: 'AmCard' })
+
+const props = defineProps({
+	title: { type: String, default: '' },
+	extra: { type: String, default: '' },
+	/** 封面图片的地址 */
+	cover: { type: String, default: '' },
+	footer: { type: String, default: '' },
+	loading: { type: Boolean, default: false },
+	variant: { type: String, default: '' },
+	bordered: { type: Boolean, default: true },
+	size: { type: String, default: '' },
+	type: { type: String, default: '' },
+	clickable: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click'])
+
+const sizeOf = useAmSize(() : string => props.size == 'default' ? 'middle' : props.size)
+/** 只分 small 与其他 */
+const size = computed(() : string => sizeOf() == 'small' ? 'small' : 'middle')
+
+const borderless = computed(() : boolean => props.variant.length > 0 ? props.variant == 'borderless' : !props.bordered)
+const inner = computed(() : boolean => props.type == 'inner')
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-card']
+	if (!borderless.value) list.push('am-card--bordered')
+	if (inner.value) list.push('am-card--inner')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const headerClasses = computed(() : string[] => [
+	'am-card__header',
+	'am-card__header--' + (inner.value ? 'small' : size.value),
+	'am-card__pad--' + size.value,
+	inner.value ? 'am-card__header--inner' : ''
+])
+
+const titleClasses = computed(() : string[] => ['am-card__title', inner.value || size.value == 'small' ? 'am-card__title--small' : ''])
+
+const hoverClass = computed(() : string => props.clickable ? 'am-card--active' : 'none')
+
+function onClick(event : UniPointerEvent) {
+	emit('click', event)
+}
+</script>
+
+<template>
+	<view :class="classes" :hover-class="hoverClass" @click="onClick">
+		<view v-if="title.length > 0 || extra.length > 0 || $slots['title'] != null || $slots['extra'] != null" :class="headerClasses">
+			<view class="am-card__title-box">
+				<text v-if="title.length > 0" :class="titleClasses">{{ title }}</text>
+				<slot name="title"></slot>
+			</view>
+			<text v-if="extra.length > 0" class="am-card__extra">{{ extra }}</text>
+			<slot name="extra"></slot>
+		</view>
+		<view v-if="cover.length > 0 || $slots['cover'] != null" class="am-card__cover">
+			<slot name="cover">
+				<image class="am-card__cover-image" :src="cover" mode="widthFix" />
+			</slot>
+		</view>
+		<view v-if="loading" :class="['am-card__body', 'am-card__body--' + size, 'am-card__pad--' + size]">
+			<view class="am-card__skeleton am-card__skeleton--title"></view>
+			<view class="am-card__skeleton am-card__skeleton--line"></view>
+			<view class="am-card__skeleton am-card__skeleton--line"></view>
+			<view class="am-card__skeleton am-card__skeleton--line am-card__skeleton--last"></view>
+		</view>
+		<view v-else-if="$slots['default'] != null" :class="['am-card__body', 'am-card__body--' + size, 'am-card__pad--' + size]">
+			<slot></slot>
+		</view>
+		<view v-if="footer.length > 0 || $slots['footer'] != null" :class="['am-card__footer', 'am-card__pad--' + size]">
+			<text v-if="footer.length > 0" class="am-card__footer-text">{{ footer }}</text>
+			<slot name="footer"></slot>
+		</view>
+		<view v-if="$slots['actions'] != null" :class="['am-card__actions', 'am-card__actions--' + size]">
+			<slot name="actions"></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-card {
+	/* 圆角要裁掉封面、头部的直角（Web 端 view 默认不裁剪） */
+	overflow: hidden;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+	transition-property: opacity;
+	transition-duration: 200ms;
+}
+.am-card--bordered { border-width: 1px; border-style: solid; border-color: var(--am-color-border-secondary, #f0f0f0); }
+.am-card--inner {
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-card--active { opacity: 0.7; }
+
+/* 左右的内边距：头部、内容、页脚共用 */
+.am-card__pad--middle { padding-left: var(--am-padding, 16px); padding-right: var(--am-padding, 16px); }
+.am-card__pad--small { padding-left: var(--am-padding-sm, 12px); padding-right: var(--am-padding-sm, 12px); }
+
+.am-card__header {
+	flex-direction: row;
+	align-items: center;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border-secondary, #f0f0f0);
+}
+.am-card__header--middle { height: 48px; }
+.am-card__header--small { height: 40px; }
+.am-card__header--inner { background-color: var(--am-color-fill-quaternary, rgba(0, 0, 0, 0.02)); }
+.am-card__title-box { flex: 1; flex-direction: row; align-items: center; margin-right: 8px; }
+.am-card__title {
+	flex: 1;
+	font-size: var(--am-font-size-lg, 16px);
+	font-weight: bold;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-card__title--small { font-size: var(--am-font-size, 14px); }
+.am-card__extra { font-size: var(--am-font-size, 14px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+
+.am-card__cover-image { width: 100%; }
+
+.am-card__body--middle { padding-top: var(--am-padding, 16px); padding-bottom: var(--am-padding, 16px); }
+.am-card__body--small { padding-top: var(--am-padding-sm, 12px); padding-bottom: var(--am-padding-sm, 12px); }
+
+.am-card__footer {
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-border-secondary, #f0f0f0);
+}
+.am-card__footer-text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+
+.am-card__actions {
+	flex-direction: row;
+	align-items: center;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-border-secondary, #f0f0f0);
+}
+.am-card__actions--middle { height: 44px; }
+.am-card__actions--small { height: 38px; }
+
+.am-card__skeleton { border-radius: 4px; background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06)); }
+.am-card__skeleton--title { width: 38%; height: 16px; }
+.am-card__skeleton--line { height: 14px; margin-top: 12px; }
+.am-card__skeleton--last { width: 61%; }
+</style>

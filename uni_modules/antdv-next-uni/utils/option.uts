@@ -1,0 +1,81 @@
+import { AmFieldNames, AmOption } from '../types/index.uts'
+import { includesValue, sameValue, toArray } from './value.uts'
+
+// 选项：select / radio / checkbox / segmented / cascader 共用（= PC 的 ProFieldOption）
+
+/** 按 fieldNames 把任意 JSON 数组转成选项（数据来自接口时字段名不同，同 Antdv Next 的 fieldNames） */
+export function normalizeOptions(list : any[] | null, names : AmFieldNames | null) : AmOption[] {
+	if (list == null) return []
+	const labelKey = names?.label ?? 'label'
+	const valueKey = names?.value ?? 'value'
+	const childrenKey = names?.children ?? 'children'
+	const result : AmOption[] = []
+	for (let i = 0; i < list.length; i++) {
+		const item = list[i]
+		if (item == null) continue
+		if (typeof item == 'string' || typeof item == 'number') {
+			result.push({ label: '' + item, value: item })
+			continue
+		}
+		const object = JSON.parseObject(JSON.stringify(item) ?? '{}') ?? ({} as UTSJSONObject)
+		const children = object.getArray(childrenKey)
+		const value = object.get(valueKey)
+		result.push({
+			label: object.getString(labelKey) ?? (value == null ? '' : '' + value),
+			value: value,
+			disabled: object.getBoolean('disabled') ?? false,
+			description: object.getString('description'),
+			isLeaf: object.getBoolean('isLeaf'),
+			children: children == null ? null : normalizeOptions(children, names)
+		})
+	}
+	return result
+}
+
+/** 按值找选项（只找这一层） */
+export function findOption(options : AmOption[], value : any | null) : AmOption | null {
+	for (let i = 0; i < options.length; i++) if (sameValue(options[i].value, value)) return options[i]
+	return null
+}
+
+/** 值对应的文字：多选时用顿号连接；没有对应的选项时显示值本身 */
+export function optionLabel(options : AmOption[], value : any | null) : string {
+	const values = toArray(value)
+	const labels : string[] = []
+	for (let i = 0; i < values.length; i++) {
+		const option = findOption(options, values[i])
+		labels.push(option == null ? '' + values[i] : option.label)
+	}
+	return labels.join('、')
+}
+
+/** 级联的路径：按值数组逐级找到选项（找不到的一级为 null 并停止） */
+export function cascadePath(options : AmOption[], values : any[]) : AmOption[] {
+	const path : AmOption[] = []
+	let level = options
+	for (let i = 0; i < values.length; i++) {
+		const option = findOption(level, values[i])
+		if (option == null) break
+		path.push(option)
+		level = option.children ?? []
+	}
+	return path
+}
+
+/** 多选：切换一个值，返回新数组 */
+export function toggleValue(values : any[], value : any | null) : any[] {
+	if (includesValue(values, value)) return values.filter((item) : boolean => !sameValue(item, value))
+	return [...values, value]
+}
+
+/** 按关键字筛选（标签包含关键字，不区分大小写） */
+export function filterOptions(options : AmOption[], keyword : string) : AmOption[] {
+	const text = keyword.trim().toLowerCase()
+	if (text.length == 0) return options
+	return options.filter((option) : boolean => option.label.toLowerCase().indexOf(text) >= 0)
+}
+
+/** 值 → 选项（组件内部统一处理选项的值是 null 的情况） */
+export function valuesOf(value : any | null) : any[] {
+	return toArray(value)
+}

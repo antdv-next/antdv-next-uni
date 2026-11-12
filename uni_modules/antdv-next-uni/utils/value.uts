@@ -1,0 +1,118 @@
+// 值的比较与转换：选项的值、表单的值在 UTS 中是 any（字符串、数字、布尔、数组、对象），
+// 规则与表单 Schema 的条件求值（@antdv-pro/form 的 condition.ts）相同：一方是数字时按数字比较
+
+/** 空值：null、空字符串、空数组 */
+export function isEmptyValue(value : any | null) : boolean {
+	if (value == null) return true
+	if (typeof value == 'string') return (value as string).length == 0
+	if (Array.isArray(value)) return (value as any[]).length == 0
+	return false
+}
+
+/** 转成数字：数字、非空的数字字符串；其余为 null */
+export function toNumberOrNull(value : any | null) : number | null {
+	if (value == null) return null
+	if (typeof value == 'number') {
+		const n = value as number
+		return isFinite(n) ? n : null
+	}
+	if (typeof value == 'string') {
+		const text = (value as string).trim()
+		if (text.length == 0) return null
+		const n = parseFloat(text)
+		return isNaN(n) || !/^-?\d+(\.\d+)?$/.test(text) ? null : n
+	}
+	return null
+}
+
+/** 相等：一方是数字时按数字比较（条件值常以字符串给出），数组不计顺序 */
+export function sameValue(a : any | null, b : any | null) : boolean {
+	if (a == null || b == null) return a == null && b == null
+	if (typeof a == 'number' || typeof b == 'number') {
+		const x = toNumberOrNull(a)
+		const y = toNumberOrNull(b)
+		return x != null && y != null && x == y
+	}
+	if (typeof a == 'string' && typeof b == 'string') return (a as string) == (b as string)
+	if (typeof a == 'boolean' && typeof b == 'boolean') return (a as boolean) == (b as boolean)
+	if (Array.isArray(a) && Array.isArray(b)) {
+		const x = a as any[]
+		const y = b as any[]
+		if (x.length != y.length) return false
+		for (let i = 0; i < x.length; i++) {
+			let found = false
+			for (let j = 0; j < y.length; j++) {
+				if (sameValue(x[i], y[j])) {
+					found = true
+					break
+				}
+			}
+			if (!found) return false
+		}
+		return true
+	}
+	return false
+}
+
+/** 数组中是否有这个值 */
+export function includesValue(list : any[], value : any | null) : boolean {
+	for (let i = 0; i < list.length; i++) if (sameValue(list[i], value)) return true
+	return false
+}
+
+/** 显示用的文字：数字去掉多余的小数位，布尔为 是 / 否，数组用顿号连接 */
+export function valueText(value : any | null) : string {
+	if (value == null) return ''
+	if (typeof value == 'string') return value as string
+	if (typeof value == 'number') {
+		const n = value as number
+		return n == Math.floor(n) ? n.toFixed(0) : '' + n
+	}
+	if (typeof value == 'boolean') return (value as boolean) ? '是' : '否'
+	if (Array.isArray(value)) {
+		const list = value as any[]
+		const parts : string[] = []
+		for (let i = 0; i < list.length; i++) parts.push(valueText(list[i]))
+		return parts.join('、')
+	}
+	return JSON.stringify(value) ?? ''
+}
+
+/** 转成数组：已经是数组时原样（复制一份），空值为空数组，其他值为单元素数组 */
+export function toArray(value : any | null) : any[] {
+	if (value == null) return []
+	if (Array.isArray(value)) return [...(value as any[])]
+	return [value]
+}
+
+/** 深拷贝一个 JSON 对象（表单的值）；UTSJSONObject 在 Web 上解析出来的嵌套对象不一定是它的实例，统一走 JSON */
+export function cloneObject(value : UTSJSONObject) : UTSJSONObject {
+	return JSON.parseObject(JSON.stringify(value) ?? '{}') ?? ({} as UTSJSONObject)
+}
+
+/** 按 a.b 形式的路径取值（表单的嵌套字段、条件的字段路径） */
+export function getPath(data : UTSJSONObject, path : string) : any | null {
+	const keys = path.split('.')
+	let current : any | null = data
+	for (let i = 0; i < keys.length; i++) {
+		if (current == null) return null
+		const object = JSON.parseObject(JSON.stringify(current) ?? 'null')
+		if (object == null) return null
+		current = object.get(keys[i])
+	}
+	return current
+}
+
+/** 按路径写值（中间缺少的对象自动补上），返回新的对象，不修改原对象 */
+export function setPath(data : UTSJSONObject, path : string, value : any | null) : UTSJSONObject {
+	const next = cloneObject(data)
+	const keys = path.split('.')
+	if (keys.length == 1) {
+		next.set(path, value)
+		return next
+	}
+	const head = keys[0]
+	const child = next.getJSON(head) ?? ({} as UTSJSONObject)
+	next.set(head, setPath(child, keys.slice(1).join('.'), value))
+	return next
+}

@@ -1,0 +1,191 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+
+// 选择类字段的触发区（= antdv-next-mobile 内部的 PickerTrigger，Picker / DatePicker / TimePicker / Select / Cascader 共用）：
+// label（已选的文字，空则显示 placeholder）、placeholder、open、disabled、allowClear、status、variant、size、suffixIcon
+// 同名同义；事件 click、clear；插槽 default（自定义已选的内容）、suffixIcon。外观与 am-input 一致。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - label、suffixIcon 是字符串（suffixIcon 为图标名，'none' 不显示；默认 borderless 用 right，其余用 down）；
+// - 多了 loading（Select 加载选项时显示转圈）；没有 id、classes / styles、键盘操作与无障碍属性。
+//
+// 表单约定：所有选择器的 disabled / status / variant / size 都只在这里合并上下文（下面的“字段状态”一段），
+// 接入表单（utils/form-field.uts）时只改这里；值变化的通知在 utils/picker-field.uts
+defineOptions({ name: 'AmPickerTrigger' })
+
+const props = defineProps({
+	label: { type: String, default: '' },
+	placeholder: { type: String, default: '' },
+	open: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	suffixIcon: { type: String, default: '' },
+	loading: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click', 'clear'])
+
+const theme = useAmTheme()
+
+// ---------- 字段状态：尺寸、禁用、状态、变体（表单上下文在这里合并） ----------
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const status = computed(() : string => props.status)
+const variant = computed(() : string => props.variant.length > 0 ? props.variant : 'outlined')
+// ---------- 字段状态结束 ----------
+
+const hasValue = computed(() : boolean => props.label.length > 0)
+const showClear = computed(() : boolean => props.allowClear && hasValue.value && !disabled.value)
+const iconColor = computed(() : string => theme().colorTextTertiary)
+const clearColor = computed(() : string => theme().colorTextQuaternary)
+const arrow = computed(() : string => {
+	if (props.suffixIcon.length > 0) return props.suffixIcon
+	return variant.value == 'borderless' ? 'right' : 'down'
+})
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-picker-trigger', 'am-picker-trigger--' + variant.value, 'am-picker-trigger--' + size.value]
+	if (variant.value != 'borderless') list.push('am-picker-trigger--box-' + size.value)
+	if (props.open) list.push('am-picker-trigger--open-' + variant.value)
+	if (status.value.length > 0) list.push('am-picker-trigger--' + variant.value + '-' + status.value)
+	if (disabled.value) list.push('am-picker-trigger--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const textClasses = computed(() : string[] => {
+	const list : string[] = ['am-picker-trigger__text', 'am-picker-trigger__text--' + size.value]
+	if (!hasValue.value) list.push('am-picker-trigger__text--placeholder')
+	return list
+})
+
+function onClick(event : UniPointerEvent) {
+	if (!disabled.value) emit('click', event)
+}
+
+function onClear(event : UniPointerEvent) {
+	event.stopPropagation()
+	emit('clear', event)
+}
+</script>
+
+<template>
+	<view :class="classes" @click="onClick">
+		<view class="am-picker-trigger__content">
+			<slot>
+				<text :class="textClasses">{{ hasValue ? label : placeholder }}</text>
+			</slot>
+		</view>
+		<view v-if="loading" class="am-picker-trigger__suffix">
+			<am-loading :size="14" />
+		</view>
+		<view v-else-if="showClear" class="am-picker-trigger__suffix am-picker-trigger__clear" @click="onClear">
+			<am-icon name="error-fill" :size="16" :color="clearColor" />
+		</view>
+		<view v-else-if="arrow != 'none'" class="am-picker-trigger__suffix">
+			<slot name="suffixIcon">
+				<am-icon :name="arrow" :size="14" :color="iconColor" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-picker-trigger { flex-direction: row; align-items: center; }
+
+/* ---------- 尺寸（同 am-input） ---------- */
+.am-picker-trigger--middle { min-height: var(--am-control-height, 40px); }
+.am-picker-trigger--small { min-height: var(--am-control-height-sm, 30px); }
+.am-picker-trigger--large { min-height: var(--am-control-height-lg, 48px); }
+.am-picker-trigger--box-middle {
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-picker-trigger--box-small {
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-picker-trigger--box-large {
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+
+/* ---------- 变体（同 am-input） ---------- */
+.am-picker-trigger--outlined {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+}
+.am-picker-trigger--filled {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-picker-trigger--underlined {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	padding-left: 0;
+	padding-right: 0;
+	border-radius: 0;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border, #d9d9d9);
+}
+.am-picker-trigger--borderless { min-height: 24px; }
+
+/* 弹层打开时相当于输入框的聚焦 */
+.am-picker-trigger--open-outlined { border-color: var(--am-color-primary, #1677ff); }
+.am-picker-trigger--open-filled { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-bg-container, #ffffff); }
+.am-picker-trigger--open-underlined { border-bottom-color: var(--am-color-primary, #1677ff); }
+
+.am-picker-trigger--outlined-error { border-color: var(--am-color-error, #ff4d4f); }
+.am-picker-trigger--outlined-warning { border-color: var(--am-color-warning, #faad14); }
+.am-picker-trigger--filled-error { background-color: var(--am-color-error-bg, #fff1f1); }
+.am-picker-trigger--filled-warning { background-color: var(--am-color-warning-bg, #fff7e8); }
+.am-picker-trigger--underlined-error { border-bottom-color: var(--am-color-error, #ff4d4f); }
+.am-picker-trigger--underlined-warning { border-bottom-color: var(--am-color-warning, #faad14); }
+
+.am-picker-trigger--disabled { opacity: 0.4; }
+
+/* ---------- 内部 ---------- */
+.am-picker-trigger__content { flex: 1; flex-direction: row; align-items: center; }
+.am-picker-trigger__text {
+	flex: 1;
+	line-height: 24px;
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-picker-trigger__text--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-picker-trigger__text--small { font-size: var(--am-font-size, 14px); }
+.am-picker-trigger__text--large { font-size: var(--am-font-size-xl, 18px); }
+.am-picker-trigger__text--placeholder { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.am-picker-trigger__suffix { margin-left: 8px; flex-direction: row; align-items: center; }
+.am-picker-trigger__clear { padding: 2px; }
+</style>

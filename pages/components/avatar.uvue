@@ -1,0 +1,86 @@
+<script setup lang="uts">
+const sizes : string[] = ['small', 'middle', 'large', '72']
+const errors = ref(0)
+
+function onError() {
+	errors.value++
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">三种内容：图片、图标、文字</text>
+		<view class="demo__card demo__row">
+			<am-avatar class="demo__item" src="/static/logo.png" />
+			<am-avatar class="demo__item" icon="user" />
+			<am-avatar class="demo__item" text="U" />
+			<am-avatar class="demo__item" text="张三" root-class="demo__avatar--primary" />
+			<am-avatar class="demo__item">
+				<am-icon name="robot" :size="22" color="#ffffff" />
+			</am-avatar>
+		</view>
+
+		<text class="demo__title">尺寸（small / middle / large / 像素）</text>
+		<view class="demo__card demo__row">
+			<am-avatar v-for="size in sizes" :key="size" class="demo__item" :size="size" icon="user" />
+			<am-avatar v-for="size in sizes" :key="size" class="demo__item" :size="size" text="U" />
+		</view>
+
+		<text class="demo__title">形状</text>
+		<view class="demo__card demo__row">
+			<am-avatar class="demo__item" shape="circle" icon="user" />
+			<am-avatar class="demo__item" shape="square" icon="user" />
+			<am-avatar class="demo__item" shape="square" size="small" text="A" />
+			<am-avatar class="demo__item" shape="square" size="large" src="/static/logo.png" />
+		</view>
+
+		<text class="demo__title">文字放不下时缩小（gap）</text>
+		<view class="demo__card demo__row">
+			<am-avatar class="demo__item" size="large" text="Tom" />
+			<am-avatar class="demo__item" size="large" text="Antdv" />
+			<am-avatar class="demo__item" size="large" text="Antdv" :gap="12" />
+			<am-avatar class="demo__item" size="large" text="管理员" />
+		</view>
+
+		<text class="demo__title">图片的填充方式（fit）</text>
+		<view class="demo__card demo__row">
+			<am-avatar class="demo__item" size="large" shape="square" src="/static/logo.png" fit="cover" />
+			<am-avatar class="demo__item" size="large" shape="square" src="/static/logo.png" fit="contain" root-class="demo__avatar--primary" />
+			<am-avatar class="demo__item" size="large" shape="square" src="/static/logo.png" fit="fill" />
+		</view>
+
+		<text class="demo__title">加载失败退回图标 / 文字（error 触发 {{ errors }} 次）</text>
+		<view class="demo__card demo__row">
+			<am-avatar class="demo__item" src="/static/not-found.png" icon="user" @error="onError" />
+			<am-avatar class="demo__item" src="/static/not-found.png" text="李四" @error="onError" />
+		</view>
+
+		<text class="demo__title">带徽标</text>
+		<view class="demo__card demo__row">
+			<am-badge class="demo__badge" :count="5">
+				<am-avatar shape="square" icon="user" />
+			</am-badge>
+			<am-badge class="demo__badge" dot>
+				<am-avatar shape="square" icon="user" />
+			</am-badge>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+.demo__avatar--primary { background-color: var(--am-color-primary, #1677ff); }
+.demo__badge { margin-right: 24px; margin-bottom: 10px; }
+</style>

@@ -1,0 +1,83 @@
+<script setup lang="uts">
+// 文本（= antdv-next-mobile 的 TypographyText）：type（secondary / success / warning / danger）、disabled、mark、code、keyboard、
+// underline、delete、strong、italic、ellipsis、copyable 同名同义；事件 expand、update:expanded、copy。
+// 实现在 <am-typography-base>（= 移动端库内部的 TypographyBase），标题、段落与它共用。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `text` 属性：<text> 里不能放插槽，样式也不继承，所以没有默认插槽；
+// - `ellipsis` / `copyable` 只有布尔值（UTS 的属性不能是 boolean | 对象 的联合类型），配置对象的字段拆成平铺的属性：
+//   rows、expandable、collapsible（= expandable: 'collapsible'）、expanded（v-model:expanded）、copyText（= copyable.text）；
+// - 量不出文字有没有被截断：写了 expandable / collapsible 就一直显示“展开”；多行时操作在文字下面另起一行（不能跟在省略号后面）；
+// - 展开 / 收起、复制是语言包里的文字（图标字体里没有复制图标），没有 ellipsis.symbol、copyable.icon 与对应的插槽；
+// - underline 与 delete 同时写时只显示删除线（App 端的 text-decoration-line 只能有一个值）；
+// - 成功 / 警告 / 危险的文字色就是功能色（没有单独的 colorSuccessText 等 token）
+defineOptions({ name: 'AmTypographyText' })
+
+const props = defineProps({
+	type: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	mark: { type: Boolean, default: false },
+	code: { type: Boolean, default: false },
+	keyboard: { type: Boolean, default: false },
+	underline: { type: Boolean, default: false },
+	delete: { type: Boolean, default: false },
+	strong: { type: Boolean, default: false },
+	italic: { type: Boolean, default: false },
+	ellipsis: { type: Boolean, default: false },
+	/** 省略时最多几行（= ellipsis.rows） */
+	rows: { type: Number, default: 1 },
+	/** 省略后可以展开一次（= ellipsis.expandable） */
+	expandable: { type: Boolean, default: false },
+	/** 展开后还能收起（= ellipsis.expandable 为 'collapsible'） */
+	collapsible: { type: Boolean, default: false },
+	/** 是否已展开，支持 v-model:expanded（= ellipsis.expanded） */
+	expanded: { type: Boolean, default: false },
+	copyable: { type: Boolean, default: false },
+	/** 复制的内容，空为显示的文字（= copyable.text） */
+	copyText: { type: String, default: '' },
+	/** 显示的文字 */
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['expand', 'update:expanded', 'copy'])
+
+function onExpand(expanded : boolean, event : UniPointerEvent) {
+	emit('expand', expanded, event)
+}
+
+function onExpandedChange(expanded : boolean) {
+	emit('update:expanded', expanded)
+}
+
+function onCopy(event : UniPointerEvent) {
+	emit('copy', event)
+}
+</script>
+
+<template>
+	<am-typography-base
+		variant="text"
+		:text="text"
+		:type="type"
+		:disabled="disabled"
+		:mark="mark"
+		:code="code"
+		:keyboard="keyboard"
+		:underline="underline"
+		:delete="props.delete"
+		:strong="strong"
+		:italic="italic"
+		:ellipsis="ellipsis"
+		:rows="rows"
+		:expandable="expandable"
+		:collapsible="collapsible"
+		:expanded="expanded"
+		:copyable="copyable"
+		:copy-text="copyText"
+		:root-class="rootClass"
+		@expand="onExpand"
+		@update:expanded="onExpandedChange"
+		@copy="onCopy"
+	/>
+</template>

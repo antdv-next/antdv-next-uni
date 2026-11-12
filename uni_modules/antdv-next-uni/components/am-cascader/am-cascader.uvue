@@ -1,0 +1,379 @@
+<script setup lang="uts">
+import { AmFieldNames, AmOption } from '../../types/index.uts'
+import { AmCascaderDisplayRender, AmCascaderLoadData } from '../../types/cascader.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmPickerField } from '../../utils/picker-field.uts'
+import { findAmOption, normalizeAmOptions, sameOptionValue } from '../../utils/picker-option.uts'
+
+// 级联选择（= antdv-next-mobile 的 Cascader）：触发区 + 底部弹层，上方是已选各级的标签，下方是当前一级的列表，逐级点选。
+// options（带 children）、fieldNames、v-model:value（每一级的值组成的数组）、v-model:open、changeOnSelect（可以只选到中间
+// 一级：弹层头部出现“确定”）、loadData（逐级加载 isLeaf 为 false 的选项的下级）、displayRender、notFoundContent、listHeight，
+// 以及选择类字段共有的 placeholder、disabled、allowClear、status、variant、size、trigger、suffixIcon、title、okText、
+// cancelText、zIndex、maskClosable、destroyOnHidden 同名同义；事件 update:value、update:open、openChange、
+// change（值、选中的各级选项）、select（点了某一项：选项、第几级）、confirm、cancel、clear、tabChange；插槽 notFoundContent。
+// 没开 changeOnSelect 时选到最后一级即提交并关闭。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - options 是 AmOption[]，或任意 JSON 数组配合 fieldNames；
+// - loadData 的约定不同：参数同为已选的路径，但要**返回**下级选项（Promise<AmOption[]>），而不是把 children 写到选项上
+//   （UTS 里选项是类的实例，props 只读）；加载过的下级组件自己记着；
+// - displayRender 返回字符串（不能返回节点），没有 displayRender 插槽；loadData / displayRender 是函数属性
+//   （Web 已验证，App 端若不可用：静态数据用 children，显示的文字用 change 事件自己拼）；
+// - listHeight 是像素数；notFoundContent 是字符串，自定义内容用同名插槽；
+// - 没有 optionRender（option 插槽）、virtual、listItemHeight、defaultValue / defaultOpen、id；
+//   自定义触发区用 `:trigger="false"` + `v-model:open`；title、suffixIcon 是字符串
+defineOptions({ name: 'AmCascader' })
+
+const props = defineProps({
+	options: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	fieldNames: { type: Object as PropType<AmFieldNames | null>, default: null },
+	value: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	open: { type: Boolean, default: false },
+	changeOnSelect: { type: Boolean, default: false },
+	loadData: { type: Function as PropType<AmCascaderLoadData | null>, default: null },
+	displayRender: { type: Function as PropType<AmCascaderDisplayRender | null>, default: null },
+	notFoundContent: { type: String, default: '' },
+	listHeight: { type: Number, default: 316 },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	trigger: { type: Boolean, default: true },
+	suffixIcon: { type: String, default: '' },
+	title: { type: String, default: '' },
+	okText: { type: String, default: '' },
+	cancelText: { type: String, default: '' },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'update:open', 'openChange', 'change', 'select', 'confirm', 'cancel', 'clear', 'tabChange'])
+
+const locale = useAmLocale()
+const theme = useAmTheme()
+const field = useAmPickerField()
+
+const root = computed(() : AmOption[] => normalizeAmOptions(props.options, props.fieldNames))
+
+/** loadData 加载过的下级：键是路径上各级的值 */
+const loaded = ref<Map<string, AmOption[]>>(new Map<string, AmOption[]>())
+
+function keyOf(path : AmOption[]) : string {
+	const parts : string[] = []
+	for (let i = 0; i < path.length; i++) parts.push('' + path[i].value)
+	return parts.join('|~|')
+}
+
+/** 已经有的下级（静态的 children 或加载过的）；还没有时为 null */
+function knownChildren(path : AmOption[]) : AmOption[] | null {
+	const option = path[path.length - 1]
+	const children = option.children
+	if (children != null && children.length > 0) return children
+	return loaded.value.get(keyOf(path))
+}
+
+/** 是不是要去加载下级：只有 isLeaf 为 false 且提供了 loadData 的选项 */
+function lazy(path : AmOption[]) : boolean {
+	return props.loadData != null && path[path.length - 1].isLeaf == false && knownChildren(path) == null
+}
+
+/** 按值逐级找到选项（只用已经有的数据） */
+function pathOf(values : any[]) : AmOption[] {
+	const path : AmOption[] = []
+	let candidates : AmOption[] | null = root.value
+	for (let i = 0; i < values.length; i++) {
+		if (candidates == null) break
+		const option = findAmOption(candidates, values[i])
+		if (option == null) break
+		path.push(option)
+		candidates = knownChildren(path)
+	}
+	return path
+}
+
+const selectedOptions = computed(() : AmOption[] => pathOf(props.value))
+
+const label = computed(() : string => {
+	const values = props.value
+	if (values.length == 0) return ''
+	const selected = selectedOptions.value
+	const labels : string[] = []
+	// 找不到对应选项的一级（下级还没加载）显示值本身
+	for (let i = 0; i < values.length; i++) labels.push(i < selected.length ? selected[i].label : '' + values[i])
+	const render = props.displayRender
+	if (render != null) return render(labels, selected)
+	return labels.join(' / ')
+})
+
+/** 弹层的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+/** 弹层里已选的路径，提交前不影响 value */
+const pending = ref<AmOption[]>([])
+/** 每一级的候选项 */
+const columns = ref<AmOption[][]>([])
+/** 当前显示第几级 */
+const level = ref(0)
+const loading = ref(false)
+/** 加载的序号：只有最新一次加载的结果生效 */
+let loadSeed = 0
+
+const checkColor = computed(() : string => theme().colorPrimary)
+const listStyle = computed(() : string => 'height:' + props.listHeight + 'px;')
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().Cascader.placeholder)
+const emptyText = computed(() : string => props.notFoundContent.length > 0 ? props.notFoundContent : locale().Select.notFoundContent)
+
+/** 顶部每一级的标签：已选的显示名称，还没选的一级显示“请选择” */
+const tabs = computed(() : string[] => {
+	const list : string[] = []
+	for (let depth = 0; depth < columns.value.length; depth++) {
+		list.push(depth < pending.value.length ? pending.value[depth].label : locale().Cascader.select)
+	}
+	return list
+})
+
+const currentOptions = computed(() : AmOption[] => level.value < columns.value.length ? columns.value[level.value] : ([] as AmOption[]))
+/** 列表里画的选项：加载中时不画 */
+const listOptions = computed(() : AmOption[] => loading.value ? ([] as AmOption[]) : currentOptions.value)
+
+/** 打开时按已有的值恢复各级的候选项 */
+function restore() {
+	loadSeed++
+	loading.value = false
+	const path = pathOf(props.value)
+	const list : AmOption[][] = [root.value]
+	for (let i = 0; i < path.length; i++) {
+		const children = knownChildren(path.slice(0, i + 1))
+		if (children == null || children.length == 0) break
+		list.push(children)
+	}
+	columns.value = list
+	pending.value = path
+	level.value = Math.min(path.length, list.length - 1)
+}
+
+watch(() : boolean => props.open, (open : boolean) => {
+	opened.value = open
+})
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	if (open) restore()
+	else field.blur()
+})
+
+// 弹层开着时 options 变了（异步取回来）：重新恢复
+watch(() : AmOption[] => root.value, () => {
+	if (opened.value) restore()
+})
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+function valuesOf(path : AmOption[]) : any[] {
+	const values : any[] = []
+	for (let i = 0; i < path.length; i++) {
+		const value = path[i].value
+		if (value != null) values.push(value)
+	}
+	return values
+}
+
+function sameValues(a : any[], b : any[]) : boolean {
+	if (a.length != b.length) return false
+	for (let i = 0; i < a.length; i++) if (!sameOptionValue(a[i], b[i])) return false
+	return true
+}
+
+function commit(values : any[], selected : AmOption[]) {
+	emit('update:value', values)
+	emit('change', values, selected)
+	field.change()
+}
+
+/** 提交弹层里的路径并关闭 */
+function finish() {
+	const selected : AmOption[] = [...pending.value]
+	const values = valuesOf(selected)
+	if (!sameValues(values, props.value)) commit(values, selected)
+	emit('confirm', values, selected)
+	setOpen(false)
+}
+
+function setLevel(index : number) {
+	if (index == level.value) return
+	level.value = index
+	emit('tabChange', index)
+}
+
+/** 进入下一级（没有下级时这一级就是最后一级） */
+function enter(path : AmOption[], children : AmOption[]) {
+	const depth = path.length - 1
+	if (children.length == 0) {
+		columns.value = columns.value.slice(0, depth + 1)
+		if (!props.changeOnSelect) finish()
+		return
+	}
+	const list = columns.value.slice(0, depth + 1)
+	list.push(children)
+	columns.value = list
+	setLevel(depth + 1)
+}
+
+function pick(option : AmOption) {
+	if (option.disabled == true || loading.value) return
+	const depth = level.value
+	const path : AmOption[] = pending.value.slice(0, depth)
+	path.push(option)
+	pending.value = path
+	emit('select', option, depth)
+	if (!lazy(path)) {
+		enter(path, knownChildren(path) ?? ([] as AmOption[]))
+		return
+	}
+	const seed = ++loadSeed
+	loading.value = true
+	// 加载期间先收起后面的各级
+	columns.value = columns.value.slice(0, depth + 1)
+	props.loadData!(path).then((children : AmOption[]) => {
+		if (seed != loadSeed) return
+		loading.value = false
+		// 换一个新的 Map，依赖它的计算属性（显示的文字）才会更新
+		const cache = new Map<string, AmOption[]>()
+		loaded.value.forEach((value : AmOption[], key : string) => {
+			cache.set(key, value)
+		})
+		cache.set(keyOf(path), children)
+		loaded.value = cache
+		enter(path, children)
+	}).catch((_ : any | null) => {
+		if (seed == loadSeed) loading.value = false
+	})
+}
+
+function selectedAt(option : AmOption) : boolean {
+	return level.value < pending.value.length && sameOptionValue(pending.value[level.value].value, option.value)
+}
+
+function onTrigger() {
+	setOpen(!opened.value)
+}
+
+function onOk() {
+	if (pending.value.length > 0) finish()
+}
+
+function onCancel() {
+	emit('cancel')
+	setOpen(false)
+}
+
+function onClear() {
+	commit([] as any[], [] as AmOption[])
+	emit('clear')
+}
+</script>
+
+<template>
+	<am-picker-trigger
+		v-if="trigger"
+		:label="label"
+		:placeholder="placeholderText"
+		:open="opened"
+		:disabled="disabled"
+		:allow-clear="allowClear"
+		:status="status"
+		:variant="variant"
+		:size="size"
+		:suffix-icon="suffixIcon"
+		:root-class="rootClass"
+		@click="onTrigger"
+		@clear="onClear"
+	/>
+	<am-picker-popup
+		:open="opened"
+		:title="title"
+		:ok-text="okText"
+		:cancel-text="cancelText"
+		:show-confirm="changeOnSelect"
+		:confirm-disabled="pending.length == 0"
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		@ok="onOk"
+		@cancel="onCancel"
+	>
+		<scroll-view class="am-cascader__tabs" direction="horizontal" :show-scrollbar="false">
+			<view
+				v-for="(tab, index) in tabs"
+				:key="index"
+				:class="['am-cascader__tab', index == level ? 'am-cascader__tab--active' : '']"
+				@click="setLevel(index)"
+			>
+				<text :class="['am-cascader__tab-text', index == level ? 'am-cascader__tab-text--active' : '']">{{ tab }}</text>
+			</view>
+		</scroll-view>
+		<scroll-view class="am-cascader__list" direction="vertical" :style="listStyle">
+			<view v-if="loading" class="am-cascader__empty"><am-loading /></view>
+			<view v-else-if="currentOptions.length == 0" class="am-cascader__empty">
+				<slot name="notFoundContent">
+					<text class="am-cascader__empty-text">{{ emptyText }}</text>
+				</slot>
+			</view>
+			<view
+				v-for="(option, index) in listOptions"
+				:key="index"
+				:class="['am-cascader__option', option.disabled == true ? 'am-cascader__option--disabled' : '']"
+				:hover-class="option.disabled == true ? 'none' : 'am-cascader__option--active'"
+				@click="pick(option)"
+			>
+				<text :class="['am-cascader__label', selectedAt(option) ? 'am-cascader__label--selected' : '']">{{ option.label }}</text>
+				<am-icon v-if="selectedAt(option)" name="check" :size="16" :color="checkColor" />
+			</view>
+		</scroll-view>
+	</am-picker-popup>
+</template>
+
+<style>
+.am-cascader__tabs {
+	flex-direction: row;
+	height: 44px;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-cascader__tab {
+	height: 43px;
+	flex-direction: row;
+	align-items: center;
+	margin-left: var(--am-padding, 16px);
+	border-bottom-width: 2px;
+	border-bottom-style: solid;
+	border-bottom-color: transparent;
+}
+.am-cascader__tab--active { border-bottom-color: var(--am-color-primary, #1677ff); }
+.am-cascader__tab-text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-cascader__tab-text--active { color: var(--am-color-primary, #1677ff); font-weight: bold; }
+.am-cascader__list { }
+.am-cascader__option {
+	flex-direction: row;
+	align-items: center;
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-cascader__option--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-cascader__option--disabled { opacity: 0.4; }
+.am-cascader__label { flex: 1; font-size: var(--am-font-size-lg, 16px); line-height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-cascader__label--selected { color: var(--am-color-primary, #1677ff); font-weight: bold; }
+.am-cascader__empty { height: 120px; align-items: center; justify-content: center; }
+.am-cascader__empty-text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+</style>

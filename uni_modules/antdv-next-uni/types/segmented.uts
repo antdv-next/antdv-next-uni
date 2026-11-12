@@ -1,0 +1,11 @@
+// am-segmented 的 options 项（= antdv-next-mobile 的 SegmentedLabeledOption）；options 里也可以直接写字符串 / 数字。
+// label 是文字、icon 是图标名，自定义内容用插槽 labelRender / iconRender
+
+export type AmSegmentedOption = {
+	label ?: string | null
+	/** 字符串或数字 */
+	value : any
+	/** 图标名（<am-icon> 的 name） */
+	icon ?: string | null
+	disabled ?: boolean | null
+}

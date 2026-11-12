@@ -1,0 +1,286 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { AM_DURATION_MID, amTransition, amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 索引栏（= antdv-next-mobile 的 IndexBar）：通讯录、城市、品牌这类按首字母分组的长列表。
+// indexList（默认为里面登记的锚点）、sticky、stickyOffsetTop、zIndex 同名同义；事件 select（点按或滑到某个索引）、
+// change（滚动中当前的锚点变化）；方法 scrollTo(index)，另有 refresh()（内容变化后重新量位置）。
+// 内容放在默认插槽，每组前放 <am-index-bar-anchor index="A" />。右侧是索引，点按或上下滑动跳到对应分组，
+// 滑动时屏幕中间显示当前的字；sticky 时当前分组的标题吸在顶部，下一组的标题顶上来时把它推上去。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 它自己就是纵向的滚动区域（scroll-view），不是跟着页面滚动：App 端量不到页面的滚动位置，也没有 position: sticky。
+//   放在页面根节点（am-config-provider）下或 flex: 1 的容器里，它告诉根节点“页面不滚动”、自己占满剩下的高度；
+//   **页面要在 pages.json 的 style 里设 "disableScroll": true**；
+// - index 是字符串；吸顶的标题是文字（锚点的 title / index），锚点默认插槽里的自定义内容不会被复制到吸顶处
+defineOptions({ name: 'AmIndexBar' })
+
+const props = defineProps({
+	indexList: { type: Array as PropType<string[]>, default: () : string[] => [] },
+	sticky: { type: Boolean, default: true },
+	/** 吸顶标题离滚动区域顶部的距离（像素） */
+	stickyOffsetTop: { type: Number, default: 0 },
+	zIndex: { type: Number, default: 10 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['select', 'change'])
+
+/** 与 am-index-bar-anchor 的高度一致 */
+const ANCHOR_HEIGHT = 32
+/** 右侧索引每个字的高度 */
+const INDEX_HEIGHT = 16
+
+const theme = useAmTheme()
+const uid = amUid('am-index-bar')
+
+type AmIndexAnchorEntry = {
+	index : string
+	title : string
+	id : string
+	top : number
+}
+
+const anchors = ref<AmIndexAnchorEntry[]>([])
+
+// 量每个分组标题相对内容顶部的位置（滚动不影响差值）；按位置排序，跳转、高亮、吸顶都用它
+let measureTimer = 0
+/** 右侧索引的上边缘（窗口坐标） */
+let sideTop = 0
+
+function scheduleMeasure() {
+	clearTimeout(measureTimer)
+	measureTimer = setTimeout(() => { measure() }, 60)
+}
+
+provide('amIndexBarPrefix', () : string => uid)
+provide('amIndexBarRegister', (index : string, title : string, id : string) => {
+	const list = anchors.value.filter((item) : boolean => item.id != id)
+	const entry : AmIndexAnchorEntry = { index: index, title: title, id: id, top: -1 }
+	list.push(entry)
+	anchors.value = list
+	scheduleMeasure()
+})
+provide('amIndexBarUnregister', (id : string) => {
+	anchors.value = anchors.value.filter((item) : boolean => item.id != id)
+	scheduleMeasure()
+})
+
+// 页面不滚动、自己滚（见 am-pull-to-refresh）
+const pageFill = inject<(() => void) | null>('amPageFill', null)
+if (pageFill != null) pageFill()
+
+const letters = computed(() : string[] => {
+	if (props.indexList.length > 0) return props.indexList
+	return anchors.value.map((item) : string => item.index)
+})
+
+// 滚动：当前分组 = 最后一个顶部已经滚过的标题
+const scrollY = ref(0)
+const activeIndex = ref('')
+
+function updateActive() {
+	const list = anchors.value
+	let current = ''
+	for (let i = 0; i < list.length; i++) {
+		if (list[i].top >= 0 && list[i].top <= scrollY.value + props.stickyOffsetTop + 1) current = list[i].index
+	}
+	if (current != activeIndex.value) {
+		activeIndex.value = current
+		if (current.length > 0) emit('change', current)
+	}
+}
+
+function measure() {
+	measureById(uid + '-content').then((content : AmRect | null) => {
+		if (content == null) return
+		const list = anchors.value
+		const tasks : Promise<AmRect | null>[] = []
+		for (let i = 0; i < list.length; i++) tasks.push(measureById(list[i].id))
+		Promise.all(tasks).then((rects : (AmRect | null)[]) => {
+			const next : AmIndexAnchorEntry[] = []
+			for (let i = 0; i < list.length; i++) {
+				const rect = rects[i]
+				const entry : AmIndexAnchorEntry = { index: list[i].index, title: list[i].title, id: list[i].id, top: rect == null ? -1 : rect.top - content.top }
+				next.push(entry)
+			}
+			next.sort((a, b) : number => a.top - b.top)
+			anchors.value = next
+			updateActive()
+		})
+	})
+	measureById(uid + '-letters').then((rect : AmRect | null) => { if (rect != null) sideTop = rect.top })
+}
+
+onMounted(() => { scheduleMeasure() })
+
+function onScroll(event : UniScrollEvent) {
+	scrollY.value = event.detail.scrollTop
+	updateActive()
+}
+
+// 吸顶标题：当前分组的标题，下一组的标题顶上来时跟着往上推
+const stickyEntry = computed(() : AmIndexAnchorEntry | null => {
+	const list = anchors.value
+	for (let i = 0; i < list.length; i++) if (list[i].index == activeIndex.value) return list[i]
+	return null
+})
+const stickyStyle = computed(() : string => {
+	const list = anchors.value
+	const entry = stickyEntry.value
+	let text = 'top:' + props.stickyOffsetTop + 'px;z-index:' + props.zIndex + ';'
+	if (entry == null) return text
+	let push = 0
+	const position = list.indexOf(entry)
+	if (position >= 0 && position + 1 < list.length) {
+		const gap = list[position + 1].top - scrollY.value - props.stickyOffsetTop
+		if (gap < ANCHOR_HEIGHT) push = gap - ANCHOR_HEIGHT
+	}
+	return text + 'transform:translateY(' + push + 'px);'
+})
+const stickyVisible = computed(() : boolean => {
+	const entry = stickyEntry.value
+	return props.sticky && entry != null && scrollY.value + props.stickyOffsetTop > entry.top
+})
+const stickyTitle = computed(() : string => {
+	const entry = stickyEntry.value
+	return entry == null ? '' : entry.title
+})
+
+// 跳转：设置 scroll-top（同一个值再设一次不生效，所以交替加一点点）
+const scrollTop = ref(0)
+let nudge = false
+
+function scrollTo(index : string) {
+	const list = anchors.value
+	for (let i = 0; i < list.length; i++) {
+		if (list[i].index == index && list[i].top >= 0) {
+			const top = Math.max(0, list[i].top - props.stickyOffsetTop)
+			nudge = !nudge
+			scrollTop.value = top + (nudge ? 0.01 : 0)
+			scrollY.value = top
+			updateActive()
+			return
+		}
+	}
+}
+
+// 右侧索引：按下、滑动时按手指的纵坐标换算成第几个字（位置挂载时量好，按下时不再等量）
+const bubble = ref('')
+/** 中间的提示：挂上（只在滑动时与淡出期间，否则即使透明也会挡住列表中间的点击）与显示 */
+const bubbleMounted = ref(false)
+const bubbleShown = ref(false)
+let hideTimer = 0
+
+function pick(clientY : number) {
+	const list = letters.value
+	if (list.length == 0) return
+	const position = Math.max(0, Math.min(list.length - 1, Math.floor((clientY - sideTop) / INDEX_HEIGHT)))
+	const index = list[position]
+	if (index == bubble.value && bubbleShown.value) return
+	bubble.value = index
+	bubbleMounted.value = true
+	bubbleShown.value = true
+	emit('select', index)
+	scrollTo(index)
+}
+
+function onSideStart(event : UniTouchEvent) {
+	if (event.touches.length == 0) return
+	clearTimeout(hideTimer)
+	// 位置可能变了（页面上方的内容变化）：重新量，这一次先用旧值
+	measureById(uid + '-letters').then((rect : AmRect | null) => { if (rect != null) sideTop = rect.top })
+	pick(event.touches[0].clientY)
+}
+
+function onSideMove(event : UniTouchEvent) {
+	if (event.touches.length == 0) return
+	event.preventDefault()
+	pick(event.touches[0].clientY)
+}
+
+function onSideEnd() {
+	clearTimeout(hideTimer)
+	hideTimer = setTimeout(() => {
+		bubbleShown.value = false
+		hideTimer = setTimeout(() => { bubbleMounted.value = false }, AM_DURATION_MID + 50)
+	}, 400)
+}
+
+const sideStyle = computed(() : string => 'z-index:' + props.zIndex + ';')
+const bubbleStyle = computed(() : string => 'z-index:' + (props.zIndex + 1) + ';opacity:' + (bubbleShown.value ? 1 : 0) + ';transform:scale(' + (bubbleShown.value ? 1 : 0.8) + ');' + amTransition('opacity, transform', AM_DURATION_MID))
+
+function letterStyle(index : string) : string {
+	if (index != activeIndex.value) return ''
+	return 'background-color:' + theme().colorPrimary + ';'
+}
+
+onUnmounted(() => {
+	clearTimeout(measureTimer)
+	clearTimeout(hideTimer)
+})
+
+defineExpose({
+	scrollTo: (index : string) => { scrollTo(index) },
+	refresh: () => { scheduleMeasure() }
+})
+</script>
+
+<template>
+	<view :class="['am-index-bar', rootClass]">
+		<scroll-view class="am-index-bar__scroll" direction="vertical" :scroll-top="scrollTop" @scroll="onScroll">
+			<view :id="uid + '-content'">
+				<slot></slot>
+			</view>
+		</scroll-view>
+		<view v-if="stickyVisible" class="am-index-bar__sticky" :style="stickyStyle">
+			<text class="am-index-bar__sticky-text">{{ stickyTitle }}</text>
+		</view>
+		<view class="am-index-bar__sidebar" :style="sideStyle" @touchstart="onSideStart" @touchmove="onSideMove" @touchend="onSideEnd" @touchcancel="onSideEnd">
+			<view :id="uid + '-letters'">
+				<view v-for="index in letters" :key="index" class="am-index-bar__index" :style="letterStyle(index)">
+					<text :class="['am-index-bar__index-text', index == activeIndex ? 'am-index-bar__index-text--active' : '']">{{ index }}</text>
+				</view>
+			</view>
+		</view>
+		<view v-if="bubbleMounted" class="am-index-bar__hint" :style="bubbleStyle">
+			<text class="am-index-bar__hint-text">{{ bubble }}</text>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-index-bar { flex: 1; }
+.am-index-bar__scroll { flex: 1; }
+/* 与 am-index-bar-anchor 同样的外观，文字为主色 */
+.am-index-bar__sticky {
+	position: absolute;
+	left: 0;
+	right: 0;
+	height: 32px;
+	justify-content: center;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	background-color: var(--am-color-bg-layout, #f5f5f5);
+}
+.am-index-bar__sticky-text { font-size: var(--am-font-size, 14px); color: var(--am-color-primary, #1677ff); }
+/* 右侧索引：竖直居中；每个字的高度与 INDEX_HEIGHT 一致 */
+.am-index-bar__sidebar { position: absolute; right: 0; top: 0; bottom: 0; justify-content: center; padding-left: 8px; padding-right: 4px; }
+.am-index-bar__index { width: 16px; height: 16px; border-radius: 8px; align-items: center; justify-content: center; }
+.am-index-bar__index-text { font-size: 10px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-index-bar__index-text--active { color: var(--am-color-text-light-solid, #ffffff); }
+.am-index-bar__hint {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 48px;
+	height: 48px;
+	margin-left: -24px;
+	margin-top: -24px;
+	border-radius: 24px;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+}
+.am-index-bar__hint-text { font-size: 20px; font-weight: bold; color: #ffffff; }
+</style>

@@ -1,0 +1,83 @@
+<script setup lang="uts">
+const spinning = ref(true)
+const delayed = ref(false)
+const full = ref(false)
+
+function showFull() {
+	full.value = true
+	setTimeout(() => { full.value = false }, 2000)
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">尺寸</text>
+		<view class="demo__card demo__row">
+			<am-spin class="demo__item" size="small" />
+			<am-spin class="demo__item" />
+			<am-spin class="demo__item" size="large" />
+		</view>
+
+		<text class="demo__title">带描述</text>
+		<view class="demo__card demo__row">
+			<am-spin class="demo__item" size="small" description="加载中" />
+			<am-spin class="demo__item" description="加载中" />
+			<am-spin class="demo__item" size="large" description="加载中" />
+		</view>
+
+		<text class="demo__title">包裹内容</text>
+		<view class="demo__card">
+			<am-spin :spinning="spinning" description="加载中...">
+				<view class="demo__box">
+					<text class="demo__text">被包裹的内容</text>
+					<text class="demo__text">加载时内容变淡，并且不能点击。</text>
+				</view>
+			</am-spin>
+			<am-button class="demo__top" size="small" :text="spinning ? '停止加载' : '开始加载'" @click="spinning = !spinning" />
+		</view>
+
+		<text class="demo__title">延迟显示（delay 500ms）</text>
+		<view class="demo__card">
+			<am-spin :spinning="delayed" :delay="500">
+				<view class="demo__box">
+					<text class="demo__text">加载时间短于 500ms 时不出现指示器，避免一闪而过。</text>
+				</view>
+			</am-spin>
+			<am-button class="demo__top" size="small" :text="delayed ? '停止加载' : '开始加载'" @click="delayed = !delayed" />
+		</view>
+
+		<text class="demo__title">自定义指示器（indicator 插槽）</text>
+		<view class="demo__card demo__row">
+			<am-spin description="同步中">
+				<template #indicator>
+					<am-icon name="reload" :size="28" color="#1677ff" />
+				</template>
+			</am-spin>
+		</view>
+
+		<text class="demo__title">全屏</text>
+		<view class="demo__card">
+			<am-button type="primary" text="全屏加载 2 秒" @click="showFull" />
+		</view>
+		<am-spin fullscreen :spinning="full" size="large" description="加载中..." />
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__top { margin-top: 16px; }
+.demo__box { padding: 16px; border-radius: 8px; background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+</style>

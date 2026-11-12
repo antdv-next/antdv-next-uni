@@ -1,0 +1,224 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { presetColor } from '../../utils/color.uts'
+import { AM_FLOAT_BUTTON_NO_BADGE, AM_FLOAT_BUTTON_NO_OFFSET, AmFloatButtonBadge, AmFloatButtonOffset } from '../../types/float-button.uts'
+
+// 悬浮按钮（= antdv-next-mobile 的 FloatButton）：固定在右下角（距右 24、距底 48 + 底部安全区域）。
+// icon、content（图标下面的文字，description 是它的旧名）、type（default / primary）、shape（circle / square）、
+// badge（{ count, dot, overflowCount, showZero, color }）、draggable、axis（x / y / xy）、magnetic（x / y：松手后吸到这个方向最近的边）、
+// v-model:offset（左上角的位置）、gap（拖动时离边缘的最小距离）同名同义；事件 click、update:offset、offsetChange；
+// 插槽 default（图标下面的自定义内容）、icon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `icon` 是图标名（<am-icon> 的 name），content / description 是字符串；自定义内容用插槽；
+// - `offset` 的 x / y 相对页面内容区的左上角（不含原生导航栏），{ x: -1, y: -1 } 表示没有指定；
+//   `badge.count` 只有数字；这两个对象要在 script 里按类型声明（AmFloatButtonBadge / AmFloatButtonOffset）；
+// - 吸边、松手没有过渡（right / bottom 不能过渡）；
+// - 没有 href / target / htmlType / ariaLabel
+//
+// 位置：外层是贴着底部安全区域的 0 尺寸锚点（没有 calc()，安全区域只能用 CSS 变量写在 bottom 上），
+// 按钮在锚点里按 right / bottom 绝对定位；拖动时改的就是这两个值
+defineOptions({ name: 'AmFloatButton' })
+
+const props = defineProps({
+	icon: { type: String, default: '' },
+	content: { type: String, default: '' },
+	description: { type: String, default: '' },
+	type: { type: String, default: 'default' },
+	shape: { type: String, default: 'circle' },
+	badge: { type: Object as PropType<AmFloatButtonBadge>, default: () : AmFloatButtonBadge => AM_FLOAT_BUTTON_NO_BADGE },
+	draggable: { type: Boolean, default: false },
+	axis: { type: String, default: 'xy' },
+	magnetic: { type: String, default: '' },
+	offset: { type: Object as PropType<AmFloatButtonOffset>, default: () : AmFloatButtonOffset => AM_FLOAT_BUTTON_NO_OFFSET },
+	gap: { type: Number, default: 16 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click', 'update:offset', 'offsetChange'])
+
+const theme = useAmTheme()
+
+const SIZE = 48
+
+const label = computed(() : string => props.content.length > 0 ? props.content : props.description)
+const iconColor = computed(() : string => props.type == 'primary' ? theme().colorTextLightSolid : theme().colorText)
+
+// ---------- 徽标 ----------
+const badgeCount = computed(() : number => props.badge.count ?? 0)
+const badgeDot = computed(() : boolean => props.badge.dot == true)
+const badgeVisible = computed(() : boolean => badgeDot.value || badgeCount.value > 0 || (props.badge.showZero == true && props.badge.count != null))
+const badgeText = computed(() : string => {
+	const max = props.badge.overflowCount ?? 99
+	return badgeCount.value > max ? max + '+' : badgeCount.value.toString()
+})
+const badgeStyle = computed(() : string => {
+	const color = props.badge.color ?? ''
+	return color.length > 0 ? 'background-color:' + presetColor(color) + ';' : ''
+})
+
+// ---------- 位置：距右、距底部安全区域的距离 ----------
+const right = ref(24)
+const bottom = ref(48)
+
+/** 页面内容区的宽高（高度不含底部安全区域） */
+function area() : number[] {
+	const info = uni.getWindowInfo()
+	return [info.windowWidth, info.windowHeight - info.safeAreaInsets.bottom]
+}
+
+function currentOffset() : AmFloatButtonOffset {
+	const size = area()
+	const offset : AmFloatButtonOffset = { x: size[0] - right.value - SIZE, y: size[1] - bottom.value - SIZE }
+	return offset
+}
+
+watch(
+	() : AmFloatButtonOffset => props.offset,
+	(offset : AmFloatButtonOffset) => {
+		if (offset.x < 0 || offset.y < 0) return
+		const size = area()
+		right.value = size[0] - offset.x - SIZE
+		bottom.value = size[1] - offset.y - SIZE
+	},
+	{ immediate: true }
+)
+
+const style = computed(() : string => 'right:' + right.value + 'px;bottom:' + bottom.value + 'px;')
+
+// ---------- 拖动 ----------
+let startX = 0
+let startY = 0
+let startRight = 0
+let startBottom = 0
+/** 这次按下有没有拖动过（拖动后的那次 click 不算点击） */
+let moved = false
+
+function clamp(value : number, max : number) : number {
+	return Math.max(props.gap, Math.min(Math.max(props.gap, max), value))
+}
+
+function onTouchStart(event : UniTouchEvent) {
+	moved = false
+	if (!props.draggable || event.touches.length == 0) return
+	startX = event.touches[0].clientX
+	startY = event.touches[0].clientY
+	startRight = right.value
+	startBottom = bottom.value
+}
+
+function onTouchMove(event : UniTouchEvent) {
+	if (!props.draggable || event.touches.length == 0) return
+	const dx = event.touches[0].clientX - startX
+	const dy = event.touches[0].clientY - startY
+	if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return
+	moved = true
+	// 拖动时页面不跟着滚
+	event.preventDefault()
+	const size = area()
+	if (props.axis != 'y') right.value = clamp(startRight - dx, size[0] - SIZE - props.gap)
+	if (props.axis != 'x') bottom.value = clamp(startBottom - dy, size[1] - SIZE - props.gap)
+}
+
+function onTouchEnd() {
+	if (!props.draggable || !moved) return
+	const size = area()
+	if (props.magnetic == 'x') {
+		const farRight = size[0] - SIZE - props.gap
+		right.value = right.value > farRight / 2 ? Math.max(props.gap, farRight) : props.gap
+	} else if (props.magnetic == 'y') {
+		const farBottom = size[1] - SIZE - props.gap
+		bottom.value = bottom.value > farBottom / 2 ? Math.max(props.gap, farBottom) : props.gap
+	}
+	const offset = currentOffset()
+	emit('update:offset', offset)
+	emit('offsetChange', offset)
+}
+
+function onClick(event : UniPointerEvent) {
+	if (moved) {
+		moved = false
+		return
+	}
+	emit('click', event)
+}
+</script>
+
+<template>
+	<view :class="['am-float-button__anchor', rootClass]">
+		<view
+			:class="['am-float-button', 'am-float-button--' + type, 'am-float-button--' + shape]"
+			:style="style"
+			hover-class="am-float-button--active"
+			@click="onClick"
+			@touchstart="onTouchStart"
+			@touchmove="onTouchMove"
+			@touchend="onTouchEnd"
+			@touchcancel="onTouchEnd"
+		>
+			<slot v-if="$slots['icon'] != null" name="icon"></slot>
+			<am-icon v-else-if="icon.length > 0" :name="icon" :size="label.length > 0 ? 16 : 20" :color="iconColor" />
+			<am-icon v-else-if="label.length == 0 && $slots['default'] == null" name="file" :size="20" :color="iconColor" />
+			<text v-if="label.length > 0" :class="['am-float-button__content', 'am-float-button__content--' + type]">{{ label }}</text>
+			<slot></slot>
+			<view
+				v-if="badgeVisible"
+				:class="['am-float-button__badge', badgeDot ? 'am-float-button__badge--dot' : '', badgeDot && shape == 'circle' ? 'am-float-button__badge--dot-circle' : '']"
+				:style="badgeStyle"
+			>
+				<text v-if="!badgeDot" class="am-float-button__badge-text">{{ badgeText }}</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-float-button__anchor { position: fixed; right: 0; bottom: var(--uni-safe-area-inset-bottom, 0px); z-index: 99; overflow: visible; }
+.am-float-button {
+	position: absolute;
+	width: 48px;
+	height: 48px;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-bg-elevated, #ffffff);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+	/* 徽标伸出按钮的右上角 */
+	overflow: visible;
+	transition-property: opacity;
+	transition-duration: 200ms;
+}
+.am-float-button--circle { border-radius: 24px; }
+.am-float-button--square {
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-float-button--primary { background-color: var(--am-color-primary, #1677ff); }
+.am-float-button--active { opacity: 0.7; }
+.am-float-button__content { margin-top: 2px; font-size: 10px; line-height: 12px; white-space: nowrap; }
+.am-float-button__content--default { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-float-button__content--primary { color: var(--am-color-text-light-solid, #ffffff); }
+.am-float-button__badge {
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 1;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	border-radius: 8px;
+	background-color: var(--am-color-error, #ff4d4f);
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-bg-container, #ffffff);
+	transform: translateX(25%) translateY(-25%);
+}
+.am-float-button__badge--dot { min-width: 10px; width: 10px; height: 10px; padding: 0; border-radius: 5px; }
+/* 圆形按钮的角上是空的，小红点挪进来 */
+.am-float-button__badge--dot-circle { top: 4px; right: 4px; transform: translateX(0) translateY(0); }
+.am-float-button__badge-text { font-size: 10px; line-height: 12px; color: var(--am-color-text-light-solid, #ffffff); }
+</style>

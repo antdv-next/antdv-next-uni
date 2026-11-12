@@ -1,0 +1,74 @@
+<script setup lang="uts">
+const types : string[] = ['success', 'info', 'warning', 'error']
+const log = ref('')
+const round = ref(0)
+
+function onClose() {
+	log.value = '触发了 close'
+}
+
+function onAfterClose() {
+	log.value = '触发了 afterClose（淡出结束）'
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">四种类型</text>
+		<view class="demo__card">
+			<am-alert v-for="type in types" :key="type" root-class="demo__block" :type="type" :title="type + ' 提示的文案'" />
+		</view>
+
+		<text class="demo__title">带图标</text>
+		<view class="demo__card">
+			<am-alert v-for="type in types" :key="type" root-class="demo__block" :type="type" show-icon :title="type + ' 提示的文案'" />
+		</view>
+
+		<text class="demo__title">描边（variant="outlined"）</text>
+		<view class="demo__card">
+			<am-alert v-for="type in types" :key="type" root-class="demo__block" :type="type" variant="outlined" show-icon :title="type + ' 提示的文案'" />
+		</view>
+
+		<text class="demo__title">带辅助性文字</text>
+		<view class="demo__card">
+			<am-alert root-class="demo__block" type="success" show-icon title="提交成功" description="你的申请已经提交，预计 1–3 个工作日内完成审核。" />
+			<am-alert type="error" show-icon title="提交失败" description="网络异常，请检查网络连接后重试。" closable />
+		</view>
+
+		<text class="demo__title">可关闭、自定义图标与操作</text>
+		<view class="demo__card">
+			<am-alert :key="round" root-class="demo__block" type="warning" show-icon title="点右侧的叉关闭" closable @close="onClose" @afterClose="onAfterClose" />
+			<am-alert root-class="demo__block" show-icon icon="bell" title="自定义图标" action="查看" />
+			<am-alert root-class="demo__block" type="info" title="操作区用插槽" show-icon>
+				<template #action>
+					<am-button size="small" type="primary" text="去处理" />
+				</template>
+			</am-alert>
+			<am-button size="small" text="恢复已关闭的提示" @click="round++" />
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">顶部公告（banner）</text>
+		<am-alert banner title="系统将于今晚 23:00 进行维护" closable />
+		<view class="demo__gap"></view>
+		<am-alert banner type="error" title="网络连接已断开" />
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__gap { height: 8px; }
+</style>

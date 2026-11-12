@@ -1,0 +1,154 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { AM_DURATION_SLOW, amTransition } from '../../utils/motion.uts'
+
+// 警告提示（= antdv-next-mobile 的 Alert）：type（success / info / warning / error；banner 时默认 warning，否则 info）、
+// variant（filled 浅色底 / outlined 只有彩色边框）、title（message 为旧名）、description、showIcon、icon、closable、
+// closeIcon、action、banner（通栏：无边框、无圆角、默认带图标）同名同义；事件 close、afterClose；
+// 插槽 default / title / message（标题）、description、icon、closeIcon、action。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / description / action 是文字，icon / closeIcon 是图标名（<am-icon> 的 name），自定义内容用同名插槽；
+// - `closable` 只有布尔值（没有 { closeIcon, disabled } 对象）；
+// - `showIcon` 的默认值是 false：UTS 里分不出“没传”和 false，banner 模式下总是带图标；
+// - 关闭时只有淡出（App 端的高度要先量出来才能过渡，警告提示不值得）；没有 `role`（view 不支持无障碍属性）
+defineOptions({ name: 'AmAlert' })
+
+const props = defineProps({
+	type: { type: String, default: '' },
+	variant: { type: String, default: 'filled' },
+	title: { type: String, default: '' },
+	message: { type: String, default: '' },
+	description: { type: String, default: '' },
+	showIcon: { type: Boolean, default: false },
+	icon: { type: String, default: '' },
+	closable: { type: Boolean, default: false },
+	closeIcon: { type: String, default: 'close' },
+	action: { type: String, default: '' },
+	banner: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['close', 'afterClose'])
+
+const theme = useAmTheme()
+
+const closed = ref(false)
+const leaving = ref(false)
+let timer = 0
+
+const mergedType = computed(() : string => {
+	if (props.type.length > 0) return props.type
+	return props.banner ? 'warning' : 'info'
+})
+const mergedTitle = computed(() : string => props.title.length > 0 ? props.title : props.message)
+const withDescription = computed(() : boolean => props.description.length > 0)
+
+const ICONS = new Map<string, string>([['success', 'success-fill'], ['info', 'info-fill'], ['warning', 'warning-fill'], ['error', 'error-fill']])
+const iconName = computed(() : string => props.icon.length > 0 ? props.icon : (ICONS.get(mergedType.value) ?? 'info-fill'))
+const iconColor = computed(() : string => {
+	const current = theme()
+	if (mergedType.value == 'success') return current.colorSuccess
+	if (mergedType.value == 'warning') return current.colorWarning
+	if (mergedType.value == 'error') return current.colorError
+	return current.colorInfo
+})
+const closeColor = computed(() : string => theme().colorTextTertiary)
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-alert', 'am-alert--' + mergedType.value]
+	if (props.variant == 'outlined') list.push('am-alert--outlined')
+	list.push(withDescription.value ? 'am-alert--with-description' : 'am-alert--plain')
+	if (props.banner) list.push('am-alert--banner')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+/** 要动的值写在 style 上：Android 上只切换类名没有过渡 */
+const rootStyle = computed(() : string => 'opacity:' + (leaving.value ? 0 : 1) + ';' + amTransition('opacity', AM_DURATION_SLOW))
+
+function onClose(event : UniPointerEvent) {
+	if (leaving.value) return
+	emit('close', event)
+	leaving.value = true
+	timer = setTimeout(() => {
+		closed.value = true
+		emit('afterClose')
+	}, AM_DURATION_SLOW)
+}
+
+onUnmounted(() => clearTimeout(timer))
+</script>
+
+<template>
+	<view v-if="!closed" :class="classes" :style="rootStyle">
+		<view v-if="showIcon || banner" :class="['am-alert__icon', withDescription ? 'am-alert__icon--large' : '']">
+			<slot name="icon">
+				<am-icon :name="iconName" :size="withDescription ? 22 : 16" :color="iconColor" />
+			</slot>
+		</view>
+		<view class="am-alert__section">
+			<text v-if="mergedTitle.length > 0" :class="['am-alert__title', withDescription ? 'am-alert__title--strong' : '']">{{ mergedTitle }}</text>
+			<slot name="title"></slot>
+			<slot name="message"></slot>
+			<slot></slot>
+			<slot name="description">
+				<text v-if="withDescription" class="am-alert__description">{{ description }}</text>
+			</slot>
+		</view>
+		<view v-if="action.length > 0 || $slots['action'] != null" class="am-alert__actions">
+			<slot name="action">
+				<text class="am-alert__action-text">{{ action }}</text>
+			</slot>
+		</view>
+		<view v-if="closable" :class="['am-alert__close', withDescription ? 'am-alert__close--top' : '']" @click="onClose">
+			<slot name="closeIcon">
+				<am-icon :name="closeIcon" :size="12" :color="closeColor" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-alert {
+	flex-direction: row;
+	border-width: 1px;
+	border-style: solid;
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-alert--plain {
+	align-items: center;
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-alert--with-description {
+	align-items: flex-start;
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-alert--info { background-color: var(--am-color-info-bg, #ecf4ff); border-color: var(--am-color-info-border, #96c2ff); }
+.am-alert--success { background-color: var(--am-color-success-bg, #eef9e8); border-color: var(--am-color-success-border, #b1e498); }
+.am-alert--warning { background-color: var(--am-color-warning-bg, #fff7e8); border-color: var(--am-color-warning-border, #fdda95); }
+.am-alert--error { background-color: var(--am-color-error-bg, #fff1f1); border-color: var(--am-color-error-border, #ffafb0); }
+.am-alert--outlined { background-color: var(--am-color-bg-container, #ffffff); }
+/* 写在类型之后：通栏没有边框与圆角 */
+.am-alert--banner { border-width: 0; border-radius: 0; }
+.am-alert__icon { margin-right: 8px; }
+.am-alert__icon--large { margin-right: 12px; padding-top: 1px; }
+.am-alert__section { flex: 1; }
+.am-alert__title { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-alert__title--strong { margin-bottom: 4px; font-size: var(--am-font-size-lg, 16px); line-height: 24px; font-weight: bold; }
+.am-alert__description { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-alert__actions { margin-left: 12px; }
+.am-alert__action-text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-primary, #1677ff); }
+/* 点击区域比图标大一圈 */
+.am-alert__close { margin-left: 4px; padding: 5px 0 5px 8px; }
+.am-alert__close--top { margin-top: 1px; }
+</style>

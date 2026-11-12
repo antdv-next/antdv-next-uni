@@ -1,0 +1,108 @@
+<script setup lang="uts">
+import { AmOption } from '@/uni_modules/antdv-next-uni/types/index.uts'
+import { AmPickerChangeInfo } from '@/uni_modules/antdv-next-uni/types/picker.uts'
+
+const cities : AmOption[][] = [[
+	{ label: '北京', value: 'beijing' },
+	{ label: '上海', value: 'shanghai' },
+	{ label: '广州', value: 'guangzhou' },
+	{ label: '深圳', value: 'shenzhen' },
+	{ label: '杭州', value: 'hangzhou' }
+]]
+const periods : AmOption[][] = [
+	[
+		{ label: '周一', value: 1 },
+		{ label: '周二', value: 2 },
+		{ label: '周三', value: 3 },
+		{ label: '周四', value: 4 },
+		{ label: '周五', value: 5 }
+	],
+	[
+		{ label: '上午', value: 'am' },
+		{ label: '下午', value: 'pm' },
+		{ label: '晚上', value: 'night' }
+	]
+]
+
+const city = ref<any[]>([])
+const period = ref<any[]>([2, 'pm'])
+const controlled = ref<any[]>([])
+const open = ref(false)
+const log = ref('')
+
+function onConfirm(value : any[], info : AmPickerChangeInfo) {
+	log.value = 'confirm: ' + JSON.stringify(value)
+}
+
+function onSelect(value : any[], info : AmPickerChangeInfo) {
+	log.value = 'select: ' + JSON.stringify(value) + '，第 ' + info.columnIndex + ' 列'
+}
+
+function onCancel() {
+	log.value = 'cancel'
+}
+
+function formatPeriod(items : (AmOption | null)[]) : string {
+	const labels : string[] = []
+	items.forEach((item : AmOption | null) => {
+		if (item != null) labels.push(item.label)
+	})
+	return labels.join('的')
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-picker v-model:value="city" :columns="cities" title="选择城市" placeholder="请选择城市" allow-clear />
+			<text class="demo__hint">当前值：{{ JSON.stringify(city) }}</text>
+		</view>
+
+		<text class="demo__title">多列、事件与 format</text>
+		<view class="demo__card">
+			<am-picker v-model:value="period" :columns="periods" title="上课时间" :format="formatPeriod" @confirm="onConfirm" @select="onSelect" @cancel="onCancel" />
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">变体、尺寸与状态</text>
+		<view class="demo__card">
+			<am-picker class="demo__block" v-model:value="city" :columns="cities" variant="filled" placeholder="filled" />
+			<am-picker class="demo__block" v-model:value="city" :columns="cities" variant="underlined" placeholder="underlined" />
+			<am-picker class="demo__block" v-model:value="city" :columns="cities" variant="borderless" placeholder="borderless" />
+			<am-picker class="demo__block" v-model:value="city" :columns="cities" size="large" placeholder="large" />
+			<am-picker class="demo__block" v-model:value="city" :columns="cities" size="small" placeholder="small" />
+			<am-picker class="demo__block" v-model:value="city" :columns="cities" status="error" placeholder="error" />
+			<am-picker v-model:value="city" :columns="cities" disabled placeholder="disabled" />
+		</view>
+
+		<text class="demo__title">放在列表里</text>
+		<am-list>
+			<am-list-item title="城市">
+				<template #extra>
+					<am-picker v-model:value="city" :columns="cities" variant="borderless" placeholder="请选择" />
+				</template>
+			</am-list-item>
+		</am-list>
+
+		<text class="demo__title">不用触发区</text>
+		<view class="demo__card">
+			<am-button block :text="controlled.length > 0 ? '已选：' + JSON.stringify(controlled) : '打开选择器'" @click="open = true" />
+			<am-picker v-model:value="controlled" v-model:open="open" :columns="cities" :trigger="false" title="v-model:open" ok-text="完成" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__footer { height: 40px; }
+</style>

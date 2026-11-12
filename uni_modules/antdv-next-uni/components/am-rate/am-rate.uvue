@@ -1,0 +1,104 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+
+// 评分（= antdv-next-mobile 的 Rate）：v-model:value、count、allowHalf（点星星的左半边为半星）、
+// allowClear（再点一次当前值清零）、disabled（只读）、character、size（small / middle / large）同名同义；
+// 事件 update:value、change。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - `character` 是字符串：图标名（默认 star-fill），或直接显示的文字（如 '好'、'A'）；没有 character 插槽
+//   （每颗星要画两层：底下一层灰的，上面一层按值裁剪的，插槽的内容换不了颜色）；
+// - 只能点选，不能按住拖动选择；
+// - 没有 defaultValue（用 v-model:value）、keyboard、id，没有 focus / blur / keydown 事件
+defineOptions({ name: 'AmRate' })
+
+const props = defineProps({
+	value: { type: Number, default: 0 },
+	count: { type: Number, default: 5 },
+	allowHalf: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: true },
+	disabled: { type: Boolean, default: false },
+	/** 图标名，或直接显示的文字 */
+	character: { type: String, default: 'star-fill' },
+	size: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change'])
+
+const theme = useAmTheme()
+const notifyChange = useAmFieldChange()
+const sizeOf = useAmSize(() : string => props.size)
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+/** 星星的边长（像素） */
+const side = computed(() : number => {
+	const size = sizeOf()
+	return size == 'small' ? 18 : (size == 'large' ? 32 : 24)
+})
+/** 星星之间的间距 */
+const space = computed(() : number => {
+	const size = sizeOf()
+	return size == 'small' ? 6 : (size == 'large' ? 12 : 8)
+})
+
+const activeColor = computed(() : string => theme().colorWarning)
+const inactiveColor = computed(() : string => theme().colorFill)
+const isIcon = computed(() : boolean => /^[a-z]+(-[a-z]+)*$/.test(props.character))
+
+const starStyle = computed(() : string => 'width:' + side.value + 'px;height:' + side.value + 'px;margin-right:' + space.value + 'px;')
+const boxStyle = computed(() : string => 'width:' + side.value + 'px;height:' + side.value + 'px;')
+const halfStyle = computed(() : string => 'width:' + side.value / 2 + 'px;')
+const fullStyle = computed(() : string => 'width:' + side.value + 'px;')
+const textStyle = computed(() : string => 'font-size:' + (side.value - 4) + 'px;line-height:' + side.value + 'px;')
+
+/** 第 index 颗星（从 0 起）填多少：1 整颗、0.5 半颗、0 不填 */
+function fill(index : number) : number {
+	const rest = props.value - index
+	if (rest >= 1) return 1
+	if (rest >= 0.5) return 0.5
+	return 0
+}
+
+function pick(index : number, half : boolean) {
+	if (disabled.value) return
+	let next = half && props.allowHalf ? index + 0.5 : index + 1
+	if (props.allowClear && next == props.value) next = 0
+	if (next == props.value) return
+	emit('update:value', next)
+	emit('change', next)
+	notifyChange()
+}
+</script>
+
+<template>
+	<view :class="['am-rate', rootClass]">
+		<view v-for="index in count" :key="index" class="am-rate__star" :style="starStyle">
+			<am-icon v-if="isIcon" :name="character" :size="side" :color="inactiveColor" />
+			<text v-else class="am-rate__text" :style="textStyle + 'color:' + inactiveColor + ';'">{{ character }}</text>
+			<view v-if="fill(index - 1) > 0" class="am-rate__fill" :style="fill(index - 1) == 1 ? fullStyle : halfStyle">
+				<!-- 里面的星星固定为整颗的宽度：App 端文字的盒子会缩到裁剪容器的宽度并居中，半颗星就错位了 -->
+				<view class="am-rate__fill-inner" :style="boxStyle">
+					<am-icon v-if="isIcon" :name="character" :size="side" :color="activeColor" />
+					<text v-else class="am-rate__text" :style="textStyle + 'color:' + activeColor + ';'">{{ character }}</text>
+				</view>
+			</view>
+			<view class="am-rate__hit am-rate__hit--left" :style="halfStyle" @click="pick(index - 1, true)"></view>
+			<view class="am-rate__hit am-rate__hit--right" :style="halfStyle" @click="pick(index - 1, false)"></view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-rate { flex-direction: row; align-items: center; }
+.am-rate__star { position: relative; }
+.am-rate__text { text-align: center; }
+.am-rate__fill { position: absolute; left: 0; top: 0; bottom: 0; overflow: hidden; }
+.am-rate__fill-inner { position: absolute; left: 0; top: 0; }
+.am-rate__hit { position: absolute; top: 0; bottom: 0; }
+.am-rate__hit--left { left: 0; }
+.am-rate__hit--right { right: 0; }
+</style>

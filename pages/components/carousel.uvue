@@ -1,0 +1,95 @@
+<script setup lang="uts">
+const colors : string[] = ['#364d79', '#1677ff', '#52c41a', '#fa8c16']
+const images : string[] = ['/static/logo.png', '/static/logo.png', '/static/logo.png']
+const current = ref(0)
+const log = ref('')
+const carousel = ref<AmCarouselComponentPublicInstance | null>(null)
+
+function onImageClick(index : number) {
+	log.value = '点了第 ' + (index + 1) + ' 张'
+}
+
+function onAfterChange(index : number) {
+	current.value = index
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-carousel @afterChange="onAfterChange">
+				<swiper-item v-for="(color, index) in colors" :key="color">
+					<view class="demo__slide" :style="'background-color:' + color + ';'">
+						<text class="demo__slide-text">{{ index + 1 }}</text>
+					</view>
+				</swiper-item>
+			</am-carousel>
+			<text class="demo__hint">当前第 {{ current + 1 }} 页</text>
+		</view>
+
+		<text class="demo__title">自动切换</text>
+		<view class="demo__card">
+			<am-carousel autoplay :autoplay-speed="2000" :height="120">
+				<swiper-item v-for="(color, index) in colors" :key="color">
+					<view class="demo__slide" :style="'background-color:' + color + ';'">
+						<text class="demo__slide-text">{{ index + 1 }}</text>
+					</view>
+				</swiper-item>
+			</am-carousel>
+		</view>
+
+		<text class="demo__title">图片轮播（images）</text>
+		<view class="demo__card">
+			<am-carousel :images="images" :height="180" @click="onImageClick" />
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">纵向</text>
+		<view class="demo__card">
+			<am-carousel dot-placement="end" :height="120">
+				<swiper-item v-for="(color, index) in colors" :key="color">
+					<view class="demo__slide" :style="'background-color:' + color + ';'">
+						<text class="demo__slide-text">{{ index + 1 }}</text>
+					</view>
+				</swiper-item>
+			</am-carousel>
+		</view>
+
+		<text class="demo__title">方法：goTo / prev / next（不循环、不显示指示点）</text>
+		<view class="demo__card">
+			<am-carousel ref="carousel" :infinite="false" :dots="false" :initial-slide="1" :height="120">
+				<swiper-item v-for="(color, index) in colors" :key="color">
+					<view class="demo__slide" :style="'background-color:' + color + ';'">
+						<text class="demo__slide-text">{{ index + 1 }}</text>
+					</view>
+				</swiper-item>
+			</am-carousel>
+			<view class="demo__row demo__top">
+				<am-button class="demo__item" size="small" text="上一页" @click="carousel?.prev()" />
+				<am-button class="demo__item" size="small" text="下一页" @click="carousel?.next()" />
+				<am-button class="demo__item" size="small" text="回到第 1 页" @click="carousel?.goTo(0, false)" />
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__slide { flex: 1; align-items: center; justify-content: center; border-radius: 8px; }
+.demo__slide-text { font-size: 28px; color: #ffffff; }
+.demo__top { margin-top: 12px; }
+</style>

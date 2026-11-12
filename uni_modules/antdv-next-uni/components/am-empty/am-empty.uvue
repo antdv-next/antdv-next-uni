@@ -1,0 +1,64 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+
+// 空状态（= antdv-next-mobile 的 Empty）：image、description 同名同义；插槽 default（底部的操作，通常是按钮）、
+// image、description。description 不写时用语言包的“暂无数据”。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 默认的图是图标字体里的 inbox（App 端没有内联 SVG，画不了插画）；`image` 是图片地址，
+//   或 'simple'（= Empty.PRESENTED_IMAGE_SIMPLE：小一号的图标与留白，用在下拉、列表里），自定义内容用 image 插槽；
+// - `description` 是字符串，没有 false / null（不显示说明）：要去掉或自定义就写一个 description 插槽
+defineOptions({ name: 'AmEmpty' })
+
+const props = defineProps({
+	image: { type: String, default: '' },
+	description: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+
+const simple = computed(() : boolean => props.image == 'simple')
+const isUrl = computed(() : boolean => props.image.length > 0 && props.image != 'simple' && props.image != 'default')
+const iconColor = computed(() : string => theme().colorTextQuaternary)
+const descriptionText = computed(() : string => props.description.length > 0 ? props.description : locale().Empty.description)
+</script>
+
+<template>
+	<view :class="['am-empty', simple ? 'am-empty--simple' : '', rootClass]">
+		<view :class="['am-empty__image', simple ? 'am-empty__image--simple' : '']">
+			<slot v-if="$slots['image'] != null" name="image"></slot>
+			<image v-else-if="isUrl" class="am-empty__img" :src="image" mode="aspectFit" />
+			<am-icon v-else name="inbox" :size="simple ? 40 : 72" :color="iconColor" />
+		</view>
+		<slot v-if="$slots['description'] != null" name="description"></slot>
+		<text v-else :class="['am-empty__description', simple ? 'am-empty__description--simple' : '']">{{ descriptionText }}</text>
+		<view v-if="$slots['default'] != null" class="am-empty__footer">
+			<slot></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-empty {
+	align-items: center;
+	padding-top: var(--am-padding-xl, 32px);
+	padding-bottom: var(--am-padding-xl, 32px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-empty--simple { padding-top: var(--am-padding-lg, 24px); padding-bottom: var(--am-padding-lg, 24px); }
+.am-empty__image { height: 100px; margin-bottom: 8px; flex-direction: row; align-items: center; justify-content: center; }
+.am-empty__image--simple { height: 40px; }
+.am-empty__img { width: 160px; height: 100%; }
+.am-empty__description {
+	font-size: var(--am-font-size, 14px);
+	line-height: 22px;
+	text-align: center;
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-empty__description--simple { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.am-empty__footer { margin-top: 16px; align-items: center; }
+</style>
