@@ -1,5 +1,8 @@
 <script setup lang="uts">
-// 示例 App 的首页：分组与 antdv-next-mobile 的文档相同
+import { AmThemeConfig, amThemeState, setAmTheme } from '@/uni_modules/antdv-next-uni/theme/theme.uts'
+import { amLocaleState, enUS, setAmLocale, zhCN } from '@/uni_modules/antdv-next-uni/locale/locale.uts'
+
+// 示例 App 的首页：分组与 antdv-next-mobile 的文档相同；顶部可以搜索组件、切换全局暗色与语言
 type DemoEntry = {
 	title : string
 	subtitle : string
@@ -124,6 +127,37 @@ const groups : DemoGroup[] = [
 	}
 ]
 
+const keyword = ref('')
+
+// 按标题或中文名过滤；没有命中的分组不显示
+const visibleGroups = computed(() : DemoGroup[] => {
+	const word = keyword.value.trim().toLowerCase()
+	if (word.length == 0) return groups
+	const list : DemoGroup[] = []
+	groups.forEach((group : DemoGroup) => {
+		const entries = group.entries.filter((entry : DemoEntry) : boolean => {
+			return entry.title.toLowerCase().includes(word) || entry.subtitle.includes(word)
+		})
+		if (entries.length > 0) list.push({ title: group.title, entries: entries } as DemoGroup)
+	})
+	return list
+})
+
+const dark = computed(() : boolean => amThemeState.theme.isDark)
+const english = computed(() : boolean => amLocaleState.locale.locale == enUS.locale)
+
+// 只换明暗算法：主色、圆角、紧凑沿用当前的全局主题（ConfigProvider 示例页里可能改过）
+function toggleDark() {
+	const algorithm : string[] = [dark.value ? 'default' : 'dark']
+	if (amThemeState.theme.isCompact) algorithm.push('compact')
+	const config : AmThemeConfig = { algorithm: algorithm, token: amThemeState.config.token }
+	setAmTheme(config)
+}
+
+function toggleLocale() {
+	setAmLocale(english.value ? zhCN : enUS)
+}
+
 function open(url : string) {
 	uni.navigateTo({ url: url })
 }
@@ -138,7 +172,15 @@ function open(url : string) {
 				<text class="index__subtitle">uni-app x 组件库，与 antdv-next-mobile 同名、同属性、同主题</text>
 			</view>
 		</view>
-		<am-list v-for="group in groups" :key="group.title" :header="group.title" mode="card">
+		<view class="index__tools">
+			<view class="index__search">
+				<am-input-search v-model:value="keyword" placeholder="搜索组件，如 Button / 按钮" />
+			</view>
+			<am-button class="index__tool" size="small" :type="dark ? 'primary' : 'default'" :text="dark ? '亮色' : '暗色'" @click="toggleDark" />
+			<am-button class="index__tool" size="small" :text="english ? '中文' : 'EN'" @click="toggleLocale" />
+		</view>
+		<am-empty v-if="visibleGroups.length == 0" description="没有匹配的组件" />
+		<am-list v-for="group in visibleGroups" :key="group.title" :header="group.title" mode="card">
 			<am-list-item
 				v-for="(entry, index) in group.entries"
 				:key="entry.url"
@@ -160,5 +202,8 @@ function open(url : string) {
 .index__heading { flex: 1; margin-left: 12px; }
 .index__title { font-size: 22px; font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
 .index__subtitle { margin-top: 4px; font-size: 13px; line-height: 20px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.index__tools { flex-direction: row; align-items: center; padding: 0 16px 4px 16px; }
+.index__search { flex: 1; }
+.index__tool { margin-left: 8px; }
 .index__footer { height: 32px; }
 </style>

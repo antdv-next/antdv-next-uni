@@ -144,6 +144,14 @@ node tools/parity/check.mjs
 - 新增组件：`components/am-foo/am-foo.uvue` + `pages/components/foo.uvue`（在 `pages.json` 和首页登记）+ 对齐检查通过
   + Web、iOS、Android 三端编译通过。
 
+## 文档与发版
+
+- 改了组件的属性 / 事件 / 插槽 / 文件头注释后运行 `node tools/docs/gen.mjs`，把 `docs/components/` 一起提交（CI 用 `--check` 校验）；
+  `docs/guide/` 是手写的。
+- `node tools/lint.mjs` 是 CI 里的静态检查（CI 没有 HBuilderX，三端编译只能在本地做）。
+- 发版：`changelog.md` 写 `## 版本（YYYY-MM-DD）` 一节 → `node tools/release.mjs <版本>`（同步 `package.json` 与
+  `manifest.json` 的版本号，打包到 `dist/`）→ 三端编译 → 提交 → `v<版本>` tag。脚本不提交、不打 tag、不上传。
+
 ## 提交
 
 Conventional commits：`feat(button): ...`、`fix(popup): ...`、`docs: ...`、`chore: ...`。

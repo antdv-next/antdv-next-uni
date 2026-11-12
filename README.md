@@ -4,7 +4,7 @@
   <p><a href="https://doc.dcloud.net.cn/uni-app-x/">uni-app x</a> 组件库，与 <a href="https://github.com/antdv-next/antdv-next-mobile">antdv-next-mobile</a> 同名、同属性、同主题。</p>
 </div>
 
-一套 uvue + UTS 代码编译到 Android、iOS、鸿蒙、Web 与微信小程序。会用 antdv-next 或 antdv-next-mobile 就会用它：
+一套 uvue + UTS 代码，目标是 Android、iOS、鸿蒙、Web 与微信小程序（目前验证过 Web、iOS、Android 的编译）。会用 antdv-next 或 antdv-next-mobile 就会用它：
 
 ```vue
 <am-config-provider :theme="{ algorithm: 'dark', token: { colorPrimary: '#00b96b' } }">
@@ -77,9 +77,25 @@ setAmTheme({ algorithm: ['dark', 'compact'], token: { colorPrimary: '#00b96b', b
 完整的差异清单在 [tools/parity/known/](./tools/parity/known/)，
 由 `node tools/parity/check.mjs` 自动核对。
 
+## 文档
+
+- [指南](./docs/README.md)：快速上手、主题、国际化、与 antdv-next-mobile 的差异
+- [组件](./docs/components/README.md)：每个组件的属性、事件、插槽、方法（由 `tools/docs/gen.mjs` 从源码生成）
+- 示例：本仓库根目录就是示例应用，首页可以搜索组件、切换暗色与语言
+
 ## 开发
 
 需要 HBuilderX 5.x（uni-app x 只能由它编译）。命令与约定见 [AGENTS.md](./AGENTS.md)。
+
+```bash
+node tools/lint.mjs            # 静态检查：目录、页面注册、App 端不生效的 gap、版本号
+node tools/parity/check.mjs    # 与 antdv-next-mobile 的属性 / 事件对齐
+node tools/docs/gen.mjs        # 重新生成 docs/components（--check 只检查是否最新）
+node tools/release.mjs 0.2.0   # 改版本号、跑检查、打出 dist/antdv-next-uni-0.2.0.zip
+```
+
+发版：先在 `uni_modules/antdv-next-uni/changelog.md` 写好新版本一节，运行 `tools/release.mjs <版本>`，三端编译通过后
+提交并推送 `v<版本>` 的 tag，CI 会建 GitHub Release 并附上压缩包；DCloud 插件市场需要在 HBuilderX 里手动发布。
 
 ## License
 

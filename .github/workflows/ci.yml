@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # uni-app x 只能用 HBuilderX 编译，CI 里没有：这里只跑不依赖 HBuilderX 的检查，三端编译在本地做（见 AGENTS.md）
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Static checks
+        run: node tools/lint.mjs
+      - name: Component docs are up to date
+        run: node tools/docs/gen.mjs --check
+
+  # 与 antdv-next-mobile 的属性 / 事件对齐：移动端 main 变了这里也会红，那正是要处理的信号
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: antdv-next/antdv-next-mobile
+          path: .mobile
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Parity with antdv-next-mobile
+        run: node tools/parity/check.mjs
+        env:
+          MOBILE_DIR: ${{ github.workspace }}/.mobile

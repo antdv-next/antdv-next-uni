@@ -1,5 +1,5 @@
 {
   "missingProps": {
-    "separator": "容器包不了插槽里的子元素，没法在它们之间插入内容（间距用容器上的 CSS gap）；分隔线请自己写在子元素之间"
+    "separator": "容器包不了插槽里的子元素，没法在它们之间插入内容（间距在 Web 端是容器上的 CSS gap，App 端由 am-space-item 加外边距）；分隔线请自己写在子元素之间"
   }
 }

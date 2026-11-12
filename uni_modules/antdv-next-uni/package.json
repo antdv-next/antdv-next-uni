@@ -2,7 +2,7 @@
 	"id": "antdv-next-uni",
 	"displayName": "Antdv Next Uni",
 	"version": "0.1.0",
-	"description": "Antdv Next 的 uni-app x 组件库（uvue + UTS）：与 antdv-next-mobile 同名、同属性、同 v-model、同主题 token，一套代码编译到 Android、iOS、鸿蒙、Web 与微信小程序",
+	"description": "Antdv Next 的 uni-app x 组件库（uvue + UTS）：与 antdv-next-mobile 同名、同属性、同 v-model、同主题 token，一套代码编译到 Android、iOS 与 Web",
 	"keywords": ["antdv-next", "ant-design", "uni-app x", "uvue", "组件库"],
 	"repository": "https://github.com/antdv-next/antdv-next-uni",
 	"engines": {

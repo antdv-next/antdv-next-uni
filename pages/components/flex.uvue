@@ -22,6 +22,15 @@ const blocks : number[] = [1, 2, 3, 4, 5, 6, 7, 8]
 			</am-flex>
 		</view>
 
+		<text class="demo__title">间距（gap：App 端子元素放进 am-space-item）</text>
+		<view class="demo__card">
+			<am-flex gap="middle">
+				<am-space-item><view class="demo__block"><text class="demo__block-text">1</text></view></am-space-item>
+				<am-space-item><view class="demo__block"><text class="demo__block-text">2</text></view></am-space-item>
+				<am-space-item><view class="demo__block"><text class="demo__block-text">3</text></view></am-space-item>
+			</am-flex>
+		</view>
+
 		<text class="demo__title">对齐（justify / align）</text>
 		<view class="demo__card">
 			<view class="demo__row">
