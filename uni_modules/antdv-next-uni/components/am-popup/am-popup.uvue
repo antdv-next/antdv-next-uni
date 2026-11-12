@@ -1,0 +1,198 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { addAmOverlay, removeAmOverlay } from '../../utils/overlay.uts'
+
+// 弹出层（= antdv-next-mobile 的 Popup）：v-model:open、placement（bottom / top / left / right / center）、
+// mask、maskClosable、closable、round、safeArea、destroyOnHidden、zIndex、width、height 同名同义；
+// 事件 update:open、close、maskClick、afterOpenChange。Drawer、Modal、ActionSheet、各种选择器都基于它。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 没有挂到 body 的 Teleport（也就没有 getContainer）：根节点 fixed 铺满屏幕，
+//   所以弹出层要放在页面根节点下，不要放在会裁剪内容的容器里；
+// - width / height 是像素数（0 为按内容 / 默认值），max-height 不支持百分比；
+// - 没有 keyboard、lockScroll、forceRender；Android 的返回键会先关掉最上面的弹出层（utils/overlay.uts）；
+// - 没有 classes / styles：传给子组件的类在 App 端不生效
+//
+// 打开时先渲染再加 --show 类，关闭时先去掉类、等过渡结束再隐藏；过渡用 transform / opacity
+defineOptions({ name: 'AmPopup' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	placement: { type: String, default: 'bottom' },
+	mask: { type: Boolean, default: true },
+	maskClosable: { type: Boolean, default: true },
+	closable: { type: Boolean, default: false },
+	/** 关闭图标的名称（<am-icon> 的 name）；自定义内容用 closeIcon 插槽 */
+	closeIcon: { type: String, default: 'close' },
+	round: { type: Boolean, default: false },
+	safeArea: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	/** 面板的宽度（像素，left / right 时有效；0 为默认的 300） */
+	width: { type: Number, default: 0 },
+	/** 面板的高度（像素，top / bottom 时有效；0 为按内容） */
+	height: { type: Number, default: 0 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'close', 'maskClick', 'afterOpenChange'])
+
+const theme = useAmTheme()
+// 子组件根节点上的类盖不过它自己的样式，图标的颜色用属性传
+const closeColor = computed(() : string => theme().colorTextTertiary)
+
+/** 内容是否已经渲染过（不销毁时关闭后仍留着） */
+const rendered = ref(false)
+/** 根节点是否显示（关闭的过渡结束后才隐藏） */
+const visible = ref(false)
+/** 是否处于“打开”的样式（用来触发过渡） */
+const shown = ref(false)
+let timer = 0
+/** 打开时登记到弹出层栈（返回键先关最上面的弹出层） */
+let overlayId = 0
+
+function unregister() {
+	if (overlayId > 0) removeAmOverlay(overlayId)
+	overlayId = 0
+}
+
+function close() {
+	emit('close')
+	emit('update:open', false)
+}
+
+watch(
+	() : boolean => props.open,
+	(open : boolean) => {
+		clearTimeout(timer)
+		unregister()
+		if (open) {
+			overlayId = addAmOverlay(() => { close() })
+			rendered.value = true
+			visible.value = true
+			// 先以隐藏的状态渲染一帧，再切到显示，过渡才会生效
+			timer = setTimeout(() => {
+				shown.value = true
+				emit('afterOpenChange', true)
+			}, 20)
+		} else if (visible.value) {
+			shown.value = false
+			timer = setTimeout(() => {
+				visible.value = false
+				if (props.destroyOnHidden) rendered.value = false
+				emit('afterOpenChange', false)
+			}, 300)
+		}
+	},
+	{ immediate: true }
+)
+
+onUnmounted(() => {
+	clearTimeout(timer)
+	unregister()
+})
+
+// max-height 不支持百分比：按窗口高度算成像素（上下弹出最多占 90%）
+const maxHeight = Math.round(uni.getWindowInfo().windowHeight * 0.9)
+
+const rootStyle = computed(() : string => 'z-index:' + props.zIndex + ';')
+
+const panelStyle = computed(() : string => {
+	const vertical = props.placement == 'bottom' || props.placement == 'top'
+	let text = ''
+	if (vertical) {
+		text += 'max-height:' + maxHeight + 'px;'
+		if (props.height > 0) text += 'height:' + props.height + 'px;'
+	} else if (props.placement != 'center') {
+		text += 'width:' + (props.width > 0 ? props.width : 300) + 'px;'
+	} else if (props.width > 0) {
+		text += 'width:' + props.width + 'px;'
+	}
+	return text
+})
+
+function onMask() {
+	emit('maskClick')
+	if (props.maskClosable) close()
+}
+</script>
+
+<template>
+	<view v-if="rendered" v-show="visible" :class="['am-popup', rootClass]" :style="rootStyle">
+		<view v-if="mask" :class="['am-popup__mask', shown ? 'am-popup__mask--show' : '']" @click="onMask"></view>
+		<view
+			:class="[
+				'am-popup__panel',
+				'am-popup__panel--' + placement,
+				round ? 'am-popup__panel--round-' + placement : '',
+				shown ? 'am-popup__panel--show' : ''
+			]"
+			:style="panelStyle"
+		>
+			<view v-if="closable" class="am-popup__close" @click="close">
+				<slot name="closeIcon">
+					<am-icon :name="closeIcon" :size="18" :color="closeColor" />
+				</slot>
+			</view>
+			<slot></slot>
+			<view v-if="safeArea && placement == 'bottom'" class="am-popup__safe-area"></view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-popup { position: fixed; left: 0; right: 0; top: 0; bottom: 0; }
+.am-popup__mask {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+	opacity: 0;
+	transition-property: opacity;
+	transition-duration: 300ms;
+}
+.am-popup__mask--show { opacity: 1; }
+.am-popup__panel {
+	position: absolute;
+	background-color: var(--am-color-bg-elevated, #ffffff);
+	transition-property: transform, opacity;
+	transition-duration: 300ms;
+	transition-timing-function: cubic-bezier(0.08, 0.82, 0.17, 1);
+}
+.am-popup__panel--bottom { left: 0; right: 0; bottom: 0; transform: translateY(100%); }
+.am-popup__panel--top { left: 0; right: 0; top: 0; transform: translateY(-100%); }
+.am-popup__panel--left { left: 0; top: 0; bottom: 0; transform: translateX(-100%); }
+.am-popup__panel--right { right: 0; top: 0; bottom: 0; transform: translateX(100%); }
+.am-popup__panel--center {
+	left: 24px;
+	right: 24px;
+	top: 25%;
+	opacity: 0;
+	transform: scale(0.85);
+	border-top-left-radius: var(--am-border-radius-xl, 16px);
+	border-top-right-radius: var(--am-border-radius-xl, 16px);
+	border-bottom-left-radius: var(--am-border-radius-xl, 16px);
+	border-bottom-right-radius: var(--am-border-radius-xl, 16px);
+}
+.am-popup__panel--show { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
+.am-popup__panel--round-bottom {
+	border-top-left-radius: var(--am-border-radius-xl, 16px);
+	border-top-right-radius: var(--am-border-radius-xl, 16px);
+}
+.am-popup__panel--round-top {
+	border-bottom-left-radius: var(--am-border-radius-xl, 16px);
+	border-bottom-right-radius: var(--am-border-radius-xl, 16px);
+}
+.am-popup__panel--round-left {
+	border-top-right-radius: var(--am-border-radius-xl, 16px);
+	border-bottom-right-radius: var(--am-border-radius-xl, 16px);
+}
+.am-popup__panel--round-right {
+	border-top-left-radius: var(--am-border-radius-xl, 16px);
+	border-bottom-left-radius: var(--am-border-radius-xl, 16px);
+}
+.am-popup__close { position: absolute; right: 12px; top: 12px; padding: 4px; z-index: 1; }
+.am-popup__safe-area { height: var(--uni-safe-area-inset-bottom, 0px); }
+</style>

@@ -1,0 +1,22 @@
+// <am-config-provider> 提供的上下文：尺寸、禁用（= antdv-next-mobile 的 useSize / useDisabled）。
+// UTS 里 inject 不能写 ComputedRef，上下文都是取值函数；这里的 useXxx 也返回取值函数，在 computed 里调用
+
+/** 组件的尺寸：自己的 `size` > ConfigProvider 的 `componentSize` > 'middle'。'medium' 当作 'middle' */
+export function useAmSize(own : () => string) : () => string {
+	const provided = inject<(() => string) | null>('amConfigSize', null)
+	return () : string => {
+		let size = own()
+		if (size.length == 0 && provided != null) size = provided()
+		if (size.length == 0 || size == 'medium') return 'middle'
+		return size
+	}
+}
+
+/** 是否禁用：自己的 `disabled` 为 true，或 ConfigProvider 的 `componentDisabled` 为 true */
+export function useAmDisabled(own : () => boolean) : () => boolean {
+	const provided = inject<(() => boolean) | null>('amConfigDisabled', null)
+	return () : boolean => {
+		if (own()) return true
+		return provided != null ? provided() : false
+	}
+}

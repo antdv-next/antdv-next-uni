@@ -1,0 +1,110 @@
+<script setup lang="uts">
+import { AM_INHERIT_THEME, AmTheme, AmThemeConfig, amThemeState, applyNavigationBar, deriveTheme, hasThemeConfig, themeStyle } from '../../theme/theme.uts'
+import { AM_INHERIT_LOCALE, AmLocale, amLocaleState } from '../../locale/locale.uts'
+import { closeAmOverlay } from '../../utils/overlay.uts'
+
+// 全局化配置（= antdv-next-mobile 的 ConfigProvider）：theme、locale、componentSize、componentDisabled 同名同义。
+//
+// 它同时是主题变量的容器：App 端没有 :root，CSS 变量只对写着它们的节点的子孙生效，
+// 所以**每个页面的根节点都应当是它**（页面背景色、原生导航栏的颜色、Android 返回键先关弹出层也由根上的它负责）。
+// 嵌套使用时内层只换主题变量（局部主题），不再管页面的高度与背景。
+//
+// 高度：App 端（蒸汽模式，页面本身可以滚动）不能用 flex: 1——根节点被定成一屏高，内容再多页面也滚不动；
+// 改为 min-height 为窗口高度（像素，App 端的 min-height 不认百分比）。窗口高度在挂载后、页面显示时重新取：
+// Android 冷启动的第一个页面第一次渲染时拿到的是整个屏幕的高度
+defineOptions({ name: 'AmConfigProvider' })
+
+const props = defineProps({
+	/** 主题：{ algorithm, token }。不传时用全局主题（setAmTheme） */
+	theme: { type: Object as PropType<AmThemeConfig>, default: () : AmThemeConfig => AM_INHERIT_THEME },
+	/** 语言包。不传时用全局语言（setAmLocale） */
+	locale: { type: Object as PropType<AmLocale>, default: () : AmLocale => AM_INHERIT_LOCALE },
+	/** 内部组件的默认尺寸：small / middle / large；空为不指定 */
+	componentSize: { type: String, default: '' },
+	/** 禁用内部的全部组件 */
+	componentDisabled: { type: Boolean, default: false },
+	/** 原生导航栏的颜色是否跟随主题（只对页面根上的 provider 有效） */
+	navigationBar: { type: Boolean, default: true }
+})
+
+// 上层的 provider（没有时是页面根上的那一个）
+const parentTheme = inject<(() => AmTheme) | null>('amTheme', null)
+const parentLocale = inject<(() => AmLocale) | null>('amLocale', null)
+const parentSize = inject<(() => string) | null>('amConfigSize', null)
+const parentDisabled = inject<(() => boolean) | null>('amConfigDisabled', null)
+const isRoot = parentTheme == null
+
+const theme = computed(() : AmTheme => {
+	if (hasThemeConfig(props.theme)) return deriveTheme(props.theme)
+	return parentTheme != null ? parentTheme() : amThemeState.theme
+})
+
+provide('amTheme', () : AmTheme => theme.value)
+provide('amLocale', () : AmLocale => {
+	if (props.locale.locale.length > 0) return props.locale
+	return parentLocale != null ? parentLocale() : amLocaleState.locale
+})
+provide('amConfigSize', () : string => {
+	if (props.componentSize.length > 0) return props.componentSize
+	return parentSize != null ? parentSize() : ''
+})
+provide('amConfigDisabled', () : boolean => {
+	if (props.componentDisabled) return true
+	return parentDisabled != null ? parentDisabled() : false
+})
+
+const windowHeight = ref(uni.getWindowInfo().windowHeight)
+
+function syncWindowHeight() {
+	const height = uni.getWindowInfo().windowHeight
+	if (height > 0 && height != windowHeight.value) windowHeight.value = height
+}
+
+// 页面里有自己滚动的全屏组件（下拉刷新、索引栏）时，它们调用 amPageFill：根节点正好一屏高，页面本身不滚
+const fill = ref(false)
+provide('amPageFill', () => { fill.value = true })
+
+const style = computed(() : string => {
+	let text = themeStyle(theme.value)
+	if (isRoot) {
+		text += 'background-color:' + theme.value.colorBgLayout + ';' + (fill.value ? 'height:' : 'min-height:') + windowHeight.value + 'px;'
+	}
+	return text
+})
+
+// 不用 uni.onWindowResize：iOS 端没有这个方法（调用即报错）
+onPageShow(() => {
+	if (isRoot) syncWindowHeight()
+})
+
+// Android 的返回键、导航栏的返回按钮先关掉最上面的弹出层，没有弹出层时照常返回
+onBackPress((_) : boolean | null => isRoot ? closeAmOverlay() : false)
+
+onMounted(() => {
+	if (!isRoot) return
+	if (props.navigationBar) applyNavigationBar(theme.value)
+	syncWindowHeight()
+	setTimeout(() => { syncWindowHeight() }, 300)
+})
+
+watch(
+	() : string => theme.value.colorBgContainer,
+	() => {
+		if (isRoot && props.navigationBar) applyNavigationBar(theme.value)
+	}
+)
+</script>
+
+<template>
+	<view :class="['am-config-provider', isRoot ? 'am-config-provider--root' : '']" :style="style">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-config-provider--root {
+	/* #ifdef WEB */
+	flex: 1;
+	/* #endif */
+}
+</style>

@@ -1,0 +1,245 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+
+// 输入框（= antdv-next-mobile 的 Input）：v-model:value、placeholder、type、allowClear、maxlength、showCount、
+// prefix / suffix、variant（outlined / filled / borderless / underlined）、status（error / warning）、size、
+// disabled、readOnly、align（start / end）、autofocus、enterkeyhint 同名同义；
+// 事件 update:value、change、input、focus、blur、pressEnter、clear；方法 focus()、blur()。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - prefix / suffix 是字符串：是图标名时显示图标，否则显示文字；自定义内容用同名插槽；
+// - change / input 的参数是当前的值（字符串），不是事件对象；
+// - 没有 defaultValue（UTS 里分不出“没传”和空字符串），请用 v-model:value；
+// - maxlength 为 -1 表示不限；placeholder 的颜色在 UTS 中取主题（placeholder-style 不支持 CSS 变量）
+defineOptions({ name: 'AmInput' })
+
+const props = defineProps({
+	value: { type: String, default: '' },
+	placeholder: { type: String, default: '' },
+	type: { type: String, default: 'text' },
+	allowClear: { type: Boolean, default: false },
+	maxlength: { type: Number, default: -1 },
+	showCount: { type: Boolean, default: false },
+	prefix: { type: String, default: '' },
+	suffix: { type: String, default: '' },
+	variant: { type: String, default: 'outlined' },
+	status: { type: String, default: '' },
+	size: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	readOnly: { type: Boolean, default: false },
+	align: { type: String, default: 'start' },
+	autofocus: { type: Boolean, default: false },
+	enterkeyhint: { type: String, default: 'done' },
+	/** 原生 input 的 name（表单提交用） */
+	name: { type: String, default: '' },
+	/** 原生 input 的 id */
+	id: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'input', 'focus', 'blur', 'pressEnter', 'clear'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const focused = ref(false)
+/** 要不要让输入框获得焦点（focus() / blur() 改它） */
+const wantFocus = ref(props.autofocus)
+
+const placeholderStyle = computed(() : string => 'color:' + theme().colorTextQuaternary + ';')
+const iconColor = computed(() : string => theme().colorTextTertiary)
+const clearColor = computed(() : string => theme().colorTextQuaternary)
+const inputType = computed(() : string => props.type == 'password' ? 'text' : props.type)
+const showClear = computed(() : boolean => props.allowClear && props.value.length > 0 && !disabled.value && !props.readOnly)
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-input', 'am-input--' + props.variant, 'am-input--' + size.value]
+	if (props.variant != 'borderless') list.push('am-input--box-' + size.value)
+	if (focused.value) list.push('am-input--focused-' + props.variant)
+	if (props.status.length > 0) list.push('am-input--' + props.variant + '-' + props.status)
+	if (disabled.value) list.push('am-input--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const controlClasses = computed(() : string[] => {
+	const list : string[] = ['am-input__control', 'am-input__control--' + size.value]
+	if (props.align == 'end') list.push('am-input__control--end')
+	return list
+})
+
+/** 字符串是不是图标名（小写字母与连字符） */
+function isIcon(name : string) : boolean {
+	return /^[a-z]+(-[a-z]+)*$/.test(name)
+}
+
+function onInput(event : UniInputEvent) {
+	const value = event.detail.value
+	emit('update:value', value)
+	emit('input', value)
+	emit('change', value)
+}
+
+function onFocus(event : UniInputFocusEvent) {
+	focused.value = true
+	emit('focus', event)
+}
+
+function onBlur(event : UniInputBlurEvent) {
+	focused.value = false
+	wantFocus.value = false
+	emit('blur', event)
+}
+
+function onConfirm() {
+	emit('pressEnter', props.value)
+}
+
+function clear() {
+	emit('update:value', '')
+	emit('input', '')
+	emit('change', '')
+	emit('clear')
+}
+
+function focus() {
+	wantFocus.value = true
+}
+
+function blur() {
+	wantFocus.value = false
+}
+
+defineExpose({ focus, blur })
+</script>
+
+<template>
+	<view :class="classes">
+		<view v-if="prefix.length > 0" class="am-input__prefix">
+			<am-icon v-if="isIcon(prefix)" :name="prefix" :size="16" :color="iconColor" />
+			<text v-else class="am-input__affix">{{ prefix }}</text>
+		</view>
+		<slot name="prefix"></slot>
+		<input
+			:id="id"
+			:name="name"
+			:class="controlClasses"
+			:value="value"
+			:type="inputType"
+			:password="type == 'password'"
+			:placeholder="placeholder"
+			:placeholder-style="placeholderStyle"
+			:maxlength="maxlength"
+			:disabled="disabled || readOnly"
+			:focus="wantFocus"
+			:confirm-type="enterkeyhint"
+			@input="onInput"
+			@focus="onFocus"
+			@blur="onBlur"
+			@confirm="onConfirm"
+		/>
+		<view v-if="showClear" class="am-input__clear" @click="clear">
+			<slot name="clearIcon">
+				<am-icon name="error-fill" :size="16" :color="clearColor" />
+			</slot>
+		</view>
+		<text v-if="showCount" class="am-input__count">{{ maxlength > 0 ? value.length + ' / ' + maxlength : value.length.toString() }}</text>
+		<view v-if="suffix.length > 0" class="am-input__suffix">
+			<am-icon v-if="isIcon(suffix)" :name="suffix" :size="16" :color="iconColor" />
+			<text v-else class="am-input__affix">{{ suffix }}</text>
+		</view>
+		<slot name="suffix"></slot>
+	</view>
+</template>
+
+<style>
+.am-input { flex-direction: row; align-items: center; }
+
+/* ---------- 尺寸 ---------- */
+.am-input--middle { min-height: var(--am-control-height, 40px); }
+.am-input--small { min-height: var(--am-control-height-sm, 30px); }
+.am-input--large { min-height: var(--am-control-height-lg, 48px); }
+.am-input--box-middle {
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-input--box-small {
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input--box-large {
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+
+/* ---------- 变体 ---------- */
+.am-input--outlined {
+	/* 聚焦时边框颜色的过渡 */
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-bg-container, #ffffff);
+}
+.am-input--filled {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-input--underlined {
+	transition-property: border-color;
+	transition-duration: 200ms;
+	padding-left: 0;
+	padding-right: 0;
+	border-radius: 0;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-border, #d9d9d9);
+}
+.am-input--borderless { min-height: 24px; }
+
+.am-input--focused-outlined { border-color: var(--am-color-primary, #1677ff); }
+.am-input--focused-filled { border-color: var(--am-color-primary, #1677ff); background-color: var(--am-color-bg-container, #ffffff); }
+.am-input--focused-underlined { border-bottom-color: var(--am-color-primary, #1677ff); }
+
+.am-input--outlined-error { border-color: var(--am-color-error, #ff4d4f); }
+.am-input--outlined-warning { border-color: var(--am-color-warning, #faad14); }
+.am-input--filled-error { background-color: var(--am-color-error-bg, #fff1f1); }
+.am-input--filled-warning { background-color: var(--am-color-warning-bg, #fff7e8); }
+.am-input--underlined-error { border-bottom-color: var(--am-color-error, #ff4d4f); }
+.am-input--underlined-warning { border-bottom-color: var(--am-color-warning, #faad14); }
+
+.am-input--disabled { opacity: 0.4; }
+
+/* ---------- 内部 ---------- */
+.am-input__control { flex: 1; height: 24px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-input__control--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-input__control--small { font-size: var(--am-font-size, 14px); }
+.am-input__control--large { font-size: var(--am-font-size-xl, 18px); }
+.am-input__control--end { text-align: right; }
+.am-input__prefix { margin-right: 8px; flex-direction: row; align-items: center; }
+.am-input__suffix { margin-left: 8px; flex-direction: row; align-items: center; }
+.am-input__affix { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-input__clear { padding: 2px; margin-left: 4px; }
+.am-input__count { margin-left: 8px; font-size: var(--am-font-size-sm, 12px); color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+</style>

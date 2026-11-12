@@ -1,0 +1,82 @@
+{
+  "*": {
+    "missingProps": {
+      "classes": "传给子组件内部节点的类在 App 端不生效（子组件自己的样式后加载）；根节点用 rootClass",
+      "styles": "内部节点的样式覆盖暂不提供，待确认 App 端对象形式的 style 透传后再加",
+      "getContainer": "uni-app x 没有挂到 body 的 Teleport，弹出层就地渲染为 fixed 节点"
+    }
+  },
+  "icon": {
+    "uniOnly": "App 端没有内联 SVG：antdv-next-mobile 用 @antdv-next/icons 的组件，这里用字体图标"
+  },
+  "loading": {
+    "uniOnly": "对应 antdv-next-mobile 内部的 Spinner；App 端没有 @keyframes，用内置的 loading 组件"
+  },
+  "button": {
+    "missingProps": {
+      "href": "uni-app x 里没有 a 标签的跳转，用 click 事件 + uni.navigateTo",
+      "target": "同 href",
+      "htmlType": "uni-app x 没有原生表单提交，Form 做好后由 Form 提供提交方式"
+    },
+    "extraProps": {
+      "text": "uvue 的样式不继承，默认插槽里的文字拿不到按钮的颜色与字号，所以文字用属性传"
+    }
+  },
+  "config-provider": {
+    "missingProps": {
+      "direction": "App 端不支持 RTL 布局",
+      "getPopupContainer": "没有 Teleport，弹出层就地渲染"
+    },
+    "extraProps": {
+      "navigationBar": "原生导航栏不受 CSS 变量影响，由页面根上的 provider 调用 uni.setNavigationBarColor"
+    }
+  },
+  "input": {
+    "missingProps": {
+      "defaultValue": "UTS 里分不出“没传”和空字符串，非受控用法请用 v-model:value",
+      "readonly": "只保留 readOnly 一种写法",
+      "clearTrigger": "清除按钮在有内容时一直显示",
+      "inputmode": "用 type（text / number / digit / tel / idcard）选择键盘",
+      "autocomplete": "原生 input 组件没有这个属性"
+    },
+    "missingEmits": {
+      "keydown": "原生 input 组件没有按键事件，回车用 pressEnter",
+      "keyup": "同 keydown",
+      "compositionstart": "原生 input 组件没有输入法组合事件",
+      "compositionend": "同 compositionstart"
+    }
+  },
+  "list": {
+    "missingProps": {
+      "bordered": "待实现",
+      "size": "待实现",
+      "dataSource": "没有数据模式：UTS 里不能把渲染函数放进属性，长列表用 uni-app x 的 list-view",
+      "renderItem": "同 dataSource",
+      "rowKey": "同 dataSource",
+      "virtual": "同 dataSource",
+      "height": "同 dataSource",
+      "itemHeight": "同 dataSource",
+      "loading": "同 dataSource",
+      "locale": "同 dataSource"
+    },
+    "missingEmits": {
+      "reachEnd": "同 dataSource"
+    }
+  },
+  "list-item": {
+    "missingProps": {
+      "href": "用 click 事件 + uni.navigateTo",
+      "target": "同 href"
+    },
+    "extraProps": {
+      "bordered": "没有 :last-child 选择器，最后一项的分隔线要自己关掉"
+    }
+  },
+  "popup": {
+    "missingProps": {
+      "lockScroll": "fixed 的遮罩已经拦住了页面的滚动",
+      "forceRender": "待实现",
+      "keyboard": "手机上没有 ESC；Android 的返回键会先关掉最上面的弹出层"
+    }
+  }
+}

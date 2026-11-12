@@ -1,0 +1,41 @@
+{
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^am-(.*)": "@/uni_modules/antdv-next-uni/components/am-$1/am-$1.uvue"
+		}
+	},
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": { "navigationBarTitleText": "Antdv Next Uni" }
+		},
+		{
+			"path": "pages/components/button",
+			"style": { "navigationBarTitleText": "Button 按钮" }
+		},
+		{
+			"path": "pages/components/input",
+			"style": { "navigationBarTitleText": "Input 输入框" }
+		},
+		{
+			"path": "pages/components/list",
+			"style": { "navigationBarTitleText": "List 列表" }
+		},
+		{
+			"path": "pages/components/popup",
+			"style": { "navigationBarTitleText": "Popup 弹出层" }
+		},
+		{
+			"path": "pages/components/config-provider",
+			"style": { "navigationBarTitleText": "ConfigProvider 全局化配置" }
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "Antdv Next Uni",
+		"navigationBarBackgroundColor": "#ffffff",
+		"backgroundColor": "#f5f5f5"
+	},
+	"uniIdRouter": {}
+}

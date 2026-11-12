@@ -1,0 +1,38 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 加载指示器（= antdv-next-mobile 内部的 Spinner）：整个库只有这一个转圈，Button、Spin、List、Toast 都用它。
+// 用内置的 loading 组件（各端原生实现）：App 端没有 @keyframes，字体图标转不起来。
+// 圆环的颜色是 border-color，且不支持 CSS 变量：color 为空时按主题取次要文字色
+defineOptions({ name: 'AmLoading' })
+
+const props = defineProps({
+	/** 圆环旁的文字 */
+	text: { type: String, default: '' },
+	/** 文字放在圆环下方 */
+	vertical: { type: Boolean, default: false },
+	color: { type: String, default: '' },
+	size: { type: Number, default: 20 }
+})
+
+const theme = useAmTheme()
+
+const spinnerStyle = computed(() : string => {
+	const color = props.color.length > 0 ? props.color : theme().colorTextTertiary
+	return 'width:' + props.size + 'px;height:' + props.size + 'px;border-color:' + color + ';'
+})
+</script>
+
+<template>
+	<view :class="['am-loading', vertical ? 'am-loading--vertical' : '']">
+		<loading :style="spinnerStyle"></loading>
+		<text v-if="text.length > 0" :class="['am-loading__text', vertical ? 'am-loading__text--vertical' : '']">{{ text }}</text>
+	</view>
+</template>
+
+<style>
+.am-loading { flex-direction: row; align-items: center; justify-content: center; }
+.am-loading--vertical { flex-direction: column; }
+.am-loading__text { margin-left: 8px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-loading__text--vertical { margin-left: 0; margin-top: 8px; }
+</style>

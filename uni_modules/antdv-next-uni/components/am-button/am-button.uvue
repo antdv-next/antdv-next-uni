@@ -1,0 +1,241 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+
+// 按钮（= antdv-next-mobile 的 Button）：type 是 color + variant 的语法糖，
+// color（default / primary / danger / success / warning）、variant（solid / outlined / dashed / filled / text / link）、
+// danger、ghost、block、size、shape、icon、iconPlacement、loading、disabled 同名同义；事件 click。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `text` 属性：uvue 的样式不继承，写在默认插槽里的文字拿不到按钮的颜色与字号（插槽仍可放自定义内容）；
+// - `icon` 是图标名（<am-icon> 的 name），不是节点；自定义图标用 `icon` 插槽；
+// - `loading` 只有布尔值，没有 `{ delay }`；没有 `href` / `target` / `htmlType`
+defineOptions({ name: 'AmButton' })
+
+const props = defineProps({
+	type: { type: String, default: 'default' },
+	color: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	danger: { type: Boolean, default: false },
+	ghost: { type: Boolean, default: false },
+	block: { type: Boolean, default: false },
+	size: { type: String, default: '' },
+	shape: { type: String, default: 'default' },
+	icon: { type: String, default: '' },
+	iconPlacement: { type: String, default: 'start' },
+	loading: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+/** type 语法糖对应的颜色 */
+const typeColor = computed(() : string => {
+	if (props.type == 'primary' || props.type == 'link') return 'primary'
+	return 'default'
+})
+
+/** type 语法糖对应的变体 */
+const typeVariant = computed(() : string => {
+	if (props.type == 'primary') return 'solid'
+	if (props.type == 'dashed') return 'dashed'
+	if (props.type == 'link') return 'link'
+	if (props.type == 'text') return 'text'
+	return 'outlined'
+})
+
+const mergedColor = computed(() : string => {
+	if (props.color.length > 0) return props.color
+	return props.danger ? 'danger' : typeColor.value
+})
+
+const mergedVariant = computed(() : string => props.variant.length > 0 ? props.variant : typeVariant.value)
+
+/** 实心按钮上的内容用反色；幽灵按钮背景透明，内容用按钮自己的颜色 */
+const solid = computed(() : boolean => mergedVariant.value == 'solid' && !props.ghost)
+
+const hasText = computed(() : boolean => props.text.length > 0)
+
+const classes = computed(() : string[] => {
+	const variant = mergedVariant.value
+	const color = mergedColor.value
+	const list : string[] = ['am-button', 'am-button--' + size.value]
+	if (props.ghost) {
+		list.push('am-button--ghost', 'am-button--ghost-' + color)
+	} else {
+		list.push('am-button--' + variant, 'am-button--' + variant + '-' + color)
+	}
+	if (variant == 'dashed') list.push('am-button--border-dashed')
+	if (variant == 'link') list.push('am-button--link')
+	if (props.block) list.push('am-button--block')
+	if (props.shape == 'round') list.push('am-button--round')
+	if (props.shape == 'circle' || (!hasText.value && variant != 'link')) list.push('am-button--icon-only-' + size.value)
+	if (props.shape == 'circle') list.push('am-button--round')
+	if (props.iconPlacement == 'end') list.push('am-button--icon-end')
+	if (disabled.value) list.push('am-button--disabled')
+	if (props.loading) list.push('am-button--loading')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const textClasses = computed(() : string[] => {
+	const list : string[] = ['am-button__text', 'am-button__text--' + size.value]
+	if (solid.value) list.push(mergedColor.value == 'default' ? 'am-button__text--solid-default' : 'am-button__text--solid')
+	else if (props.ghost && mergedColor.value == 'default') list.push('am-button__text--solid')
+	else list.push('am-button__text--' + mergedColor.value)
+	if (props.iconPlacement == 'end') list.push('am-button__text--icon-end')
+	return list
+})
+
+/** 图标与加载圈的颜色：不能继承，也不能用 CSS 变量（loading 的 border-color），在 UTS 里按主题取 */
+const contentColor = computed(() : string => {
+	const current = theme()
+	const color = mergedColor.value
+	if (solid.value) return color == 'default' ? current.colorBgContainer : current.colorTextLightSolid
+	if (props.ghost && color == 'default') return current.colorTextLightSolid
+	if (color == 'primary') return current.colorPrimary
+	if (color == 'danger') return current.colorError
+	if (color == 'success') return current.colorSuccess
+	if (color == 'warning') return current.colorWarning
+	return current.colorText
+})
+
+const iconSize = computed(() : number => size.value == 'small' ? 15 : (size.value == 'large' ? 20 : 18))
+const iconClass = computed(() : string => {
+	if (!hasText.value) return ''
+	return props.iconPlacement == 'end' ? 'am-button__icon--end' : 'am-button__icon'
+})
+const spinnerStyle = computed(() : string => 'width:' + iconSize.value + 'px;height:' + iconSize.value + 'px;border-color:' + contentColor.value + ';')
+const hoverClass = computed(() : string => disabled.value || props.loading ? 'none' : 'am-button--active')
+
+function onClick(event : UniPointerEvent) {
+	if (disabled.value || props.loading) return
+	emit('click', event)
+}
+</script>
+
+<template>
+	<view :class="classes" :hover-class="hoverClass" @click="onClick">
+		<loading v-if="loading" :style="spinnerStyle" :class="iconClass"></loading>
+		<am-icon v-else-if="icon.length > 0" :name="icon" :size="iconSize" :color="contentColor" :class="iconClass" />
+		<slot v-else name="icon"></slot>
+		<text v-if="hasText" :class="textClasses">{{ text }}</text>
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-button {
+	/* 按下（hover-class）时透明度的过渡；transition 中不能用 var() */
+	transition-property: opacity;
+	transition-duration: 200ms;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	align-self: flex-start;
+	border-width: 1px;
+	border-style: solid;
+	border-color: transparent;
+	background-color: transparent;
+}
+.am-button--icon-end { flex-direction: row-reverse; }
+
+/* ---------- 尺寸：用到变量的属性要写展开的形式 ---------- */
+.am-button--middle {
+	height: var(--am-control-height, 40px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-button--small {
+	height: var(--am-control-height-sm, 30px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-button--large {
+	height: var(--am-control-height-lg, 48px);
+	padding-left: var(--am-padding-lg, 24px);
+	padding-right: var(--am-padding-lg, 24px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+.am-button--block { align-self: stretch; }
+.am-button--round { border-radius: 999px; }
+.am-button--icon-only-middle { width: var(--am-control-height, 40px); padding-left: 0; padding-right: 0; }
+.am-button--icon-only-small { width: var(--am-control-height-sm, 30px); padding-left: 0; padding-right: 0; }
+.am-button--icon-only-large { width: var(--am-control-height-lg, 48px); padding-left: 0; padding-right: 0; }
+/* 链接按钮没有内边距；高度保留（antdv-next-mobile 是 auto）：按钮默认 align-self: flex-start，高度不一样时在一行里对不齐 */
+.am-button--link { padding-left: 0; padding-right: 0; border-width: 0; }
+.am-button--border-dashed { border-style: dashed; }
+
+/* ---------- 状态 ---------- */
+.am-button--active { opacity: 0.7; }
+.am-button--disabled { opacity: 0.4; }
+.am-button--loading { opacity: 0.65; }
+
+/* ---------- 实心 ---------- */
+.am-button--solid-default { background-color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-button--solid-primary { background-color: var(--am-color-primary, #1677ff); }
+.am-button--solid-danger { background-color: var(--am-color-error, #ff4d4f); }
+.am-button--solid-success { background-color: var(--am-color-success, #52c41a); }
+.am-button--solid-warning { background-color: var(--am-color-warning, #faad14); }
+
+/* ---------- 描边 / 虚线 ---------- */
+.am-button--outlined,
+.am-button--dashed { background-color: var(--am-color-bg-container, #ffffff); }
+.am-button--outlined-default,
+.am-button--dashed-default { border-color: var(--am-color-border, #d9d9d9); }
+.am-button--outlined-primary,
+.am-button--dashed-primary { border-color: var(--am-color-primary, #1677ff); }
+.am-button--outlined-danger,
+.am-button--dashed-danger { border-color: var(--am-color-error, #ff4d4f); }
+.am-button--outlined-success,
+.am-button--dashed-success { border-color: var(--am-color-success, #52c41a); }
+.am-button--outlined-warning,
+.am-button--dashed-warning { border-color: var(--am-color-warning, #faad14); }
+
+/* ---------- 浅色填充 ---------- */
+.am-button--filled-default { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-button--filled-primary { background-color: var(--am-color-primary-bg, #ecf4ff); }
+.am-button--filled-danger { background-color: var(--am-color-error-bg, #fff1f1); }
+.am-button--filled-success { background-color: var(--am-color-success-bg, #eef9e8); }
+.am-button--filled-warning { background-color: var(--am-color-warning-bg, #fff7e8); }
+
+/* ---------- 幽灵：背景透明，用在有色背景上 ---------- */
+.am-button--ghost-default { border-color: #ffffff; }
+.am-button--ghost-primary { border-color: var(--am-color-primary, #1677ff); }
+.am-button--ghost-danger { border-color: var(--am-color-error, #ff4d4f); }
+.am-button--ghost-success { border-color: var(--am-color-success, #52c41a); }
+.am-button--ghost-warning { border-color: var(--am-color-warning, #faad14); }
+
+/* ---------- 文字：颜色、字号不继承，写在 text 上 ---------- */
+.am-button__icon { margin-right: 6px; }
+.am-button__icon--end { margin-left: 6px; }
+.am-button__text--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-button__text--small { font-size: var(--am-font-size, 14px); }
+.am-button__text--large { font-size: var(--am-font-size-xl, 18px); }
+.am-button__text--solid { color: var(--am-color-text-light-solid, #ffffff); }
+.am-button__text--solid-default { color: var(--am-color-bg-container, #ffffff); }
+.am-button__text--default { color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-button__text--primary { color: var(--am-color-primary, #1677ff); }
+.am-button__text--danger { color: var(--am-color-error, #ff4d4f); }
+.am-button__text--success { color: var(--am-color-success, #52c41a); }
+.am-button__text--warning { color: var(--am-color-warning, #faad14); }
+</style>

@@ -1,0 +1,80 @@
+<script setup lang="uts">
+// 示例 App 的首页：分组与 antdv-next-mobile 的文档相同
+type DemoEntry = {
+	title : string
+	subtitle : string
+	icon : string
+	url : string
+}
+
+type DemoGroup = {
+	title : string
+	entries : DemoEntry[]
+}
+
+const groups : DemoGroup[] = [
+	{
+		title: '通用',
+		entries: [
+			{ title: 'Button', subtitle: '按钮', icon: 'appstore', url: '/pages/components/button' },
+			{ title: 'ConfigProvider', subtitle: '全局化配置', icon: 'setting', url: '/pages/components/config-provider' }
+		]
+	},
+	{
+		title: '数据录入',
+		entries: [
+			{ title: 'Input', subtitle: '输入框', icon: 'edit', url: '/pages/components/input' }
+		]
+	},
+	{
+		title: '数据展示',
+		entries: [
+			{ title: 'List', subtitle: '列表', icon: 'file', url: '/pages/components/list' }
+		]
+	},
+	{
+		title: '反馈',
+		entries: [
+			{ title: 'Popup', subtitle: '弹出层', icon: 'message', url: '/pages/components/popup' }
+		]
+	}
+]
+
+function open(url : string) {
+	uni.navigateTo({ url: url })
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<view class="index__hero">
+			<image class="index__logo" src="/static/logo.png" mode="aspectFit"></image>
+			<view class="index__heading">
+				<text class="index__title">Antdv Next Uni</text>
+				<text class="index__subtitle">uni-app x 组件库，与 antdv-next-mobile 同名、同属性、同主题</text>
+			</view>
+		</view>
+		<am-list v-for="group in groups" :key="group.title" :header="group.title" mode="card">
+			<am-list-item
+				v-for="(entry, index) in group.entries"
+				:key="entry.url"
+				:title="entry.title"
+				:extra="entry.subtitle"
+				:prefix="entry.icon"
+				:bordered="index < group.entries.length - 1"
+				arrow
+				@click="open(entry.url)"
+			/>
+		</am-list>
+		<view class="index__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.index__hero { flex-direction: row; align-items: center; padding: 24px 16px 12px 16px; }
+.index__logo { width: 56px; height: 56px; }
+.index__heading { flex: 1; margin-left: 12px; }
+.index__title { font-size: 22px; font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.index__subtitle { margin-top: 4px; font-size: 13px; line-height: 20px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.index__footer { height: 32px; }
+</style>

@@ -1,0 +1,44 @@
+{
+	"name": "Antdv Next Uni",
+	"appid": "",
+	"description": "Antdv Next 的 uni-app x 组件库示例：与 antdv-next-mobile 同名、同属性、同主题 token",
+	"versionName": "0.1.0",
+	"versionCode": 100,
+	"uni-app-x": {
+		"vapor": true,
+		"styleIsolationVersion": "2"
+	},
+	"vueVersion": "3",
+	"mp-weixin": {
+		"darkmode": true,
+		"appid": "",
+		"setting": {
+			"urlCheck": false,
+			"minified": true
+		},
+		"usingComponents": true
+	},
+	"web": {
+		"darkmode": true,
+		"devServer": {
+			"port": 19596
+		},
+		"router": {
+			"base": "./",
+			"mode": "hash"
+		}
+	},
+	"app-android": {
+		"distribute": {
+			"abiFilters": ["arm64-v8a"]
+		}
+	},
+	"app-ios": {
+		"distribute": {}
+	},
+	"app-harmony": {
+		"distribute": {
+			"bundleName": "com.antdvnext.uni"
+		}
+	}
+}

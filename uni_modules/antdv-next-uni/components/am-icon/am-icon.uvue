@@ -1,0 +1,33 @@
+<script setup lang="uts">
+import { AM_ICON_FONT, iconGlyph } from '../../utils/icons.uts'
+
+// 图标：字体图标（static/am-icons.ttf，App.uvue 中 loadAmIcons() 加载），名称见 utils/icons.uts 的 AM_ICON_NAMES。
+// App 端没有内联 SVG，也没有伪元素，所以不能像 antdv-next-mobile 那样用 @antdv-next/icons 的组件。
+// color 为空时用 CSS 变量中的文字色；颜色写在 text 上（uvue 的样式不继承）
+defineOptions({ name: 'AmIcon' })
+
+const props = defineProps({
+	name: { type: String, required: true },
+	size: { type: Number, default: 16 },
+	color: { type: String, default: '' }
+})
+
+const glyph = computed(() : string => iconGlyph(props.name))
+
+const style = computed(() : string => {
+	let text = 'font-family:' + AM_ICON_FONT + ';font-size:' + props.size + 'px;line-height:' + props.size + 'px;'
+	if (props.color.length > 0) text += 'color:' + props.color + ';'
+	return text
+})
+</script>
+
+<template>
+	<text class="am-icon" :style="style">{{ glyph }}</text>
+</template>
+
+<style>
+.am-icon {
+	color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	text-align: center;
+}
+</style>

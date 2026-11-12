@@ -1,0 +1,115 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled } from '../../utils/config.uts'
+
+// 列表项（= antdv-next-mobile 的 ListItem）：title、description、prefix、extra、arrow、clickable、disabled、align
+// 同名同义；事件 click；插槽 default（标题处的自定义内容）、prefix、description、extra。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - title / description / extra 是字符串，`prefix` 是图标名；自定义内容用同名插槽；
+// - `clickable` 要显式写（拿不到“有没有绑定 click”）；写了 `arrow` 时默认可点击；
+// - `arrow` 只有布尔值；没有 href / target
+defineOptions({ name: 'AmListItem' })
+
+const props = defineProps({
+	title: { type: String, default: '' },
+	description: { type: String, default: '' },
+	/** 左侧的图标名 */
+	prefix: { type: String, default: '' },
+	/** 右侧的文字 */
+	extra: { type: String, default: '' },
+	arrow: { type: Boolean, default: false },
+	clickable: { type: Boolean, default: false },
+	disabled: { type: Boolean, default: false },
+	/** 内容的垂直对齐：center / start */
+	align: { type: String, default: 'center' },
+	/** 是否画底部的分隔线（列表的最后一项可以关掉） */
+	bordered: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click'])
+
+const theme = useAmTheme()
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const canClick = computed(() : boolean => (props.clickable || props.arrow) && !disabled.value)
+const hoverClass = computed(() : string => canClick.value ? 'am-list-item--active' : 'none')
+const prefixColor = computed(() : string => theme().colorPrimary)
+const arrowColor = computed(() : string => theme().colorTextQuaternary)
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-list-item']
+	if (props.align == 'start') list.push('am-list-item--start')
+	if (disabled.value) list.push('am-list-item--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+function onClick(event : UniPointerEvent) {
+	if (canClick.value) emit('click', event)
+}
+</script>
+
+<template>
+	<view :class="classes" :hover-class="hoverClass" @click="onClick">
+		<view v-if="prefix.length > 0" class="am-list-item__prefix">
+			<am-icon :name="prefix" :size="20" :color="prefixColor" />
+		</view>
+		<slot name="prefix"></slot>
+		<view :class="['am-list-item__content', bordered ? 'am-list-item__content--bordered' : '']">
+			<view class="am-list-item__main">
+				<text v-if="title.length > 0" class="am-list-item__title">{{ title }}</text>
+				<slot></slot>
+				<text v-if="description.length > 0" class="am-list-item__description">{{ description }}</text>
+				<slot name="description"></slot>
+			</view>
+			<view class="am-list-item__extra">
+				<text v-if="extra.length > 0" class="am-list-item__extra-text">{{ extra }}</text>
+				<slot name="extra"></slot>
+			</view>
+			<am-icon v-if="arrow" name="right" :size="14" :color="arrowColor" class="am-list-item__arrow" />
+		</view>
+	</view>
+</template>
+
+<style>
+.am-list-item {
+	flex-direction: row;
+	align-items: center;
+	padding-left: var(--am-padding, 16px);
+	background-color: var(--am-color-bg-container, #ffffff);
+	transition-property: background-color;
+	transition-duration: 200ms;
+}
+.am-list-item--start { align-items: flex-start; }
+.am-list-item--active { background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-list-item--disabled { opacity: 0.4; }
+.am-list-item__prefix { margin-right: var(--am-padding-sm, 12px); }
+/* 分隔线从标题处开始（不贯穿到左侧的图标下面） */
+.am-list-item__content {
+	flex: 1;
+	flex-direction: row;
+	align-items: center;
+	/* 不写 min-height：App 端的 min-height 不含内边距，会比 Web 高出一截；高度由行高 + 内边距给出 */
+	padding-top: var(--am-padding-sm, 12px);
+	padding-bottom: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-list-item__content--bordered {
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-list-item__main { flex: 1; min-width: 64px; }
+.am-list-item__title { font-size: var(--am-font-size-lg, 16px); line-height: 26px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-list-item__description {
+	margin-top: 2px;
+	font-size: var(--am-font-size, 14px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-list-item__extra { flex-direction: row; align-items: center; justify-content: flex-end; margin-left: 12px; flex-shrink: 1; overflow: hidden; }
+.am-list-item__extra-text { font-size: var(--am-font-size-lg, 16px); line-height: 26px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); text-align: right; }
+.am-list-item__arrow { margin-left: 4px; }
+</style>

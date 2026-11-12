@@ -1,0 +1,49 @@
+<script setup lang="uts">
+const clicks = ref(0)
+const pushOn = ref(true)
+
+function onClick() {
+	clicks.value++
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<am-list header="基础用法">
+			<am-list-item title="单行列表" />
+			<am-list-item title="带额外内容" extra="内容" />
+			<am-list-item title="带描述" description="描述信息显示在标题下方" :bordered="false" />
+		</am-list>
+
+		<text class="demo__title">可点击</text>
+		<am-list :footer="'已点击 ' + clicks + ' 次'">
+			<am-list-item title="点击触发事件" arrow @click="onClick" />
+			<am-list-item title="可点击但不显示箭头" clickable @click="onClick" />
+			<am-list-item title="禁用状态" arrow disabled :bordered="false" @click="onClick" />
+		</am-list>
+
+		<text class="demo__title">图标、描述与额外内容</text>
+		<am-list>
+			<am-list-item title="账单" prefix="wallet" arrow />
+			<am-list-item title="总资产" description="含理财与余额" prefix="card" extra="¥ 12,580.00" arrow />
+			<am-list-item title="设置" prefix="setting" arrow :bordered="false" />
+		</am-list>
+
+		<text class="demo__title">卡片模式</text>
+		<am-list mode="card" header="通知">
+			<am-list-item title="消息推送">
+				<template #extra>
+					<am-button size="small" :type="pushOn ? 'primary' : 'default'" :text="pushOn ? '已开启' : '已关闭'" @click="pushOn = !pushOn" />
+				</template>
+			</am-list-item>
+			<am-list-item title="语言" extra="简体中文" arrow :bordered="false" />
+		</am-list>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+</style>

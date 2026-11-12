@@ -1,0 +1,36 @@
+// 打开着的弹出层（Modal、Drawer、下拉、选择器……都基于 am-popup）：Android 的返回键、导航栏的返回按钮应当先关掉最上面的弹出层，
+// 而不是离开页面（用户以为是关弹窗，结果页面没了）。弹出层打开时登记关闭方法，am-config-provider 的 onBackPress
+// 调用 closeAmOverlay()；页面自己写了 onBackPress 时也可以先调用它
+
+type AmOverlayEntry = {
+	id : number
+	close : () => void
+}
+
+const overlays : AmOverlayEntry[] = []
+let nextId = 1
+
+/** 登记一个打开着的弹出层，返回编号（关闭时用 removeAmOverlay 注销） */
+export function addAmOverlay(close : () => void) : number {
+	const id = nextId++
+	overlays.push({ id: id, close: close })
+	return id
+}
+
+export function removeAmOverlay(id : number) : void {
+	const index = overlays.findIndex((item) : boolean => item.id == id)
+	if (index >= 0) overlays.splice(index, 1)
+}
+
+/** 关闭最上面的弹出层：有弹出层时返回 true（onBackPress 返回它即可阻止离开页面） */
+export function closeAmOverlay() : boolean {
+	if (overlays.length == 0) return false
+	const top = overlays[overlays.length - 1]
+	overlays.splice(overlays.length - 1, 1)
+	top.close()
+	return true
+}
+
+export function hasAmOverlay() : boolean {
+	return overlays.length > 0
+}

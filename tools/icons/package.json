@@ -1,0 +1,14 @@
+{
+  "name": "antdv-next-uni-icons",
+  "private": true,
+  "description": "生成组件库的图标字体：从 @ant-design/icons-svg 挑选图标，输出 uni_modules/antdv-next-uni/static/am-icons.ttf 与 utils/icons.uts",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@ant-design/icons-svg": "4.6.0",
+    "svg2ttf": "6.0.3",
+    "svgicons2svgfont": "15.0.1"
+  }
+}

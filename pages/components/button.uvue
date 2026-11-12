@@ -1,0 +1,93 @@
+<script setup lang="uts">
+const colors : string[] = ['default', 'primary', 'danger', 'success', 'warning']
+const variants : string[] = ['solid', 'outlined', 'dashed', 'filled', 'text', 'link']
+const loading = ref(false)
+const count = ref(0)
+
+function submit() {
+	loading.value = true
+	setTimeout(() => {
+		loading.value = false
+		count.value++
+	}, 1500)
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">按钮类型</text>
+		<view class="demo__card demo__row">
+			<am-button class="demo__item" type="primary" text="Primary" />
+			<am-button class="demo__item" text="Default" />
+			<am-button class="demo__item" type="dashed" text="Dashed" />
+			<am-button class="demo__item" type="text" text="Text" />
+			<am-button class="demo__item" type="link" text="Link" />
+		</view>
+
+		<text class="demo__title">颜色与变体</text>
+		<view class="demo__card">
+			<view v-for="color in colors" :key="color" class="demo__row">
+				<am-button v-for="variant in variants" :key="variant" class="demo__item" size="small" :color="color" :variant="variant" :text="variant" />
+			</view>
+		</view>
+
+		<text class="demo__title">块级按钮</text>
+		<view class="demo__card">
+			<am-button class="demo__block" type="primary" block text="Primary Block" />
+			<am-button class="demo__block" block text="Default Block" />
+			<am-button type="primary" danger block text="Danger Block" />
+		</view>
+
+		<text class="demo__title">尺寸与形状</text>
+		<view class="demo__card demo__row">
+			<am-button class="demo__item" type="primary" size="large" text="Large" />
+			<am-button class="demo__item" type="primary" text="Middle" />
+			<am-button class="demo__item" type="primary" size="small" text="Small" />
+			<am-button class="demo__item" type="primary" shape="round" text="Round" />
+			<am-button class="demo__item" type="primary" shape="circle" icon="search" />
+			<am-button class="demo__item" shape="circle" icon="search" />
+		</view>
+
+		<text class="demo__title">图标</text>
+		<view class="demo__card demo__row">
+			<am-button class="demo__item" type="primary" icon="search" text="搜索" />
+			<am-button class="demo__item" icon="plus" text="新建" />
+			<am-button class="demo__item" color="primary" variant="filled" icon="right" icon-placement="end" text="下一步" />
+			<am-button class="demo__item" icon="search" />
+		</view>
+
+		<text class="demo__title">加载中与禁用</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button class="demo__item" type="primary" loading text="加载中" />
+				<am-button class="demo__item" loading />
+				<am-button class="demo__item" type="primary" disabled text="禁用" />
+				<am-button class="demo__item" disabled text="禁用" />
+			</view>
+			<am-button type="primary" block :loading="loading" :text="'点击提交（已提交 ' + count + ' 次）'" @click="submit" />
+		</view>
+
+		<text class="demo__title">幽灵按钮</text>
+		<view class="demo__card demo__ghost demo__row">
+			<am-button class="demo__item" type="primary" ghost text="Primary" />
+			<am-button class="demo__item" ghost text="Default" />
+			<am-button class="demo__item" type="primary" danger ghost text="Danger" />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px 16px 6px 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 8px; margin-bottom: 10px; }
+.demo__block { margin-bottom: 10px; }
+.demo__ghost { background-color: #374151; }
+.demo__footer { height: 40px; }
+</style>

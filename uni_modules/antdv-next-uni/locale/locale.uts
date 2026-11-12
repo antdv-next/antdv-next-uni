@@ -1,0 +1,155 @@
+// 语言包：结构与 antdv-next-mobile 的 locale 相同（组件名为键），内置简体中文与英文。
+// 组件里的文案一律从这里取，不写死：`const locale = useAmLocale()`，`locale().Modal.okText`
+
+export type AmLocaleCommon = {
+	confirm : string
+	cancel : string
+	close : string
+	loading : string
+	reset : string
+	done : string
+	delete : string
+	back : string
+}
+
+export type AmLocaleModal = {
+	okText : string
+	cancelText : string
+	justOkText : string
+}
+
+export type AmLocaleActionSheet = {
+	cancelText : string
+}
+
+export type AmLocalePicker = {
+	okText : string
+	cancelText : string
+	placeholder : string
+}
+
+export type AmLocaleDatePicker = {
+	placeholder : string
+	year : string
+	quarter : string
+	month : string
+	week : string
+	day : string
+	hour : string
+	minute : string
+	second : string
+}
+
+export type AmLocaleSelect = {
+	placeholder : string
+	notFoundContent : string
+}
+
+export type AmLocaleEmpty = {
+	description : string
+}
+
+export type AmLocaleInput = {
+	placeholder : string
+	clear : string
+}
+
+export type AmLocaleInputSearch = {
+	placeholder : string
+	cancelText : string
+}
+
+export type AmLocalePullToRefresh = {
+	pulling : string
+	canRelease : string
+	refreshing : string
+	complete : string
+}
+
+export type AmLocaleInfiniteScroll = {
+	loading : string
+	noMore : string
+	failed : string
+	retry : string
+}
+
+export type AmLocale = {
+	/** dayjs 风格的语言代码，如 zh-cn */
+	locale : string
+	common : AmLocaleCommon
+	Modal : AmLocaleModal
+	ActionSheet : AmLocaleActionSheet
+	Picker : AmLocalePicker
+	DatePicker : AmLocaleDatePicker
+	Select : AmLocaleSelect
+	Empty : AmLocaleEmpty
+	Input : AmLocaleInput
+	InputSearch : AmLocaleInputSearch
+	PullToRefresh : AmLocalePullToRefresh
+	InfiniteScroll : AmLocaleInfiniteScroll
+}
+
+export const zhCN : AmLocale = {
+	locale: 'zh-cn',
+	common: { confirm: '确定', cancel: '取消', close: '关闭', loading: '加载中', reset: '重置', done: '完成', delete: '删除', back: '返回' },
+	Modal: { okText: '确定', cancelText: '取消', justOkText: '知道了' },
+	ActionSheet: { cancelText: '取消' },
+	Picker: { okText: '确定', cancelText: '取消', placeholder: '请选择' },
+	DatePicker: { placeholder: '请选择日期', year: '年', quarter: '季度', month: '月', week: '周', day: '日', hour: '时', minute: '分', second: '秒' },
+	Select: { placeholder: '请选择', notFoundContent: '暂无数据' },
+	Empty: { description: '暂无数据' },
+	Input: { placeholder: '请输入', clear: '清除' },
+	InputSearch: { placeholder: '搜索', cancelText: '取消' },
+	PullToRefresh: { pulling: '下拉刷新', canRelease: '释放立即刷新', refreshing: '加载中...', complete: '刷新成功' },
+	InfiniteScroll: { loading: '加载中...', noMore: '没有更多了', failed: '加载失败', retry: '重新加载' }
+}
+
+export const enUS : AmLocale = {
+	locale: 'en',
+	common: { confirm: 'Confirm', cancel: 'Cancel', close: 'Close', loading: 'Loading', reset: 'Reset', done: 'Done', delete: 'Delete', back: 'Back' },
+	Modal: { okText: 'OK', cancelText: 'Cancel', justOkText: 'OK' },
+	ActionSheet: { cancelText: 'Cancel' },
+	Picker: { okText: 'OK', cancelText: 'Cancel', placeholder: 'Please select' },
+	DatePicker: { placeholder: 'Select date', year: '', quarter: 'Q', month: '', week: 'W', day: '', hour: '', minute: '', second: '' },
+	Select: { placeholder: 'Please select', notFoundContent: 'No data' },
+	Empty: { description: 'No data' },
+	Input: { placeholder: 'Please enter', clear: 'Clear' },
+	InputSearch: { placeholder: 'Search', cancelText: 'Cancel' },
+	PullToRefresh: { pulling: 'Pull to refresh', canRelease: 'Release to refresh', refreshing: 'Loading...', complete: 'Refreshed' },
+	InfiniteScroll: { loading: 'Loading...', noMore: 'No more', failed: 'Failed to load', retry: 'Retry' }
+}
+
+/**
+ * “沿用上层 / 全局语言”的占位（<am-config-provider> 的 locale 的默认值）：locale 为空字符串
+ */
+export const AM_INHERIT_LOCALE : AmLocale = {
+	locale: '',
+	common: zhCN.common,
+	Modal: zhCN.Modal,
+	ActionSheet: zhCN.ActionSheet,
+	Picker: zhCN.Picker,
+	DatePicker: zhCN.DatePicker,
+	Select: zhCN.Select,
+	Empty: zhCN.Empty,
+	Input: zhCN.Input,
+	InputSearch: zhCN.InputSearch,
+	PullToRefresh: zhCN.PullToRefresh,
+	InfiniteScroll: zhCN.InfiniteScroll
+}
+
+/** 全局语言（响应式）：没有给 <am-config-provider> 传 `locale` 时用它 */
+export const amLocaleState = reactive({
+	locale: zhCN
+})
+
+/** 设置全局语言（= antdv-next-mobile 的 ConfigProvider.config({ locale })） */
+export function setAmLocale(locale : AmLocale) : void {
+	amLocaleState.locale = locale
+}
+
+/** 当前语言的取值函数（在 setup 中调用）：所在的 <am-config-provider> 有 `locale` 时取它的，否则取全局语言 */
+export function useAmLocale() : () => AmLocale {
+	const local = inject<(() => AmLocale) | null>('amLocale', null)
+	if (local != null) return local
+	return () : AmLocale => amLocaleState.locale
+}

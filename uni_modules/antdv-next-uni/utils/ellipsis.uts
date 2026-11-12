@@ -1,0 +1,18 @@
+// 文字超出时省略：一行用 white-space: nowrap（全平台支持）；多行在 App 蒸汽模式用 text 的 max-lines 属性（组件属性，CSS 的 lines 已废弃），
+// Web 没有 max-lines，用 -webkit-line-clamp（条件编译，只在 Web 输出）
+
+/** 写在 text 的 style 上 */
+export function ellipsisStyle(lines : number) : string {
+	if (lines <= 0) return ''
+	if (lines == 1) return 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+	let style = 'overflow:hidden;text-overflow:ellipsis;'
+	// #ifdef WEB
+	style += 'display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:' + lines + ';'
+	// #endif
+	return style
+}
+
+/** 写在 text 的 max-lines 属性上（-1 不限制） */
+export function maxLines(lines : number) : number {
+	return lines > 1 ? lines : -1
+}

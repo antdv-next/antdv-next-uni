@@ -1,0 +1,16 @@
+<script setup lang="uts">
+import { loadAmIcons } from '@/uni_modules/antdv-next-uni/utils/icons.uts'
+
+onLaunch(() => {
+	// 图标字体全局加载一次：组件里的 <am-icon> 都用它
+	loadAmIcons()
+})
+</script>
+
+<style>
+/* #ifdef VUE3-VAPOR || WEB || MP-WEIXIN */
+page {
+	background-color: #f5f5f5;
+}
+/* #endif */
+</style>

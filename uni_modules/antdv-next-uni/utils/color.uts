@@ -1,0 +1,17 @@
+// 预设颜色名 → 颜色（Tag、Badge、Timeline 的 color 与 Antdv Next 相同：预设名或颜色值）
+
+const PRESETS = new Map<string, string>([
+	['blue', '#1677ff'], ['geekblue', '#2f54eb'], ['purple', '#722ed1'], ['magenta', '#eb2f96'],
+	['red', '#f5222d'], ['volcano', '#fa541c'], ['orange', '#fa8c16'], ['gold', '#faad14'],
+	['yellow', '#fadb14'], ['lime', '#a0d911'], ['green', '#52c41a'], ['cyan', '#13c2c2'], ['gray', '#8c8c8c']
+])
+
+/** 预设颜色名对应的颜色；不是预设名时原样返回（当作颜色值） */
+export function presetColor(name : string) : string {
+	return PRESETS.get(name) ?? name
+}
+
+/** 是否是状态色（success / processing / error / warning / default），这些颜色跟随主题 */
+export function isStatusColor(name : string) : boolean {
+	return name == 'success' || name == 'processing' || name == 'error' || name == 'warning' || name == 'default'
+}

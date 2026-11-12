@@ -1,0 +1,76 @@
+// 动效：时长与曲线同 Antdv Next 的 motion token（motionDurationMid 0.2s、motionDurationSlow 0.3s、
+// motionEaseInOut cubic-bezier(0.645, 0.045, 0.355, 1)）。App 端没有 @keyframes，只用 transition：
+// 可以过渡的是 transform、opacity、width / height、left / top、background-color、border-color（文字颜色不能过渡），
+// transition 中不能用 var()，CSS 里写字面量，UTS 拼 style 时用这里的常量。
+// 跟随选中项移动的指示器（标签页的下划线、分段控制器的滑块）用 transform 平移，不改 left：transform 不触发重新排版
+
+export const AM_EASE = 'cubic-bezier(0.645, 0.045, 0.355, 1)'
+export const AM_DURATION_MID = 200
+export const AM_DURATION_SLOW = 300
+
+/** transition 的 style 片段：properties 如 'transform, width' */
+export function amTransition(properties : string, duration : number) : string {
+	return 'transition-property:' + properties + ';transition-duration:' + duration + 'ms;transition-timing-function:' + AM_EASE + ';'
+}
+
+let uidSeed = 0
+
+/** 组件实例的唯一前缀：子元素的 id 用它拼（uni.getElementById 在整个页面中查找） */
+export function amUid(prefix : string) : string {
+	uidSeed++
+	return prefix + '-' + uidSeed
+}
+
+export type AmRect = {
+	left : number
+	top : number
+	width : number
+	height : number
+}
+
+/** 元素在窗口中的位置与大小；元素不存在或平台不支持时为 null（调用方退回没有动画的样式） */
+export function measureById(id : string) : Promise<AmRect | null> {
+	const element = uni.getElementById(id)
+	if (element == null) return Promise.resolve(null)
+	const pending = element.getBoundingClientRectAsync()
+	if (pending == null) return Promise.resolve(null)
+	return pending.then((rect : DOMRect) : AmRect | null => {
+		const result : AmRect = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+		return result
+	}).catch((_ : any | null) : AmRect | null => null)
+}
+
+/**
+ * 一组子元素（id 为 prefix + 序号）相对父元素的位置，按序号排列；量不到的为 null。
+ * 量一次存起来，选中项变化时直接取，不在点击时才去量：Android 上异步量一次要 200ms 左右，指示器会慢半拍再跳过去
+ */
+export function measureAllWithin(parentId : string, prefix : string, count : number) : Promise<(AmRect | null)[]> {
+	return measureById(parentId).then((parent : AmRect | null) : Promise<(AmRect | null)[]> => {
+		const result : (AmRect | null)[] = []
+		if (parent == null) return Promise.resolve(result)
+		function next(index : number) : Promise<(AmRect | null)[]> {
+			if (index >= count) return Promise.resolve(result)
+			return measureById(prefix + index).then((child : AmRect | null) : Promise<(AmRect | null)[]> => {
+				if (child == null) result.push(null)
+				else {
+					const rect : AmRect = { left: child.left - parent.left, top: child.top - parent.top, width: child.width, height: child.height }
+					result.push(rect)
+				}
+				return next(index + 1)
+			})
+		}
+		return next(0)
+	})
+}
+
+/** 子元素相对父元素的位置（两者都按窗口坐标量，滚动、弹出层的平移不影响差值） */
+export function measureWithin(parentId : string, childId : string) : Promise<AmRect | null> {
+	return measureById(parentId).then((parent : AmRect | null) : Promise<AmRect | null> => {
+		if (parent == null) return Promise.resolve(null)
+		return measureById(childId).then((child : AmRect | null) : AmRect | null => {
+			if (child == null) return null
+			const result : AmRect = { left: child.left - parent.left, top: child.top - parent.top, width: child.width, height: child.height }
+			return result
+		})
+	})
+}

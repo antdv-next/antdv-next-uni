@@ -1,0 +1,433 @@
+// 主题：与 antdv-next-mobile 同一套 token。
+//
+// 移动端库（H5）里派生色由 CSS 的 color-mix() 现算；uni-app x 的 App 端没有 color-mix()，变量的值也不能再引用 var()，
+// 所以这里按 antdv-next-mobile `style/tokens.css` 里完全相同的比例在 UTS 中算成字面量，
+// 再由 <am-config-provider> 写成 CSS 变量（--am-color-primary …，名称与移动端库一致）放在页面根节点上。
+// 改派生公式时两边一起改。
+//
+// 组件样式一律写 `var(--am-xxx, 字面量回退)`，回退值与默认主题一致，不包 provider 也能显示。
+
+/**
+ * 种子 / 别名 token：名称与 Antdv Next、antdv-next-mobile 的 theme.token 相同，
+ * 后台或 PC 端的主题配置可以原样传进来；不写的用默认值（或由其他 token 派生）
+ */
+export type AmThemeToken = {
+	colorPrimary ?: string
+	colorSuccess ?: string
+	colorWarning ?: string
+	colorError ?: string
+	colorInfo ?: string
+	colorLink ?: string
+	/** 文字的基色：亮色 #000，暗色 #fff */
+	colorTextBase ?: string
+	/** 背景的基色：亮色 #fff，暗色 #000 */
+	colorBgBase ?: string
+	fontSize ?: number
+	fontSizeSM ?: number
+	fontSizeLG ?: number
+	fontSizeXL ?: number
+	controlHeight ?: number
+	controlHeightXS ?: number
+	controlHeightSM ?: number
+	controlHeightLG ?: number
+	borderRadius ?: number
+	borderRadiusXS ?: number
+	borderRadiusSM ?: number
+	borderRadiusLG ?: number
+	borderRadiusXL ?: number
+	paddingXXS ?: number
+	paddingXS ?: number
+	paddingSM ?: number
+	padding ?: number
+	paddingMD ?: number
+	paddingLG ?: number
+	paddingXL ?: number
+}
+
+/**
+ * 主题配置（= antdv-next-mobile 的 ThemeConfig）。
+ * algorithm：'default' | 'dark' | 'compact'，或它们的数组（如 ['dark', 'compact']）
+ */
+export type AmThemeConfig = {
+	algorithm ?: any
+	token ?: AmThemeToken
+}
+
+/** 算好的整套主题：字段名即 Antdv Next 的 token 名（CSS 变量与组件里的 UTS 共用） */
+export type AmTheme = {
+	isDark : boolean
+	isCompact : boolean
+
+	colorPrimary : string
+	colorPrimaryBg : string
+	colorPrimaryBgHover : string
+	colorPrimaryBorder : string
+	colorPrimaryHover : string
+	colorPrimaryActive : string
+
+	colorSuccess : string
+	colorSuccessBg : string
+	colorSuccessBorder : string
+	colorSuccessActive : string
+
+	colorWarning : string
+	colorWarningBg : string
+	colorWarningBorder : string
+	colorWarningActive : string
+
+	colorError : string
+	colorErrorBg : string
+	colorErrorBgHover : string
+	colorErrorBorder : string
+	colorErrorActive : string
+
+	colorInfo : string
+	colorInfoBg : string
+	colorInfoBorder : string
+	colorLink : string
+
+	colorTextBase : string
+	colorBgBase : string
+	colorText : string
+	colorTextSecondary : string
+	colorTextTertiary : string
+	colorTextQuaternary : string
+	colorTextLightSolid : string
+
+	colorBgContainer : string
+	colorBgElevated : string
+	colorBgLayout : string
+	colorBgSpotlight : string
+	colorBgMask : string
+
+	colorFill : string
+	colorFillSecondary : string
+	colorFillTertiary : string
+	colorFillQuaternary : string
+
+	colorBorder : string
+	colorBorderSecondary : string
+	colorSplit : string
+
+	fontSize : number
+	fontSizeSM : number
+	fontSizeLG : number
+	fontSizeXL : number
+
+	controlHeight : number
+	controlHeightXS : number
+	controlHeightSM : number
+	controlHeightLG : number
+
+	borderRadius : number
+	borderRadiusXS : number
+	borderRadiusSM : number
+	borderRadiusLG : number
+	borderRadiusXL : number
+
+	paddingXXS : number
+	paddingXS : number
+	paddingSM : number
+	padding : number
+	paddingMD : number
+	paddingLG : number
+	paddingXL : number
+}
+
+// ---------- 颜色运算 ----------
+
+/** #rgb / #rrggbb → [r, g, b]；不认识的格式按黑色处理 */
+export function parseHex(color : string) : number[] {
+	let hex = color.startsWith('#') ? color.substring(1) : color
+	if (hex.length == 3) {
+		hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2)
+	}
+	if (hex.length != 6) return [0, 0, 0]
+	const value = parseInt(hex, 16)
+	if (isNaN(value)) return [0, 0, 0]
+	return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+}
+
+function toHex(channels : number[]) : string {
+	let out = '#'
+	for (let i = 0; i < 3; i++) {
+		const channel = Math.max(0, Math.min(255, Math.round(channels[i])))
+		const part = channel.toString(16)
+		out += part.length == 1 ? '0' + part : part
+	}
+	return out
+}
+
+/**
+ * = CSS 的 `color-mix(in srgb, a percent%, b)`：a 占 percent（0–100），其余为 b。
+ * 两个颜色都是不透明的十六进制颜色，结果也是
+ */
+export function mixColor(a : string, percent : number, b : string) : string {
+	const ca = parseHex(a)
+	const cb = parseHex(b)
+	const weight = percent / 100
+	const mixed : number[] = []
+	for (let i = 0; i < 3; i++) mixed.push(ca[i] * weight + cb[i] * (1 - weight))
+	return toHex(mixed)
+}
+
+/** = `color-mix(in srgb, color percent%, transparent)`：带透明度的颜色（rgba 字符串） */
+export function alphaColor(color : string, percent : number) : string {
+	const c = parseHex(color)
+	return 'rgba(' + c[0] + ', ' + c[1] + ', ' + c[2] + ', ' + (percent / 100) + ')'
+}
+
+// ---------- 算法 ----------
+
+export const AM_ALGORITHM_DEFAULT = 'default'
+export const AM_ALGORITHM_DARK = 'dark'
+export const AM_ALGORITHM_COMPACT = 'compact'
+
+/** algorithm 可以是一个名称，也可以是名称的数组 */
+function algorithmNames(algorithm : any | null) : string[] {
+	const names : string[] = []
+	if (algorithm == null) return names
+	if (typeof algorithm == 'string') {
+		names.push(algorithm as string)
+	} else if (Array.isArray(algorithm)) {
+		const list = algorithm as any[]
+		for (let i = 0; i < list.length; i++) {
+			if (typeof list[i] == 'string') names.push(list[i] as string)
+		}
+	}
+	return names
+}
+
+const EMPTY_TOKEN : AmThemeToken = {}
+/** 空配置：表示“沿用上层 / 全局主题”（<am-config-provider> 的 theme 的默认值） */
+export const AM_INHERIT_THEME : AmThemeConfig = {}
+const EMPTY_CONFIG : AmThemeConfig = AM_INHERIT_THEME
+
+/**
+ * 由配置算出整套主题。比例与 antdv-next-mobile 的 tokens.css 一一对应：
+ * 亮色 / 暗色只换“种子”（基色、混合比例），派生公式是同一套
+ */
+export function deriveTheme(config : AmThemeConfig) : AmTheme {
+	const token = config.token ?? EMPTY_TOKEN
+	const names = algorithmNames(config.algorithm)
+	const dark = names.includes(AM_ALGORITHM_DARK)
+	const compact = names.includes(AM_ALGORITHM_COMPACT)
+
+	// 种子：品牌色与功能色（暗色下默认值略暗）
+	const primary = token.colorPrimary ?? (dark ? '#1668dc' : '#1677ff')
+	const success = token.colorSuccess ?? (dark ? '#49aa19' : '#52c41a')
+	const warning = token.colorWarning ?? (dark ? '#d89614' : '#faad14')
+	const error = token.colorError ?? (dark ? '#dc4446' : '#ff4d4f')
+	const info = token.colorInfo ?? primary
+
+	// 种子：中性色的基色与混合比例
+	const textBase = token.colorTextBase ?? (dark ? '#ffffff' : '#000000')
+	const bgBase = token.colorBgBase ?? (dark ? '#000000' : '#ffffff')
+	const mixLight = dark ? '#000000' : '#ffffff'
+	const mixDark = dark ? '#ffffff' : '#000000'
+	const alphaText = dark ? 85 : 88
+	const mixBgContainer = dark ? 8 : 0
+	const mixBgElevated = dark ? 12 : 0
+	const mixBgLayout = dark ? 0 : 4
+	const mixBgSpotlight = dark ? 26 : 85
+	const alphaFill = dark ? 18 : 15
+	const alphaFillSecondary = dark ? 12 : 6
+	const alphaFillTertiary = dark ? 8 : 4
+	const alphaFillQuaternary = dark ? 4 : 2
+	const mixBorder = dark ? 26 : 15
+	const mixBorderSecondary = dark ? 19 : 6
+	const alphaSplit = dark ? 12 : 6
+
+	const bgContainer = mixColor(textBase, mixBgContainer, bgBase)
+
+	return {
+		isDark: dark,
+		isCompact: compact,
+
+		colorPrimary: primary,
+		colorPrimaryBg: mixColor(primary, 8, bgContainer),
+		colorPrimaryBgHover: mixColor(primary, 16, bgContainer),
+		colorPrimaryBorder: mixColor(primary, 45, bgContainer),
+		colorPrimaryHover: mixColor(primary, 82, mixLight),
+		colorPrimaryActive: mixColor(primary, 85, mixDark),
+
+		colorSuccess: success,
+		colorSuccessBg: mixColor(success, 10, bgContainer),
+		colorSuccessBorder: mixColor(success, 45, bgContainer),
+		colorSuccessActive: mixColor(success, 85, mixDark),
+
+		colorWarning: warning,
+		colorWarningBg: mixColor(warning, 10, bgContainer),
+		colorWarningBorder: mixColor(warning, 45, bgContainer),
+		colorWarningActive: mixColor(warning, 85, mixDark),
+
+		colorError: error,
+		colorErrorBg: mixColor(error, 8, bgContainer),
+		colorErrorBgHover: mixColor(error, 16, bgContainer),
+		colorErrorBorder: mixColor(error, 45, bgContainer),
+		colorErrorActive: mixColor(error, 85, mixDark),
+
+		colorInfo: info,
+		colorInfoBg: mixColor(info, 8, bgContainer),
+		colorInfoBorder: mixColor(info, 45, bgContainer),
+		colorLink: token.colorLink ?? primary,
+
+		colorTextBase: textBase,
+		colorBgBase: bgBase,
+		colorText: alphaColor(textBase, alphaText),
+		colorTextSecondary: alphaColor(textBase, 65),
+		colorTextTertiary: alphaColor(textBase, 45),
+		colorTextQuaternary: alphaColor(textBase, 25),
+		colorTextLightSolid: '#ffffff',
+
+		colorBgContainer: bgContainer,
+		colorBgElevated: mixColor(textBase, mixBgElevated, bgBase),
+		colorBgLayout: mixColor(textBase, mixBgLayout, bgBase),
+		colorBgSpotlight: mixColor(textBase, mixBgSpotlight, bgBase),
+		colorBgMask: dark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.45)',
+
+		colorFill: alphaColor(textBase, alphaFill),
+		colorFillSecondary: alphaColor(textBase, alphaFillSecondary),
+		colorFillTertiary: alphaColor(textBase, alphaFillTertiary),
+		colorFillQuaternary: alphaColor(textBase, alphaFillQuaternary),
+
+		colorBorder: mixColor(textBase, mixBorder, bgBase),
+		colorBorderSecondary: mixColor(textBase, mixBorderSecondary, bgBase),
+		colorSplit: alphaColor(textBase, alphaSplit),
+
+		fontSize: token.fontSize ?? (compact ? 13 : 14),
+		fontSizeSM: token.fontSizeSM ?? (compact ? 11 : 12),
+		fontSizeLG: token.fontSizeLG ?? (compact ? 15 : 16),
+		fontSizeXL: token.fontSizeXL ?? (compact ? 17 : 18),
+
+		controlHeight: token.controlHeight ?? (compact ? 34 : 40),
+		controlHeightXS: token.controlHeightXS ?? (compact ? 20 : 24),
+		controlHeightSM: token.controlHeightSM ?? (compact ? 26 : 30),
+		controlHeightLG: token.controlHeightLG ?? (compact ? 42 : 48),
+
+		borderRadius: token.borderRadius ?? (compact ? 6 : 8),
+		borderRadiusXS: token.borderRadiusXS ?? 2,
+		borderRadiusSM: token.borderRadiusSM ?? 4,
+		borderRadiusLG: token.borderRadiusLG ?? (compact ? 8 : 12),
+		borderRadiusXL: token.borderRadiusXL ?? (compact ? 12 : 16),
+
+		paddingXXS: token.paddingXXS ?? (compact ? 2 : 4),
+		paddingXS: token.paddingXS ?? (compact ? 6 : 8),
+		paddingSM: token.paddingSM ?? (compact ? 8 : 12),
+		padding: token.padding ?? (compact ? 12 : 16),
+		paddingMD: token.paddingMD ?? (compact ? 16 : 20),
+		paddingLG: token.paddingLG ?? (compact ? 20 : 24),
+		paddingXL: token.paddingXL ?? (compact ? 24 : 32)
+	}
+}
+
+/**
+ * 主题的 CSS 变量（style 字符串；小程序上对象形式的 style 绑定 CSS 变量会失效，统一用字符串）。
+ * 变量名与 antdv-next-mobile 相同：colorPrimaryBg → --am-color-primary-bg
+ */
+export function themeStyle(theme : AmTheme) : string {
+	return '--am-color-primary:' + theme.colorPrimary + ';' +
+		'--am-color-primary-bg:' + theme.colorPrimaryBg + ';' +
+		'--am-color-primary-bg-hover:' + theme.colorPrimaryBgHover + ';' +
+		'--am-color-primary-border:' + theme.colorPrimaryBorder + ';' +
+		'--am-color-primary-hover:' + theme.colorPrimaryHover + ';' +
+		'--am-color-primary-active:' + theme.colorPrimaryActive + ';' +
+		'--am-color-success:' + theme.colorSuccess + ';' +
+		'--am-color-success-bg:' + theme.colorSuccessBg + ';' +
+		'--am-color-success-border:' + theme.colorSuccessBorder + ';' +
+		'--am-color-success-active:' + theme.colorSuccessActive + ';' +
+		'--am-color-warning:' + theme.colorWarning + ';' +
+		'--am-color-warning-bg:' + theme.colorWarningBg + ';' +
+		'--am-color-warning-border:' + theme.colorWarningBorder + ';' +
+		'--am-color-warning-active:' + theme.colorWarningActive + ';' +
+		'--am-color-error:' + theme.colorError + ';' +
+		'--am-color-error-bg:' + theme.colorErrorBg + ';' +
+		'--am-color-error-bg-hover:' + theme.colorErrorBgHover + ';' +
+		'--am-color-error-border:' + theme.colorErrorBorder + ';' +
+		'--am-color-error-active:' + theme.colorErrorActive + ';' +
+		'--am-color-info:' + theme.colorInfo + ';' +
+		'--am-color-info-bg:' + theme.colorInfoBg + ';' +
+		'--am-color-info-border:' + theme.colorInfoBorder + ';' +
+		'--am-color-link:' + theme.colorLink + ';' +
+		'--am-color-text:' + theme.colorText + ';' +
+		'--am-color-text-secondary:' + theme.colorTextSecondary + ';' +
+		'--am-color-text-tertiary:' + theme.colorTextTertiary + ';' +
+		'--am-color-text-quaternary:' + theme.colorTextQuaternary + ';' +
+		'--am-color-text-light-solid:' + theme.colorTextLightSolid + ';' +
+		'--am-color-bg-container:' + theme.colorBgContainer + ';' +
+		'--am-color-bg-elevated:' + theme.colorBgElevated + ';' +
+		'--am-color-bg-layout:' + theme.colorBgLayout + ';' +
+		'--am-color-bg-spotlight:' + theme.colorBgSpotlight + ';' +
+		'--am-color-bg-mask:' + theme.colorBgMask + ';' +
+		'--am-color-fill:' + theme.colorFill + ';' +
+		'--am-color-fill-secondary:' + theme.colorFillSecondary + ';' +
+		'--am-color-fill-tertiary:' + theme.colorFillTertiary + ';' +
+		'--am-color-fill-quaternary:' + theme.colorFillQuaternary + ';' +
+		'--am-color-border:' + theme.colorBorder + ';' +
+		'--am-color-border-secondary:' + theme.colorBorderSecondary + ';' +
+		'--am-color-split:' + theme.colorSplit + ';' +
+		'--am-font-size:' + theme.fontSize + 'px;' +
+		'--am-font-size-sm:' + theme.fontSizeSM + 'px;' +
+		'--am-font-size-lg:' + theme.fontSizeLG + 'px;' +
+		'--am-font-size-xl:' + theme.fontSizeXL + 'px;' +
+		'--am-control-height:' + theme.controlHeight + 'px;' +
+		'--am-control-height-xs:' + theme.controlHeightXS + 'px;' +
+		'--am-control-height-sm:' + theme.controlHeightSM + 'px;' +
+		'--am-control-height-lg:' + theme.controlHeightLG + 'px;' +
+		'--am-border-radius:' + theme.borderRadius + 'px;' +
+		'--am-border-radius-xs:' + theme.borderRadiusXS + 'px;' +
+		'--am-border-radius-sm:' + theme.borderRadiusSM + 'px;' +
+		'--am-border-radius-lg:' + theme.borderRadiusLG + 'px;' +
+		'--am-border-radius-xl:' + theme.borderRadiusXL + 'px;' +
+		'--am-padding-xxs:' + theme.paddingXXS + 'px;' +
+		'--am-padding-xs:' + theme.paddingXS + 'px;' +
+		'--am-padding-sm:' + theme.paddingSM + 'px;' +
+		'--am-padding:' + theme.padding + 'px;' +
+		'--am-padding-md:' + theme.paddingMD + 'px;' +
+		'--am-padding-lg:' + theme.paddingLG + 'px;' +
+		'--am-padding-xl:' + theme.paddingXL + 'px;'
+}
+
+// ---------- 全局主题 ----------
+
+/**
+ * 全局主题（响应式）：没有给 <am-config-provider> 传 `theme` 时用它。
+ * 相当于 antdv-next-mobile 的 `applyTheme()` / `ConfigProvider.config({ theme })`
+ */
+export const amThemeState = reactive({
+	config: EMPTY_CONFIG,
+	theme: deriveTheme(EMPTY_CONFIG)
+})
+
+/** 设置全局主题：所有没有自己 `theme` 的 <am-config-provider> 跟着变 */
+export function setAmTheme(config : AmThemeConfig) : void {
+	amThemeState.config = config
+	amThemeState.theme = deriveTheme(config)
+}
+
+/** 配置里是否写了内容（空配置表示“沿用上层 / 全局主题”） */
+export function hasThemeConfig(config : AmThemeConfig) : boolean {
+	return config.algorithm != null || config.token != null
+}
+
+/**
+ * 当前主题的取值函数（在 setup 中调用）：所在的 <am-config-provider> 有自己的 `theme` 时取它的，否则取全局主题。
+ * 不能用 CSS 变量的地方（placeholder-style、loading 的颜色、transition、Canvas）用它在 UTS 里取颜色：
+ *
+ *     const theme = useAmTheme()
+ *     const color = computed(() : string => theme().colorPrimary)
+ */
+export function useAmTheme() : () => AmTheme {
+	const local = inject<(() => AmTheme) | null>('amTheme', null)
+	if (local != null) return local
+	return () : AmTheme => amThemeState.theme
+}
+
+/** 原生导航栏的颜色跟随主题（CSS 变量管不到原生导航栏） */
+export function applyNavigationBar(theme : AmTheme) : void {
+	uni.setNavigationBarColor({
+		frontColor: theme.isDark ? '#ffffff' : '#000000',
+		backgroundColor: theme.colorBgContainer,
+		fail: (_) => {}
+	})
+}

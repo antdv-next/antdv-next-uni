@@ -1,0 +1,65 @@
+<script setup lang="uts">
+// 列表（= antdv-next-mobile 的 List）：移动端最常用的单元格列表。header、footer、mode（default / card）同名同义，
+// 列表项用 <am-list-item>。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - header / footer 是字符串，自定义内容用同名插槽；
+// - 没有数据模式（dataSource / renderItem / virtual）：长列表请用 uni-app x 的 list-view
+defineOptions({ name: 'AmList' })
+
+const props = defineProps({
+	header: { type: String, default: '' },
+	footer: { type: String, default: '' },
+	/** card：带外边距的圆角卡片 */
+	mode: { type: String, default: 'default' },
+	rootClass: { type: String, default: '' }
+})
+
+// 列表项据此决定要不要画分隔线之外的东西（预留：尺寸等）
+provide('amListMode', () : string => props.mode)
+</script>
+
+<template>
+	<view :class="['am-list', rootClass]">
+		<text v-if="header.length > 0" :class="['am-list__header', mode == 'card' ? 'am-list__header--card' : '']">{{ header }}</text>
+		<slot name="header"></slot>
+		<view :class="['am-list__body', mode == 'card' ? 'am-list__body--card' : '']">
+			<slot></slot>
+		</view>
+		<text v-if="footer.length > 0" :class="['am-list__footer', mode == 'card' ? 'am-list__footer--card' : '']">{{ footer }}</text>
+		<slot name="footer"></slot>
+	</view>
+</template>
+
+<style>
+.am-list__header {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	font-size: var(--am-font-size, 14px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-list__header--card { padding-left: 28px; padding-right: 28px; }
+.am-list__footer {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	font-size: var(--am-font-size-sm, 12px);
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-list__footer--card { padding-left: 28px; padding-right: 28px; }
+.am-list__body {
+	background-color: var(--am-color-bg-container, #ffffff);
+	overflow: hidden;
+}
+.am-list__body--card {
+	margin-left: 12px;
+	margin-right: 12px;
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+</style>

@@ -1,0 +1,165 @@
+// 由 tools/icons/build.mjs 生成，不要手改：图标名称 → 字体中的字符（字体为 static/am-icons.ttf，Ant Design Icons，MIT）
+
+/** 图标字体的名称（uni.loadFontFace 的 family） */
+export const AM_ICON_FONT = 'am-icons'
+
+const ICON_CODES = new Map<string, number>([
+	['left', 0xe600],
+	['right', 0xe601],
+	['up', 0xe602],
+	['down', 0xe603],
+	['close', 0xe604],
+	['check', 0xe605],
+	['plus', 0xe606],
+	['minus', 0xe607],
+	['search', 0xe608],
+	['home', 0xe609],
+	['home-fill', 0xe60a],
+	['appstore', 0xe60b],
+	['appstore-fill', 0xe60c],
+	['cart', 0xe60d],
+	['shopping', 0xe60e],
+	['shopping-fill', 0xe60f],
+	['user', 0xe610],
+	['heart', 0xe611],
+	['heart-fill', 0xe612],
+	['star', 0xe613],
+	['star-fill', 0xe614],
+	['delete', 0xe615],
+	['edit', 0xe616],
+	['share', 0xe617],
+	['setting', 0xe618],
+	['location', 0xe619],
+	['phone', 0xe61a],
+	['message', 0xe61b],
+	['bell', 0xe61c],
+	['gift', 0xe61d],
+	['wallet', 0xe61e],
+	['card', 0xe61f],
+	['car', 0xe620],
+	['shop', 0xe621],
+	['tag', 0xe622],
+	['fire', 0xe623],
+	['clock', 0xe624],
+	['file', 0xe625],
+	['service', 0xe626],
+	['more', 0xe627],
+	['filter', 0xe628],
+	['scan', 0xe629],
+	['camera', 0xe62a],
+	['picture', 0xe62b],
+	['eye', 0xe62c],
+	['eye-off', 0xe62d],
+	['lock', 0xe62e],
+	['logout', 0xe62f],
+	['reload', 0xe630],
+	['loading', 0xe631],
+	['info', 0xe632],
+	['info-fill', 0xe633],
+	['success', 0xe634],
+	['success-fill', 0xe635],
+	['error', 0xe636],
+	['error-fill', 0xe637],
+	['warning', 0xe638],
+	['warning-fill', 0xe639],
+	['question', 0xe63a],
+	['coupon', 0xe63b],
+	['order', 0xe63c],
+	['undo', 0xe63d],
+	['inbox', 0xe63e],
+	['robot', 0xe63f],
+])
+
+/** 收录的图标名称（示例页列出全部图标） */
+export const AM_ICON_NAMES : string[] = [
+	'left',
+	'right',
+	'up',
+	'down',
+	'close',
+	'check',
+	'plus',
+	'minus',
+	'search',
+	'home',
+	'home-fill',
+	'appstore',
+	'appstore-fill',
+	'cart',
+	'shopping',
+	'shopping-fill',
+	'user',
+	'heart',
+	'heart-fill',
+	'star',
+	'star-fill',
+	'delete',
+	'edit',
+	'share',
+	'setting',
+	'location',
+	'phone',
+	'message',
+	'bell',
+	'gift',
+	'wallet',
+	'card',
+	'car',
+	'shop',
+	'tag',
+	'fire',
+	'clock',
+	'file',
+	'service',
+	'more',
+	'filter',
+	'scan',
+	'camera',
+	'picture',
+	'eye',
+	'eye-off',
+	'lock',
+	'logout',
+	'reload',
+	'loading',
+	'info',
+	'info-fill',
+	'success',
+	'success-fill',
+	'error',
+	'error-fill',
+	'warning',
+	'warning-fill',
+	'question',
+	'coupon',
+	'order',
+	'undo',
+	'inbox',
+	'robot',
+]
+
+/** 图标对应的字符；不认识的名称返回空字符串（不显示） */
+export function iconGlyph(name : string) : string {
+	const code = ICON_CODES.get(name)
+	return code == null ? '' : String.fromCharCode(code)
+}
+
+let loaded = false
+
+/**
+ * 加载图标字体（App.uvue 的 onLaunch 中调用一次）。global 为 true 时全部页面可用；
+ * 多次调用只加载一次
+ */
+export function loadAmIcons() : void {
+	if (loaded) return
+	loaded = true
+	uni.loadFontFace({
+		global: true,
+		family: AM_ICON_FONT,
+		source: "url('/uni_modules/antdv-next-uni/static/am-icons.ttf')",
+		fail: (error) => {
+			loaded = false
+			console.error('[antdv-next-uni] 图标字体加载失败', error)
+		}
+	})
+}
