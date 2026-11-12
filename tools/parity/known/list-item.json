@@ -1,0 +1,9 @@
+{
+  "missingProps": {
+    "href": "用 click 事件 + uni.navigateTo",
+    "target": "同 href"
+  },
+  "extraProps": {
+    "bordered": "没有 :last-child 选择器，最后一项的分隔线要自己关掉"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "missingProps": {
+    "lockScroll": "fixed 的遮罩已经拦住了页面的滚动",
+    "forceRender": "待实现",
+    "keyboard": "手机上没有 ESC；Android 的返回键会先关掉最上面的弹出层"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "missingProps": {
+    "href": "uni-app x 里没有 a 标签的跳转，用 click 事件 + uni.navigateTo",
+    "target": "同 href",
+    "htmlType": "uni-app x 没有原生表单提交，Form 做好后由 Form 提供提交方式"
+  },
+  "extraProps": {
+    "text": "uvue 的样式不继承，默认插槽里的文字拿不到按钮的颜色与字号，所以文字用属性传"
+  }
+}

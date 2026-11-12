@@ -7,7 +7,7 @@
 //
 // 做法：读移动端每个组件的 interface.ts（XxxProps 的字段、XxxEmits 的键），读 uni 端组件的
 // defineProps({...}) / defineEmits([...])，逐个比较。uni-app x 做不到、或有意不同的地方登记在
-// known-differences.json（带原因），其余的差异都算缺陷。
+// known/<组件>.json（带原因），其余的差异都算缺陷。
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -18,7 +18,15 @@ const root = join(here, '..', '..')
 const mobileRoot = process.env.MOBILE_DIR ?? join(root, '..', 'antdv-next-mobile')
 const mobileSrc = join(mobileRoot, 'packages', 'antdv-next-mobile', 'src')
 const uniComponents = join(root, 'uni_modules', 'antdv-next-uni', 'components')
-const known = JSON.parse(readFileSync(join(here, 'known-differences.json'), 'utf8'))
+// 每个组件一个文件（tools/parity/known/<组件>.json），所有组件共有的差异在 _common.json
+const knownDir = join(here, 'known')
+const known = {}
+for (const file of readdirSync(knownDir)) {
+  if (!file.endsWith('.json'))
+    continue
+  const name = file.slice(0, -5)
+  known[name === '_common' ? '*' : name] = JSON.parse(readFileSync(join(knownDir, file), 'utf8'))
+}
 
 if (!existsSync(mobileSrc)) {
   console.error(`找不到 antdv-next-mobile 的源码：${mobileSrc}\n用 MOBILE_DIR 指定它的仓库目录。`)
@@ -151,7 +159,7 @@ for (const component of components) {
     uniOnly.push(component)
     if (!entry.uniOnly) {
       unexpected++
-      console.log(`\n✖ am-${component}：antdv-next-mobile 中没有对应的组件（若是 uni 端特有的，在 known-differences.json 里写 "uniOnly": "原因"）`)
+      console.log(`\n✖ am-${component}：antdv-next-mobile 中没有对应的组件（若是 uni 端特有的，在 tools/parity/known/<组件>.json 里写 "uniOnly": "原因"）`)
     }
     continue
   }
@@ -198,10 +206,10 @@ for (const component of components) {
 console.log(`\n共比较 ${compared} 个组件；uni 端特有 ${uniOnly.length} 个${uniOnly.length ? `（${uniOnly.map(n => `am-${n}`).join('、')}）` : ''}。`)
 if (staleEntries.length) {
   unexpected += staleEntries.length
-  console.log(`\n✖ known-differences.json 里有已经不存在的差异，请删掉：\n  ${staleEntries.join('\n  ')}`)
+  console.log(`\n✖ tools/parity/known/ 里有已经不存在的差异，请删掉：\n  ${staleEntries.join('\n  ')}`)
 }
 if (unexpected > 0) {
-  console.log(`\n✖ ${unexpected} 处未登记的差异。要么对齐，要么登记到 tools/parity/known-differences.json 并写明原因。`)
+  console.log(`\n✖ ${unexpected} 处未登记的差异。要么对齐，要么登记到 tools/parity/known/<组件>.json 并写明原因。`)
   if (!reportOnly)
     process.exit(1)
 }

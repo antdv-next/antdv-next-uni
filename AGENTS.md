@@ -11,7 +11,7 @@
    `interface.ts` 和文档。
 2. **对齐的是接口和设计，不是代码**。移动端库是 TS + DOM + 完整 CSS，App 端编译不了；这里是独立的 uvue + UTS 实现。
 3. **做不到的差异要登记**。uni-app x 的限制导致的差异写在组件顶部的注释里，并登记到
-   `tools/parity/known-differences.json`（带原因）。`node tools/parity/check.mjs` 不通过不能合并。
+   `tools/parity/known/<组件>.json`（带原因）。`node tools/parity/check.mjs` 不通过不能合并。
 
 ## 目录
 
@@ -42,7 +42,7 @@ import { useAmTheme } from '../../theme/theme.uts'
 import { useAmDisabled, useAmSize } from '../../utils/config.uts'
 
 // 第一段注释：对应 antdv-next-mobile 的哪个组件、哪些属性同名同义；
-// 第二段：与它的差异及原因（同时登记到 tools/parity/known-differences.json）
+// 第二段：与它的差异及原因（同时登记到 tools/parity/known/<组件>.json）
 defineOptions({ name: 'AmFoo' })
 
 const props = defineProps({

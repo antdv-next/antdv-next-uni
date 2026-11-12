@@ -1,0 +1,29 @@
+// 多个组件共用的类型（UTS 中对象要对应声明过的 type，不能直接传对象字面量）。
+// UTS 的对象 type 会编译成运行时的类：再导出要写 `export { AmOption } from …`，不能写 `export type { }`。
+// 只属于一个组件的类型放在 `types/<组件>.uts`，不要都堆在这里
+
+export { AmTheme, AmThemeConfig, AmThemeToken } from '../theme/theme.uts'
+export { AmLocale } from '../locale/locale.uts'
+
+/**
+ * 选项：select / radio / checkbox / segmented / cascader 共用（= antdv-next-mobile 各组件的 options 项）。
+ * value 可以是字符串、数字或布尔，比较时一方是数字就按数字比
+ */
+export type AmOption = {
+	label : string
+	value : any | null
+	disabled ?: boolean
+	/** 补充说明（卡片选择、列表式单选中显示在名称下方） */
+	description ?: string | null
+	/** 级联的下级 */
+	children ?: AmOption[] | null
+	/** 级联逐级加载时：没有下级（同 Antdv Next Cascader 的 isLeaf） */
+	isLeaf ?: boolean | null
+}
+
+/** 选项的字段名（同 Antdv Next 的 fieldNames） */
+export type AmFieldNames = {
+	label ?: string
+	value ?: string
+	children ?: string
+}

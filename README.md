@@ -64,7 +64,7 @@ setAmTheme({ algorithm: ['dark', 'compact'], token: { colorPrimary: '#00b96b', b
 - 没有 Teleport：弹出层放在页面根节点下；没有 `getContainer`。
 - 没有 `classes` / `styles`，根节点用 `rootClass`。
 
-完整的差异清单在 [tools/parity/known-differences.json](./tools/parity/known-differences.json)，
+完整的差异清单在 [tools/parity/known/](./tools/parity/known/)，
 由 `node tools/parity/check.mjs` 自动核对。
 
 ## 开发

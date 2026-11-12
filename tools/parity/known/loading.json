@@ -1,0 +1,3 @@
+{
+  "uniOnly": "对应 antdv-next-mobile 内部的 Spinner；App 端没有 @keyframes，用内置的 loading 组件"
+}

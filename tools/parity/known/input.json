@@ -1,0 +1,15 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和空字符串，非受控用法请用 v-model:value",
+    "readonly": "只保留 readOnly 一种写法",
+    "clearTrigger": "清除按钮在有内容时一直显示",
+    "inputmode": "用 type（text / number / digit / tel / idcard）选择键盘",
+    "autocomplete": "原生 input 组件没有这个属性"
+  },
+  "missingEmits": {
+    "keydown": "原生 input 组件没有按键事件，回车用 pressEnter",
+    "keyup": "同 keydown",
+    "compositionstart": "原生 input 组件没有输入法组合事件",
+    "compositionend": "同 compositionstart"
+  }
+}

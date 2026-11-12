@@ -1,0 +1,7 @@
+{
+  "missingProps": {
+    "classes": "传给子组件内部节点的类在 App 端不生效（子组件自己的样式后加载）；根节点用 rootClass",
+    "styles": "内部节点的样式覆盖暂不提供，待确认 App 端对象形式的 style 透传后再加",
+    "getContainer": "uni-app x 没有挂到 body 的 Teleport，弹出层就地渲染为 fixed 节点"
+  }
+}

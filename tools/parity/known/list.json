@@ -1,0 +1,17 @@
+{
+  "missingProps": {
+    "bordered": "待实现",
+    "size": "待实现",
+    "dataSource": "没有数据模式：UTS 里不能把渲染函数放进属性，长列表用 uni-app x 的 list-view",
+    "renderItem": "同 dataSource",
+    "rowKey": "同 dataSource",
+    "virtual": "同 dataSource",
+    "height": "同 dataSource",
+    "itemHeight": "同 dataSource",
+    "loading": "同 dataSource",
+    "locale": "同 dataSource"
+  },
+  "missingEmits": {
+    "reachEnd": "同 dataSource"
+  }
+}

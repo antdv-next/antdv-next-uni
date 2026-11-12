@@ -1,5 +1,10 @@
 // 语言包：结构与 antdv-next-mobile 的 locale 相同（组件名为键），内置简体中文与英文。
-// 组件里的文案一律从这里取，不写死：`const locale = useAmLocale()`，`locale().Modal.okText`
+// 组件里的文案一律从这里取，不写死：`const locale = useAmLocale()`，`locale().Modal.okText`。
+//
+// 与 antdv-next-mobile 的差异：
+// - UTS 的类型里不能放函数与元组：`DatePicker.rangePlaceholder` 拆成 rangeStartPlaceholder / rangeEndPlaceholder，
+//   `Calendar.rangePrompt(maxRange)` 改成带 ${maxRange} 的模板字符串 `Calendar.rangePrompt`；
+// - `Form.defaultValidateMessages` 只有最常用的 `required` 模板（${label} 为字段名）
 
 export type AmLocaleCommon = {
 	confirm : string
@@ -18,6 +23,11 @@ export type AmLocaleModal = {
 	justOkText : string
 }
 
+export type AmLocalePopconfirm = {
+	okText : string
+	cancelText : string
+}
+
 export type AmLocaleActionSheet = {
 	cancelText : string
 }
@@ -30,6 +40,8 @@ export type AmLocalePicker = {
 
 export type AmLocaleDatePicker = {
 	placeholder : string
+	rangeStartPlaceholder : string
+	rangeEndPlaceholder : string
 	year : string
 	quarter : string
 	month : string
@@ -38,6 +50,31 @@ export type AmLocaleDatePicker = {
 	hour : string
 	minute : string
 	second : string
+	am : string
+	pm : string
+}
+
+export type AmLocaleTimePicker = {
+	placeholder : string
+}
+
+export type AmLocaleCalendar = {
+	title : string
+	confirm : string
+	today : string
+	start : string
+	end : string
+	startEnd : string
+	monthFormat : string
+	/** 星期的名称，周日在前 */
+	weekdays : string[]
+	/** 超出可选天数时的提示，${maxRange} 为天数 */
+	rangePrompt : string
+}
+
+export type AmLocaleCascader = {
+	placeholder : string
+	select : string
 }
 
 export type AmLocaleSelect = {
@@ -47,6 +84,16 @@ export type AmLocaleSelect = {
 
 export type AmLocaleEmpty = {
 	description : string
+}
+
+export type AmLocaleForm = {
+	optional : string
+	required : string
+}
+
+export type AmLocaleImage = {
+	preview : string
+	loadFailed : string
 }
 
 export type AmLocaleInput = {
@@ -73,50 +120,120 @@ export type AmLocaleInfiniteScroll = {
 	retry : string
 }
 
+export type AmLocaleUpload = {
+	upload : string
+	uploading : string
+	uploadError : string
+	removeFile : string
+	previewFile : string
+}
+
+export type AmLocalePagination = {
+	prev : string
+	next : string
+}
+
+export type AmLocaleNumberKeyboard = {
+	done : string
+	delete : string
+}
+
+export type AmLocaleTypography = {
+	expand : string
+	collapse : string
+	copy : string
+	copied : string
+}
+
+export type AmLocaleSpin = {
+	tip : string
+}
+
+export type AmLocaleDropdown = {
+	confirm : string
+	reset : string
+}
+
 export type AmLocale = {
-	/** dayjs 风格的语言代码，如 zh-cn */
+	/** dayjs 风格的语言代码，如 zh-cn；空字符串表示“沿用上层 / 全局语言” */
 	locale : string
 	common : AmLocaleCommon
 	Modal : AmLocaleModal
+	Popconfirm : AmLocalePopconfirm
 	ActionSheet : AmLocaleActionSheet
 	Picker : AmLocalePicker
 	DatePicker : AmLocaleDatePicker
+	TimePicker : AmLocaleTimePicker
+	Calendar : AmLocaleCalendar
+	Cascader : AmLocaleCascader
 	Select : AmLocaleSelect
 	Empty : AmLocaleEmpty
+	Form : AmLocaleForm
+	Image : AmLocaleImage
 	Input : AmLocaleInput
 	InputSearch : AmLocaleInputSearch
 	PullToRefresh : AmLocalePullToRefresh
 	InfiniteScroll : AmLocaleInfiniteScroll
+	Upload : AmLocaleUpload
+	Pagination : AmLocalePagination
+	NumberKeyboard : AmLocaleNumberKeyboard
+	Typography : AmLocaleTypography
+	Spin : AmLocaleSpin
+	Dropdown : AmLocaleDropdown
 }
 
 export const zhCN : AmLocale = {
 	locale: 'zh-cn',
 	common: { confirm: '确定', cancel: '取消', close: '关闭', loading: '加载中', reset: '重置', done: '完成', delete: '删除', back: '返回' },
 	Modal: { okText: '确定', cancelText: '取消', justOkText: '知道了' },
+	Popconfirm: { okText: '确定', cancelText: '取消' },
 	ActionSheet: { cancelText: '取消' },
 	Picker: { okText: '确定', cancelText: '取消', placeholder: '请选择' },
-	DatePicker: { placeholder: '请选择日期', year: '年', quarter: '季度', month: '月', week: '周', day: '日', hour: '时', minute: '分', second: '秒' },
+	DatePicker: { placeholder: '请选择日期', rangeStartPlaceholder: '开始日期', rangeEndPlaceholder: '结束日期', year: '年', quarter: '季度', month: '月', week: '周', day: '日', hour: '时', minute: '分', second: '秒', am: '上午', pm: '下午' },
+	TimePicker: { placeholder: '请选择时间' },
+	Calendar: { title: '日期选择', confirm: '确定', today: '今天', start: '开始', end: '结束', startEnd: '开始/结束', monthFormat: 'YYYY年M月', weekdays: ['日', '一', '二', '三', '四', '五', '六'], rangePrompt: '最多选择 ${maxRange} 天' },
+	Cascader: { placeholder: '请选择', select: '请选择' },
 	Select: { placeholder: '请选择', notFoundContent: '暂无数据' },
 	Empty: { description: '暂无数据' },
+	Form: { optional: '（可选）', required: '请输入${label}' },
+	Image: { preview: '预览', loadFailed: '加载失败' },
 	Input: { placeholder: '请输入', clear: '清除' },
 	InputSearch: { placeholder: '搜索', cancelText: '取消' },
 	PullToRefresh: { pulling: '下拉刷新', canRelease: '释放立即刷新', refreshing: '加载中...', complete: '刷新成功' },
-	InfiniteScroll: { loading: '加载中...', noMore: '没有更多了', failed: '加载失败', retry: '重新加载' }
+	InfiniteScroll: { loading: '加载中...', noMore: '没有更多了', failed: '加载失败', retry: '重新加载' },
+	Upload: { upload: '上传', uploading: '上传中...', uploadError: '上传失败', removeFile: '删除文件', previewFile: '预览文件' },
+	Pagination: { prev: '上一页', next: '下一页' },
+	NumberKeyboard: { done: '完成', delete: '删除' },
+	Typography: { expand: '展开', collapse: '收起', copy: '复制', copied: '复制成功' },
+	Spin: { tip: '加载中...' },
+	Dropdown: { confirm: '确定', reset: '重置' }
 }
 
 export const enUS : AmLocale = {
 	locale: 'en',
 	common: { confirm: 'Confirm', cancel: 'Cancel', close: 'Close', loading: 'Loading', reset: 'Reset', done: 'Done', delete: 'Delete', back: 'Back' },
 	Modal: { okText: 'OK', cancelText: 'Cancel', justOkText: 'OK' },
+	Popconfirm: { okText: 'OK', cancelText: 'Cancel' },
 	ActionSheet: { cancelText: 'Cancel' },
 	Picker: { okText: 'OK', cancelText: 'Cancel', placeholder: 'Please select' },
-	DatePicker: { placeholder: 'Select date', year: '', quarter: 'Q', month: '', week: 'W', day: '', hour: '', minute: '', second: '' },
+	DatePicker: { placeholder: 'Select date', rangeStartPlaceholder: 'Start date', rangeEndPlaceholder: 'End date', year: '', quarter: 'Q', month: '', week: 'W', day: '', hour: '', minute: '', second: '', am: 'AM', pm: 'PM' },
+	TimePicker: { placeholder: 'Select time' },
+	Calendar: { title: 'Calendar', confirm: 'Confirm', today: 'Today', start: 'Start', end: 'End', startEnd: 'Start/End', monthFormat: 'MMM YYYY', weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], rangePrompt: 'Choose no more than ${maxRange} days' },
+	Cascader: { placeholder: 'Please select', select: 'Select' },
 	Select: { placeholder: 'Please select', notFoundContent: 'No data' },
 	Empty: { description: 'No data' },
+	Form: { optional: '(optional)', required: 'Please enter ${label}' },
+	Image: { preview: 'Preview', loadFailed: 'Load failed' },
 	Input: { placeholder: 'Please enter', clear: 'Clear' },
 	InputSearch: { placeholder: 'Search', cancelText: 'Cancel' },
 	PullToRefresh: { pulling: 'Pull to refresh', canRelease: 'Release to refresh', refreshing: 'Loading...', complete: 'Refreshed' },
-	InfiniteScroll: { loading: 'Loading...', noMore: 'No more', failed: 'Failed to load', retry: 'Retry' }
+	InfiniteScroll: { loading: 'Loading...', noMore: 'No more', failed: 'Failed to load', retry: 'Retry' },
+	Upload: { upload: 'Upload', uploading: 'Uploading...', uploadError: 'Upload error', removeFile: 'Remove file', previewFile: 'Preview file' },
+	Pagination: { prev: 'Previous', next: 'Next' },
+	NumberKeyboard: { done: 'Done', delete: 'Delete' },
+	Typography: { expand: 'Expand', collapse: 'Collapse', copy: 'Copy', copied: 'Copied' },
+	Spin: { tip: 'Loading...' },
+	Dropdown: { confirm: 'Confirm', reset: 'Reset' }
 }
 
 /**
@@ -126,15 +243,27 @@ export const AM_INHERIT_LOCALE : AmLocale = {
 	locale: '',
 	common: zhCN.common,
 	Modal: zhCN.Modal,
+	Popconfirm: zhCN.Popconfirm,
 	ActionSheet: zhCN.ActionSheet,
 	Picker: zhCN.Picker,
 	DatePicker: zhCN.DatePicker,
+	TimePicker: zhCN.TimePicker,
+	Calendar: zhCN.Calendar,
+	Cascader: zhCN.Cascader,
 	Select: zhCN.Select,
 	Empty: zhCN.Empty,
+	Form: zhCN.Form,
+	Image: zhCN.Image,
 	Input: zhCN.Input,
 	InputSearch: zhCN.InputSearch,
 	PullToRefresh: zhCN.PullToRefresh,
-	InfiniteScroll: zhCN.InfiniteScroll
+	InfiniteScroll: zhCN.InfiniteScroll,
+	Upload: zhCN.Upload,
+	Pagination: zhCN.Pagination,
+	NumberKeyboard: zhCN.NumberKeyboard,
+	Typography: zhCN.Typography,
+	Spin: zhCN.Spin,
+	Dropdown: zhCN.Dropdown
 }
 
 /** 全局语言（响应式）：没有给 <am-config-provider> 传 `locale` 时用它 */
@@ -152,4 +281,9 @@ export function useAmLocale() : () => AmLocale {
 	const local = inject<(() => AmLocale) | null>('amLocale', null)
 	if (local != null) return local
 	return () : AmLocale => amLocaleState.locale
+}
+
+/** 把模板里的 ${name} 换成值：formatAmLocale('最多选择 ${maxRange} 天', 'maxRange', '7') */
+export function formatAmLocale(template : string, name : string, value : string) : string {
+	return template.split('${' + name + '}').join(value)
 }

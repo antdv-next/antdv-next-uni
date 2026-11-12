@@ -1,0 +1,9 @@
+{
+  "missingProps": {
+    "direction": "App 端不支持 RTL 布局",
+    "getPopupContainer": "没有 Teleport，弹出层就地渲染"
+  },
+  "extraProps": {
+    "navigationBar": "原生导航栏不受 CSS 变量影响，由页面根上的 provider 调用 uni.setNavigationBarColor"
+  }
+}
