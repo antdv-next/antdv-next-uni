@@ -6,10 +6,5 @@
     "collapsible": "= ellipsis.expandable 为 collapsible（展开后还能收起），原因同 rows",
     "expanded": "= ellipsis.expanded（v-model:expanded），原因同 rows",
     "copyText": "= copyable.text，copyable 只有布尔值，原因同 rows"
-  },
-  "extraEmits": {
-    "expand": "移动端库有这个事件，但声明在 TypographyBaseEmits 上（没有 TypographyXxxEmits），对齐工具读不到",
-    "update:expanded": "同 expand",
-    "copy": "同 expand"
   }
 }

@@ -101,7 +101,8 @@ const markClasses = computed(() : string[] => {
 .am-badge__mark--error { background-color: var(--am-color-error, #ff4d4f); }
 .am-badge__mark--warning { background-color: var(--am-color-warning, #faad14); }
 .am-badge__mark--default { background-color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
-.am-badge__text { font-size: 12px; line-height: 16px; color: var(--am-color-text-light-solid, #ffffff); }
+/* 不换行：角标是绝对定位的，没有可用宽度时 App 端会把长数字折成两行 */
+.am-badge__text { white-space: nowrap; font-size: 12px; line-height: 16px; color: var(--am-color-text-light-solid, #ffffff); }
 .am-badge__text--small { font-size: 10px; line-height: 12px; }
 
 .am-badge-status { flex-direction: row; align-items: center; align-self: flex-start; }

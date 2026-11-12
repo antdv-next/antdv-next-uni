@@ -1,6 +1,7 @@
 <script setup lang="uts">
 import { useAmTheme } from '../../theme/theme.uts'
-import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
 
 // 输入框（= antdv-next-mobile 的 Input）：v-model:value、placeholder、type、allowClear、maxlength、showCount、
 // prefix / suffix、variant（outlined / filled / borderless / underlined）、status（error / warning）、size、
@@ -23,7 +24,8 @@ const props = defineProps({
 	showCount: { type: Boolean, default: false },
 	prefix: { type: String, default: '' },
 	suffix: { type: String, default: '' },
-	variant: { type: String, default: 'outlined' },
+	/** outlined / filled / borderless / underlined；空为跟随表单（表单里默认 borderless），否则 outlined */
+	variant: { type: String, default: '' },
 	status: { type: String, default: '' },
 	size: { type: String, default: '' },
 	disabled: { type: Boolean, default: false },
@@ -43,8 +45,16 @@ const emit = defineEmits(['update:value', 'change', 'input', 'focus', 'blur', 'p
 const theme = useAmTheme()
 const sizeOf = useAmSize(() : string => props.size)
 const size = computed(() : string => sizeOf())
-const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
 const disabled = computed(() : boolean => disabledOf())
+
+// 表单约定：变体、校验状态跟随所在的 Form / FormItem；值变化、失焦时通知 FormItem 重新校验
+const variantOf = useAmFieldVariant(() : string => props.variant)
+const variant = computed(() : string => variantOf())
+const statusOf = useAmFieldStatus(() : string => props.status)
+const status = computed(() : string => statusOf())
+const notifyChange = useAmFieldChange()
+const notifyBlur = useAmFieldBlur()
 
 const focused = ref(false)
 /** 要不要让输入框获得焦点（focus() / blur() 改它） */
@@ -57,10 +67,10 @@ const inputType = computed(() : string => props.type == 'password' ? 'text' : pr
 const showClear = computed(() : boolean => props.allowClear && props.value.length > 0 && !disabled.value && !props.readOnly)
 
 const classes = computed(() : string[] => {
-	const list : string[] = ['am-input', 'am-input--' + props.variant, 'am-input--' + size.value]
-	if (props.variant != 'borderless') list.push('am-input--box-' + size.value)
-	if (focused.value) list.push('am-input--focused-' + props.variant)
-	if (props.status.length > 0) list.push('am-input--' + props.variant + '-' + props.status)
+	const list : string[] = ['am-input', 'am-input--' + variant.value, 'am-input--' + size.value]
+	if (variant.value != 'borderless') list.push('am-input--box-' + size.value)
+	if (focused.value) list.push('am-input--focused-' + variant.value)
+	if (status.value.length > 0) list.push('am-input--' + variant.value + '-' + status.value)
 	if (disabled.value) list.push('am-input--disabled')
 	if (props.rootClass.length > 0) list.push(props.rootClass)
 	return list
@@ -82,6 +92,7 @@ function onInput(event : UniInputEvent) {
 	emit('update:value', value)
 	emit('input', value)
 	emit('change', value)
+	notifyChange()
 }
 
 function onFocus(event : UniInputFocusEvent) {
@@ -93,6 +104,7 @@ function onBlur(event : UniInputBlurEvent) {
 	focused.value = false
 	wantFocus.value = false
 	emit('blur', event)
+	notifyBlur()
 }
 
 function onConfirm() {
@@ -104,6 +116,7 @@ function clear() {
 	emit('input', '')
 	emit('change', '')
 	emit('clear')
+	notifyChange()
 }
 
 function focus() {

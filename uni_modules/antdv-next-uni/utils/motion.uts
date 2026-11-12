@@ -48,12 +48,14 @@ export function measureAllWithin(parentId : string, prefix : string, count : num
 	return measureById(parentId).then((parent : AmRect | null) : Promise<(AmRect | null)[]> => {
 		const result : (AmRect | null)[] = []
 		if (parent == null) return Promise.resolve(result)
+		// 闭包里的 parent 不会被收窄成非空，另存一个确定非空的
+		const origin : AmRect = parent
 		function next(index : number) : Promise<(AmRect | null)[]> {
 			if (index >= count) return Promise.resolve(result)
 			return measureById(prefix + index).then((child : AmRect | null) : Promise<(AmRect | null)[]> => {
 				if (child == null) result.push(null)
 				else {
-					const rect : AmRect = { left: child.left - parent.left, top: child.top - parent.top, width: child.width, height: child.height }
+					const rect : AmRect = { left: child.left - origin.left, top: child.top - origin.top, width: child.width, height: child.height }
 					result.push(rect)
 				}
 				return next(index + 1)

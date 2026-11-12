@@ -107,12 +107,32 @@ function topLevelKeys(body) {
   return keys
 }
 
-/** 接口的全部字段：自己的 + `extends` 的（只找同一个文件里的父接口） */
-function interfaceKeys(source, name, seen = new Set()) {
+/** 父接口不在本文件里时，顺着 `import type { Name } from './x'` 到别的文件里找 */
+function importedSource(source, name, fromFile) {
+  for (const match of source.matchAll(/import\s+type\s*\{([^}]*)\}\s*from\s*'([^']+)'/g)) {
+    const names = match[1].split(',').map(item => item.trim().split(/\s+as\s+/).pop())
+    if (!names.includes(name) || !match[2].startsWith('.'))
+      continue
+    const base = join(dirname(fromFile), match[2])
+    for (const candidate of [`${base}.ts`, join(base, 'interface.ts'), join(base, 'index.ts')]) {
+      if (existsSync(candidate))
+        return { source: readFileSync(candidate, 'utf8'), file: candidate }
+    }
+  }
+  return null
+}
+
+/** 接口的全部字段：自己的 + `extends` 的（父接口可以在同一个文件里，也可以是 import 进来的） */
+function interfaceKeys(source, name, seen = new Set(), file = '') {
   if (seen.has(name))
     return []
   seen.add(name)
-  const body = interfaceBody(source, name)
+  let body = interfaceBody(source, name)
+  if (body === null && file) {
+    const imported = importedSource(source, name, file)
+    if (imported)
+      return interfaceKeys(imported.source, name, new Set([...seen].filter(item => item !== name)), imported.file)
+  }
   if (body === null)
     return []
   const keys = []
@@ -120,7 +140,7 @@ function interfaceKeys(source, name, seen = new Set()) {
   if (heritage) {
     for (const base of heritage[1].split(',')) {
       const baseName = base.trim().replace(/<.*$/, '')
-      for (const key of interfaceKeys(source, baseName, seen)) {
+      for (const key of interfaceKeys(source, baseName, seen, file)) {
         if (!keys.includes(key))
           keys.push(key)
       }
@@ -141,14 +161,23 @@ function readMobile(component) {
   const source = readFileSync(path, 'utf8')
   if (interfaceBody(source, `${prefix}Props`) === null)
     return null
+  // 有的组件把事件声明在共用的 XxxBaseEmits 上（Typography）
+  let emits = interfaceKeys(source, `${prefix}Emits`, new Set(), path)
+  if (emits.length === 0 && interfaceBody(source, `${prefix}Emits`) === null) {
+    const base = /interface\s+(\w+BaseEmits)\b/.exec(source)
+    if (base)
+      emits = interfaceKeys(source, base[1], new Set(), path)
+  }
   return {
-    props: interfaceKeys(source, `${prefix}Props`),
-    emits: interfaceKeys(source, `${prefix}Emits`),
+    props: interfaceKeys(source, `${prefix}Props`, new Set(), path),
+    emits,
   }
 }
 
 function readUni(component) {
   const path = join(uniComponents, `am-${component}`, `am-${component}.uvue`)
+  if (!existsSync(path))
+    return null
   const source = readFileSync(path, 'utf8')
   const props = []
   const propsMatch = /defineProps\(\{([\s\S]*?)\n\}\)/.exec(source)
@@ -166,7 +195,7 @@ function readUni(component) {
 
 const reportOnly = process.argv.includes('--report')
 const components = readdirSync(uniComponents)
-  .filter(name => name.startsWith('am-'))
+  .filter(name => name.startsWith('am-') && existsSync(join(uniComponents, name, `${name}.uvue`)))
   .map(name => name.slice(3))
   .sort()
 
@@ -178,6 +207,8 @@ const staleEntries = []
 for (const component of components) {
   const mobile = readMobile(component)
   const uni = readUni(component)
+  if (uni === null)
+    continue
   // "*" 里登记的是所有组件共有的差异
   const own = known[component] ?? {}
   const common = known['*'] ?? {}

@@ -1,6 +1,7 @@
 <script setup lang="uts">
 import { useAmTheme } from '../../theme/theme.uts'
-import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
 
 // 选择类字段的触发区（= antdv-next-mobile 内部的 PickerTrigger，Picker / DatePicker / TimePicker / Select / Cascader 共用）：
 // label（已选的文字，空则显示 placeholder）、placeholder、open、disabled、allowClear、status、variant、size、suffixIcon
@@ -35,10 +36,12 @@ const theme = useAmTheme()
 // ---------- 字段状态：尺寸、禁用、状态、变体（表单上下文在这里合并） ----------
 const sizeOf = useAmSize(() : string => props.size)
 const size = computed(() : string => sizeOf())
-const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
 const disabled = computed(() : boolean => disabledOf())
-const status = computed(() : string => props.status)
-const variant = computed(() : string => props.variant.length > 0 ? props.variant : 'outlined')
+const statusOf = useAmFieldStatus(() : string => props.status)
+const status = computed(() : string => statusOf())
+const variantOf = useAmFieldVariant(() : string => props.variant)
+const variant = computed(() : string => variantOf())
 // ---------- 字段状态结束 ----------
 
 const hasValue = computed(() : boolean => props.label.length > 0)

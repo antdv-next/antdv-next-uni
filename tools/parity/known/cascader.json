@@ -3,24 +3,8 @@
     "defaultValue": "UTS 里分不出“没传”和空值，非受控用法请用 v-model:value",
     "optionRender": "渲染函数无法表达（UTS 里不能把节点放进数据）；选项显示 label",
     "virtual": "选项列表是 scroll-view 里直接渲染，暂无虚拟列表",
-    "listItemHeight": "选项的高度由内容决定（没有虚拟列表，不需要估计高度）"
-  },
-  "extraProps": {
-    "open": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "placeholder": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "disabled": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "allowClear": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "status": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "variant": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "size": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "trigger": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "suffixIcon": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "title": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "okText": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "cancelText": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "zIndex": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "maskClosable": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "destroyOnHidden": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”",
-    "rootClass": "移动端库 PickerFieldProps 的属性（同名同义）；对齐工具只解析同一个文件里的 extends，picker/interface.ts 里的父接口读不到，所以显示为“多出”"
+    "listItemHeight": "选项的高度由内容决定（没有虚拟列表，不需要估计高度）",
+    "defaultOpen": "open 不绑定时组件自己管理显示状态，没有单独的初始值属性",
+    "id": "触发器是 view，没有原生控件的 id"
   }
 }

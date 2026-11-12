@@ -17,18 +17,23 @@
 
 ## 状态
 
-早期阶段（0.1.0）：工程骨架、主题引擎和 6 个组件已完成，其余组件按 antdv-next-mobile 的清单陆续补齐。
+早期阶段（0.1.0）：72 个组件，覆盖 antdv-next-mobile 70 个组件目录中的 51 个，其余 19 个（Space、Calendar、Upload、
+ImagePreview、Popover、NoticeBar、TabBar、SideBar、Selector、NumberKeyboard、FloatingPanel、VirtualList、Mask、
+Affix、Watermark 等）尚未实现。
 
-| 已完成 | 说明 |
+| 分组 | 组件 |
 | --- | --- |
-| `am-config-provider` | 主题（亮色 / 暗色 / 紧凑、可嵌套）、语言、尺寸、禁用 |
-| `am-button` | 颜色 × 变体、尺寸、形状、图标、加载中、幽灵 |
-| `am-input` | 四种变体、清除、计数、前后缀、状态、`focus()` |
-| `am-list` / `am-list-item` | 单元格列表、卡片模式 |
-| `am-popup` | 五个方向、圆角、关闭图标、Android 返回键 |
-| `am-icon`、`am-loading` | 字体图标、加载指示器 |
+| 通用 | `am-button`、`am-float-button`、`am-typography-text` / `-title` / `-paragraph`、`am-icon`、`am-config-provider` |
+| 布局 | `am-divider`、`am-flex`、`am-row` / `am-col`、`am-safe-area` |
+| 导航 | `am-nav-bar`、`am-tabs`、`am-steps`、`am-segmented`、`am-pagination`、`am-dropdown` / `am-dropdown-item`、`am-index-bar` / `am-index-bar-anchor` |
+| 数据录入 | `am-form` / `am-form-item`、`am-input`、`am-textarea`、`am-input-search`、`am-input-password`、`am-input-number`、`am-checkbox` / `-group`、`am-radio` / `-group`、`am-switch`、`am-rate`、`am-slider`、`am-picker`、`am-picker-view`、`am-date-picker`、`am-time-picker`、`am-select`、`am-cascader` |
+| 数据展示 | `am-avatar`、`am-badge`、`am-tag` / `am-checkable-tag`、`am-card`、`am-collapse`、`am-descriptions`、`am-empty`、`am-image`、`am-carousel`、`am-list` / `am-list-item`、`am-statistic` / `am-statistic-timer`、`am-timeline` |
+| 反馈 | `am-alert`、`am-modal`、`am-drawer`、`am-popup`、`am-action-sheet`、`am-progress`、`am-result`、`am-skeleton`、`am-spin`、`am-loading`，以及 `amMessage` / `amToast`（`utils/message.uts`）、`confirmAmModal`（`utils/modal.uts`） |
+| 手势 | `am-pull-to-refresh`、`am-infinite-scroll`、`am-swipe-action` |
 
-已在 Web、iOS 模拟器上运行，iOS、Android 编译通过；鸿蒙与微信小程序尚未验证。
+验证情况：Web、iOS、Android 三端编译通过；Web 端全部文件无类型警告；在 iOS 模拟器上打开过首页、Button、Form、Tabs、
+PickerView、Badge 等页面。多数组件的交互（弹层、手势、选择器）还没有在真机或模拟器上逐个点过；Android 未实机运行，
+鸿蒙与微信小程序未验证。
 
 ## 使用
 

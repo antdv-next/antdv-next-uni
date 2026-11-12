@@ -34,6 +34,10 @@ antdv-next-uni/                     本仓库 = 一个 HBuilderX 项目（不是
 
 `am-button`、`am-popup`、`am-input`、`am-list` / `am-list-item`、`am-config-provider` 是参考实现，新组件照它们的结构写。
 
+表单约定：`am-form` / `am-form-item` 用 inject 提供禁用、变体、校验状态和“值变了 / 失焦了”的通知，
+字段通过 `utils/form-field.uts` 的 `useAmFieldDisabled` / `useAmFieldStatus` / `useAmFieldVariant` / `useAmFieldChange` /
+`useAmFieldBlur` 接入；选择类字段统一在 `am-picker-trigger` 和 `utils/picker-field.uts` 里接。
+
 ## 组件的写法
 
 ```vue
@@ -133,6 +137,9 @@ $CLI launch app-ios --project "$PWD" --iosTarget simulator --deviceId <UDID> --p
 node tools/parity/check.mjs
 ```
 
+- 单文件检查：`tools/check-web.sh <文件…>`（需要 Web 开发服务器在运行并把日志写到 `unpackage/web.log`）。
+  `HTTP 500` 是语法错误；类型错误是日志里的 `warning:`，有时晚几秒才出现，批量检查后再 `grep warning unpackage/web.log` 一遍。
+  **没登记到 `pages.json` 的页面不会被类型检查。**
 - `launch` 命令不会自己退出时，把输出重定向到文件再看（管道接 `tail` 会一直没有输出）。
 - 新增组件：`components/am-foo/am-foo.uvue` + `pages/components/foo.uvue`（在 `pages.json` 和首页登记）+ 对齐检查通过
   + Web、iOS、Android 三端编译通过。

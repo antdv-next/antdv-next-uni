@@ -175,7 +175,8 @@ const contentTextClass = computed(() : string[] => {
 	border-bottom-style: solid;
 	border-bottom-color: var(--am-color-border-secondary, #f0f0f0);
 }
-.am-descriptions__label--horizontal { max-width: 50%; margin-right: 8px; }
+/* App 端的 max-width 不支持百分比 */
+.am-descriptions__label--horizontal { max-width: 160px; flex-shrink: 1; margin-right: 8px; }
 .am-descriptions__label--vertical { padding-bottom: var(--am-padding-xxs, 4px); }
 .am-descriptions__label--bordered { background-color: var(--am-color-fill-quaternary, rgba(0, 0, 0, 0.02)); }
 .am-descriptions__label--bordered-horizontal {

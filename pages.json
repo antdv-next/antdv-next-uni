@@ -8,27 +8,341 @@
 	"pages": [
 		{
 			"path": "pages/index/index",
-			"style": { "navigationBarTitleText": "Antdv Next Uni" }
+			"style": {
+				"navigationBarTitleText": "Antdv Next Uni"
+			}
+		},
+		{
+			"path": "pages/components/action-sheet",
+			"style": {
+				"navigationBarTitleText": "ActionSheet 动作面板"
+			}
+		},
+		{
+			"path": "pages/components/alert",
+			"style": {
+				"navigationBarTitleText": "Alert 警告提示"
+			}
+		},
+		{
+			"path": "pages/components/avatar",
+			"style": {
+				"navigationBarTitleText": "Avatar 头像"
+			}
+		},
+		{
+			"path": "pages/components/badge",
+			"style": {
+				"navigationBarTitleText": "Badge 徽标数"
+			}
 		},
 		{
 			"path": "pages/components/button",
-			"style": { "navigationBarTitleText": "Button 按钮" }
+			"style": {
+				"navigationBarTitleText": "Button 按钮"
+			}
 		},
 		{
-			"path": "pages/components/input",
-			"style": { "navigationBarTitleText": "Input 输入框" }
+			"path": "pages/components/card",
+			"style": {
+				"navigationBarTitleText": "Card 卡片"
+			}
 		},
 		{
-			"path": "pages/components/list",
-			"style": { "navigationBarTitleText": "List 列表" }
+			"path": "pages/components/carousel",
+			"style": {
+				"navigationBarTitleText": "Carousel 走马灯"
+			}
 		},
 		{
-			"path": "pages/components/popup",
-			"style": { "navigationBarTitleText": "Popup 弹出层" }
+			"path": "pages/components/cascader",
+			"style": {
+				"navigationBarTitleText": "Cascader 级联选择"
+			}
+		},
+		{
+			"path": "pages/components/checkbox",
+			"style": {
+				"navigationBarTitleText": "Checkbox 多选框"
+			}
+		},
+		{
+			"path": "pages/components/collapse",
+			"style": {
+				"navigationBarTitleText": "Collapse 折叠面板"
+			}
 		},
 		{
 			"path": "pages/components/config-provider",
-			"style": { "navigationBarTitleText": "ConfigProvider 全局化配置" }
+			"style": {
+				"navigationBarTitleText": "ConfigProvider 全局化配置"
+			}
+		},
+		{
+			"path": "pages/components/date-picker",
+			"style": {
+				"navigationBarTitleText": "DatePicker 日期选择器"
+			}
+		},
+		{
+			"path": "pages/components/descriptions",
+			"style": {
+				"navigationBarTitleText": "Descriptions 描述列表"
+			}
+		},
+		{
+			"path": "pages/components/divider",
+			"style": {
+				"navigationBarTitleText": "Divider 分割线"
+			}
+		},
+		{
+			"path": "pages/components/drawer",
+			"style": {
+				"navigationBarTitleText": "Drawer 抽屉"
+			}
+		},
+		{
+			"path": "pages/components/dropdown",
+			"style": {
+				"navigationBarTitleText": "Dropdown 下拉菜单"
+			}
+		},
+		{
+			"path": "pages/components/empty",
+			"style": {
+				"navigationBarTitleText": "Empty 空状态"
+			}
+		},
+		{
+			"path": "pages/components/flex",
+			"style": {
+				"navigationBarTitleText": "Flex 弹性布局"
+			}
+		},
+		{
+			"path": "pages/components/float-button",
+			"style": {
+				"navigationBarTitleText": "FloatButton 悬浮按钮"
+			}
+		},
+		{
+			"path": "pages/components/form",
+			"style": {
+				"navigationBarTitleText": "Form 表单"
+			}
+		},
+		{
+			"path": "pages/components/grid",
+			"style": {
+				"navigationBarTitleText": "Grid 栅格"
+			}
+		},
+		{
+			"path": "pages/components/image",
+			"style": {
+				"navigationBarTitleText": "Image 图片"
+			}
+		},
+		{
+			"path": "pages/components/index-bar",
+			"style": {
+				"navigationBarTitleText": "IndexBar 索引栏",
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/components/infinite-scroll",
+			"style": {
+				"navigationBarTitleText": "InfiniteScroll 无限滚动"
+			}
+		},
+		{
+			"path": "pages/components/input",
+			"style": {
+				"navigationBarTitleText": "Input 输入框"
+			}
+		},
+		{
+			"path": "pages/components/input-more",
+			"style": {
+				"navigationBarTitleText": "Input 文本域 / 搜索 / 密码"
+			}
+		},
+		{
+			"path": "pages/components/input-number",
+			"style": {
+				"navigationBarTitleText": "InputNumber 数字输入框"
+			}
+		},
+		{
+			"path": "pages/components/list",
+			"style": {
+				"navigationBarTitleText": "List 列表"
+			}
+		},
+		{
+			"path": "pages/components/message",
+			"style": {
+				"navigationBarTitleText": "message / Toast 全局提示"
+			}
+		},
+		{
+			"path": "pages/components/modal",
+			"style": {
+				"navigationBarTitleText": "Modal 对话框"
+			}
+		},
+		{
+			"path": "pages/components/nav-bar",
+			"style": {
+				"navigationBarTitleText": "NavBar 导航栏"
+			}
+		},
+		{
+			"path": "pages/components/pagination",
+			"style": {
+				"navigationBarTitleText": "Pagination 分页"
+			}
+		},
+		{
+			"path": "pages/components/picker",
+			"style": {
+				"navigationBarTitleText": "Picker 选择器"
+			}
+		},
+		{
+			"path": "pages/components/picker-view",
+			"style": {
+				"navigationBarTitleText": "PickerView 选择器视图"
+			}
+		},
+		{
+			"path": "pages/components/popup",
+			"style": {
+				"navigationBarTitleText": "Popup 弹出层"
+			}
+		},
+		{
+			"path": "pages/components/progress",
+			"style": {
+				"navigationBarTitleText": "Progress 进度条"
+			}
+		},
+		{
+			"path": "pages/components/pull-to-refresh",
+			"style": {
+				"navigationBarTitleText": "PullToRefresh 下拉刷新",
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/components/radio",
+			"style": {
+				"navigationBarTitleText": "Radio 单选框"
+			}
+		},
+		{
+			"path": "pages/components/rate",
+			"style": {
+				"navigationBarTitleText": "Rate 评分"
+			}
+		},
+		{
+			"path": "pages/components/result",
+			"style": {
+				"navigationBarTitleText": "Result 结果"
+			}
+		},
+		{
+			"path": "pages/components/safe-area",
+			"style": {
+				"navigationBarTitleText": "SafeArea 安全区"
+			}
+		},
+		{
+			"path": "pages/components/segmented",
+			"style": {
+				"navigationBarTitleText": "Segmented 分段控制器"
+			}
+		},
+		{
+			"path": "pages/components/select",
+			"style": {
+				"navigationBarTitleText": "Select 选择器"
+			}
+		},
+		{
+			"path": "pages/components/skeleton",
+			"style": {
+				"navigationBarTitleText": "Skeleton 骨架屏"
+			}
+		},
+		{
+			"path": "pages/components/slider",
+			"style": {
+				"navigationBarTitleText": "Slider 滑动输入条"
+			}
+		},
+		{
+			"path": "pages/components/spin",
+			"style": {
+				"navigationBarTitleText": "Spin 加载中"
+			}
+		},
+		{
+			"path": "pages/components/statistic",
+			"style": {
+				"navigationBarTitleText": "Statistic 统计数值"
+			}
+		},
+		{
+			"path": "pages/components/steps",
+			"style": {
+				"navigationBarTitleText": "Steps 步骤条"
+			}
+		},
+		{
+			"path": "pages/components/swipe-action",
+			"style": {
+				"navigationBarTitleText": "SwipeAction 滑动操作"
+			}
+		},
+		{
+			"path": "pages/components/switch",
+			"style": {
+				"navigationBarTitleText": "Switch 开关"
+			}
+		},
+		{
+			"path": "pages/components/tabs",
+			"style": {
+				"navigationBarTitleText": "Tabs 标签页"
+			}
+		},
+		{
+			"path": "pages/components/tag",
+			"style": {
+				"navigationBarTitleText": "Tag 标签"
+			}
+		},
+		{
+			"path": "pages/components/time-picker",
+			"style": {
+				"navigationBarTitleText": "TimePicker 时间选择器"
+			}
+		},
+		{
+			"path": "pages/components/timeline",
+			"style": {
+				"navigationBarTitleText": "Timeline 时间轴"
+			}
+		},
+		{
+			"path": "pages/components/typography",
+			"style": {
+				"navigationBarTitleText": "Typography 排版"
+			}
 		}
 	],
 	"globalStyle": {
