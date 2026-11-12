@@ -26,10 +26,18 @@ const compactSize = ref('middle')
 		<text class="demo__title">基础用法（横向，默认 small）</text>
 		<view class="demo__card">
 			<am-space>
-				<am-button type="primary" text="主按钮" />
-				<am-button text="默认" />
-				<am-tag text="标签" />
-				<text class="demo__text">文字</text>
+				<am-space-item>
+					<am-button type="primary" text="主按钮" />
+				</am-space-item>
+				<am-space-item>
+					<am-button text="默认" />
+				</am-space-item>
+				<am-space-item>
+					<am-tag text="标签" />
+				</am-space-item>
+				<am-space-item>
+					<text class="demo__text">文字</text>
+				</am-space-item>
 			</am-space>
 		</view>
 
@@ -39,57 +47,97 @@ const compactSize = ref('middle')
 				<am-button v-for="item in sizes" :key="item" class="demo__item" size="small" :type="size == item ? 'primary' : 'default'" :text="item" @click="size = item" />
 			</view>
 			<am-space :size="size">
-				<am-button text="按钮" />
-				<am-button text="按钮" />
-				<am-button text="按钮" />
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
 			</am-space>
 			<am-slider v-model:value="custom" :min="0" :max="48" />
 			<am-space :size="custom">
-				<am-button text="按钮" />
-				<am-button text="按钮" />
-				<am-button :text="custom + 'px'" />
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
+				<am-space-item>
+					<am-button :text="custom + 'px'" />
+				</am-space-item>
 			</am-space>
 		</view>
 
 		<text class="demo__title">纵向与撑满（vertical / block）</text>
 		<view class="demo__card">
 			<am-space vertical block size="middle">
-				<am-button block type="primary" text="提交" />
-				<am-button block text="保存草稿" />
-				<am-button block type="text" text="取消" />
+				<am-space-item>
+					<am-button block type="primary" text="提交" />
+				</am-space-item>
+				<am-space-item>
+					<am-button block text="保存草稿" />
+				</am-space-item>
+				<am-space-item>
+					<am-button block type="text" text="取消" />
+				</am-space-item>
 			</am-space>
 		</view>
 
 		<text class="demo__title">对齐（align）</text>
 		<view class="demo__card">
 			<am-space align="start" root-class="demo__stage">
-				<text class="demo__text">start</text>
-				<am-button text="按钮" />
-				<view class="demo__tall"><text class="demo__block-text">高</text></view>
+				<am-space-item>
+					<text class="demo__text">start</text>
+				</am-space-item>
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
+				<am-space-item>
+					<view class="demo__tall"><text class="demo__block-text">高</text></view>
+				</am-space-item>
 			</am-space>
 			<am-space align="end" root-class="demo__stage">
-				<text class="demo__text">end</text>
-				<am-button text="按钮" />
-				<view class="demo__tall"><text class="demo__block-text">高</text></view>
+				<am-space-item>
+					<text class="demo__text">end</text>
+				</am-space-item>
+				<am-space-item>
+					<am-button text="按钮" />
+				</am-space-item>
+				<am-space-item>
+					<view class="demo__tall"><text class="demo__block-text">高</text></view>
+				</am-space-item>
 			</am-space>
 		</view>
 
 		<text class="demo__title">自动换行（wrap）</text>
 		<view class="demo__card">
 			<am-space wrap block>
-				<am-tag v-for="item in tags" :key="item" :text="item" />
-				<am-button v-for="item in tags" :key="item" size="small" :text="item" />
+				<am-space-item v-for="item in tags">
+					<am-tag :key="item" :text="item" />
+				</am-space-item>
+				<am-space-item v-for="item in tags">
+					<am-button :key="item" size="small" :text="item" />
+				</am-space-item>
 			</am-space>
 		</view>
 
 		<text class="demo__title">Flex 的 gap</text>
 		<view class="demo__card">
 			<am-flex gap="middle" wrap>
-				<view v-for="n in 7" :key="n" class="demo__block"><text class="demo__block-text">{{ n }}</text></view>
+				<am-space-item v-for="n in 7">
+					<view :key="n" class="demo__block"><text class="demo__block-text">{{ n }}</text></view>
+				</am-space-item>
 			</am-flex>
 			<am-flex vertical :gap="4" root-class="demo__gap-top">
-				<view class="demo__bar"><text class="demo__block-text">:gap="4"</text></view>
-				<view class="demo__bar"><text class="demo__block-text">:gap="4"</text></view>
+				<am-space-item>
+					<view class="demo__bar"><text class="demo__block-text">:gap="4"</text></view>
+				</am-space-item>
+				<am-space-item>
+					<view class="demo__bar"><text class="demo__block-text">:gap="4"</text></view>
+				</am-space-item>
 			</am-flex>
 		</view>
 

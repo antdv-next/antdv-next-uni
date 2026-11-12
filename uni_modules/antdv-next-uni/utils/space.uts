@@ -1,0 +1,28 @@
+// am-space / am-flex 的间距上下文。
+//
+// App 端（iOS / Android）的运行时不支持 CSS `gap`：编译不报错，但没有任何效果（5.34 在 iOS 模拟器上实测）。
+// 容器又包不了插槽里的子元素、没有后代选择器，所以间距只能由子元素自己加外边距：
+// 把子元素放进 <am-space-item>，它从这里取到间距、方向、是不是最后一个。
+// Web 端 `gap` 有效，容器直接写 gap，<am-space-item> 在 Web 上不加外边距（见组件里的条件编译）
+
+/** 在 am-space / am-flex 的 setup 中调用：gap 为带单位的间距，没有间距时为空字符串 */
+export function provideAmSpace(gap : () => string, vertical : () => boolean, wrap : () => boolean) : void {
+	// 登记的子项（setup 的顺序 = 模板里的顺序；之后用 v-if 插到中间的会排在最后）
+	const ids = ref<number[]>([])
+	let seed = 0
+	provide('amSpaceGap', gap)
+	provide('amSpaceVertical', vertical)
+	provide('amSpaceWrap', wrap)
+	provide('amSpaceRegister', () : number => {
+		seed++
+		ids.value = ids.value.concat([seed])
+		return seed
+	})
+	provide('amSpaceUnregister', (id : number) => {
+		ids.value = ids.value.filter((item : number) : boolean => item != id)
+	})
+	provide('amSpaceIsLast', (id : number) : boolean => {
+		const list = ids.value
+		return list.length > 0 && list[list.length - 1] == id
+	})
+}

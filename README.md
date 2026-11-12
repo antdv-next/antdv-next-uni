@@ -17,23 +17,28 @@
 
 ## 状态
 
-早期阶段（0.1.0）：72 个组件，覆盖 antdv-next-mobile 70 个组件目录中的 51 个，其余 19 个（Space、Calendar、Upload、
-ImagePreview、Popover、NoticeBar、TabBar、SideBar、Selector、NumberKeyboard、FloatingPanel、VirtualList、Mask、
-Affix、Watermark 等）尚未实现。
+早期阶段（0.1.0）：`uni_modules/antdv-next-uni/components` 下 94 个组件目录，示例应用 74 个页面。
+antdv-next-mobile 首批 70 个组件目录都有对应实现（Message / Toast 是 `utils/message.uts` 里的函数，Grid 对应
+`am-row` / `am-col`，Typography 拆成 `am-typography-text` / `-title` / `-paragraph`）。移动端之后新增的
+ActionBar、Barrage、CollapseTransition、Draggable、Highlight、LoadingBar、RollingText、ShareSheet、ShimmerText、
+Signature 尚未实现。
 
-| 分组 | 组件 |
+| 分组 | 示例页（每页对应同名的 `am-*` 组件及其子组件） |
 | --- | --- |
-| 通用 | `am-button`、`am-float-button`、`am-typography-text` / `-title` / `-paragraph`、`am-icon`、`am-config-provider` |
-| 布局 | `am-divider`、`am-flex`、`am-row` / `am-col`、`am-safe-area` |
-| 导航 | `am-nav-bar`、`am-tabs`、`am-steps`、`am-segmented`、`am-pagination`、`am-dropdown` / `am-dropdown-item`、`am-index-bar` / `am-index-bar-anchor` |
-| 数据录入 | `am-form` / `am-form-item`、`am-input`、`am-textarea`、`am-input-search`、`am-input-password`、`am-input-number`、`am-checkbox` / `-group`、`am-radio` / `-group`、`am-switch`、`am-rate`、`am-slider`、`am-picker`、`am-picker-view`、`am-date-picker`、`am-time-picker`、`am-select`、`am-cascader` |
-| 数据展示 | `am-avatar`、`am-badge`、`am-tag` / `am-checkable-tag`、`am-card`、`am-collapse`、`am-descriptions`、`am-empty`、`am-image`、`am-carousel`、`am-list` / `am-list-item`、`am-statistic` / `am-statistic-timer`、`am-timeline` |
-| 反馈 | `am-alert`、`am-modal`、`am-drawer`、`am-popup`、`am-action-sheet`、`am-progress`、`am-result`、`am-skeleton`、`am-spin`、`am-loading`，以及 `amMessage` / `amToast`（`utils/message.uts`）、`confirmAmModal`（`utils/modal.uts`） |
-| 手势 | `am-pull-to-refresh`、`am-infinite-scroll`、`am-swipe-action` |
+| 通用 | BackTop、Button、ConfigProvider、FloatButton、FloatButtonGroup、Typography |
+| 布局 | Divider、Flex、Grid、SafeArea、Space |
+| 导航 | Dropdown、IndexBar、NavBar、Pagination、Segmented、SideBar、Steps、TabBar、Tabs |
+| 数据录入 | Calendar、Cascader、Checkbox、DatePicker、Form、Input、Input、InputNumber、InputOTP、NumberKeyboard、Picker、PickerView、Radio、Rate、Select、Selector、Slider、Switch、TimePicker、Upload |
+| 数据展示 | Avatar、AvatarGroup、Badge、Card、Carousel、Collapse、Descriptions、Empty、Image、ImagePreview、List、Result、Statistic、Tag、Timeline、VirtualList、Watermark |
+| 反馈 | ActionSheet、Alert、Drawer、Mask、Modal、NoticeBar、Popover、Popup、Progress、Skeleton、Spin、message / Toast |
+| 手势与其他 | Affix、FloatingPanel、InfiniteScroll、PullToRefresh、SwipeAction |
 
-验证情况：Web、iOS、Android 三端编译通过；Web 端全部文件无类型警告；在 iOS 模拟器上打开过首页、Button、Form、Tabs、
-PickerView、Badge 等页面。多数组件的交互（弹层、手势、选择器）还没有在真机或模拟器上逐个点过；Android 未实机运行，
-鸿蒙与微信小程序未验证。
+uni 端特有：`am-icon`、`am-loading`、`am-picker-popup`、`am-picker-trigger`、`am-typography-base`、`am-space-item`
+（App 端 `gap` 不生效，`am-space` / `am-flex` 的间距由包在子元素外面的 `am-space-item` 提供）。
+
+验证情况：Web、iOS、Android 三端编译通过；Web 端全部文件无类型警告；`node tools/parity/check.mjs` 无未登记差异。
+在 iOS 模拟器上打开过首页、Button、Form、Tabs、PickerView、Badge、Calendar、Space、TabBar、Upload 等页面。
+多数组件的交互（弹层、手势、选择器）还没有在真机或模拟器上逐个点过；Android 未实机运行，鸿蒙与微信小程序未验证。
 
 ## 使用
 

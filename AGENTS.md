@@ -100,7 +100,7 @@ const size = computed(() : string => sizeOf())   // 'small' | 'middle' | 'large'
 | --- | --- |
 | 只有 class 选择器，没有后代 / 标签 / 属性选择器、伪类、伪元素 | BEM 单 class；状态用额外的类或 `:style` |
 | 样式不继承 | 文字在 `<text>` 里，颜色字号写在 text 上 |
-| 只有 flex（默认纵向）和绝对定位；没有 `gap` | 间距写在子元素的 margin 上 |
+| 只有 flex（默认纵向）和绝对定位；`gap` 在 App 端能编译但运行时不生效（iOS 模拟器实测，class / style / `:style` 都一样） | 间距写在子元素的 margin 上；`am-space` / `am-flex` 的子元素包一层 `am-space-item`（`utils/space.uts`） |
 | 用到 `var()` 的属性不能写简写（VDOM 模式） | `border-top-left-radius` ×4、`padding-left` / `padding-right` 分开写；固定值可以简写 |
 | `transition` 里不能用 `var()`；没有 `@keyframes` | 时长写字面量，只过渡 transform / opacity / 宽高 / 背景色 / 边框色；转圈用内置 `<loading>` |
 | Android 上只切换类名时没有过渡 | 要动的值写在 `:style` 上 |

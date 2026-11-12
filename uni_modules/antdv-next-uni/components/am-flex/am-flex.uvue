@@ -1,12 +1,13 @@
 <script setup lang="uts">
 import { useAmTheme } from '../../theme/theme.uts'
+import { provideAmSpace } from '../../utils/space.uts'
 
 // 弹性布局（= antdv-next-mobile 的 Flex）：vertical、orientation（horizontal / vertical）、wrap、justify、align、
 // flex（容器自己的 flex）、gap（small 8 / middle 16 / large 24，或像素数）同名同义；
 // justify / align 是 CSS 的值（flex-start / center / space-between …）。
 //
 // 与 antdv-next-mobile 的差异（uni-app x 的限制）：
-// - `gap` 用容器上的 CSS `gap`（HBuilderX 5.34 起 App 端可以编译），写在 :style 上；预设值取主题的
+// - `gap`：Web 端是容器上的 CSS `gap`；**App 端的运行时不支持 gap，子元素要放进 <am-space-item>**（由它加外边距）；预设值取主题的
 //   paddingXS / padding / paddingLG，数字（或数字字符串）按像素，其他 CSS 长度原样写入；
 // - `wrap` 只有布尔值（true = wrap），没有 `component`（根节点只能是 view）；
 // - 不写 align 时子元素拉伸（uvue 的 view 默认 align-items: stretch，与 CSS 的 normal 表现相同）
@@ -37,6 +38,13 @@ const gapValue = computed(() : string => {
 	return /^\d+(\.\d+)?$/.test(text) ? text + 'px' : text
 })
 
+// 给 <am-space-item> 的上下文：App 端的运行时不支持 CSS gap，间距由包着子元素的 <am-space-item> 加外边距
+provideAmSpace(
+	() : string => gapValue.value,
+	() : boolean => props.vertical || props.orientation == 'vertical',
+	() : boolean => props.wrap
+)
+
 const style = computed(() : string => {
 	const vertical = props.vertical || props.orientation == 'vertical'
 	let text = 'flex-direction:' + (vertical ? 'column' : 'row') + ';'
@@ -44,7 +52,9 @@ const style = computed(() : string => {
 	if (props.align.length > 0) text += 'align-items:' + props.align + ';'
 	if (props.wrap) text += 'flex-wrap:wrap;'
 	if (props.flex.length > 0) text += 'flex:' + props.flex + ';'
+	// #ifdef WEB
 	if (gapValue.value.length > 0) text += 'gap:' + gapValue.value + ';'
+	// #endif
 	return text
 })
 </script>

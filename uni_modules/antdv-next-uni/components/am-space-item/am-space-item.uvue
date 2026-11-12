@@ -1,0 +1,60 @@
+<script setup lang="uts">
+// 间距项：<am-space> / <am-flex gap> 的直接子元素的包装。
+//
+// antdv-next-mobile 没有这个组件（那边容器会自动给每个子元素包一层）。这里需要它是因为 App 端的运行时
+// 不支持 CSS `gap`，容器也包不了插槽里的子元素：
+//
+//     <am-space>
+//       <am-space-item><am-button text="确定" /></am-space-item>
+//       <am-space-item><am-button text="取消" /></am-space-item>
+//     </am-space>
+//
+// 它按所在容器的间距给自己加外边距（横向加在右边，纵向加在下边；最后一项不加；换行时右边和下边都加）。
+// Web 端容器的 `gap` 有效，这里就不加外边距，两端的排版一致。只编译到 Web 时可以不用它。
+defineOptions({ name: 'AmSpaceItem' })
+
+const props = defineProps({
+	/** 在主轴上占满剩余空间（flex: 1） */
+	grow: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const gapOf = inject<(() => string) | null>('amSpaceGap', null)
+const verticalOf = inject<(() => boolean) | null>('amSpaceVertical', null)
+const wrapOf = inject<(() => boolean) | null>('amSpaceWrap', null)
+const register = inject<(() => number) | null>('amSpaceRegister', null)
+const unregister = inject<((id : number) => void) | null>('amSpaceUnregister', null)
+const isLast = inject<((id : number) => boolean) | null>('amSpaceIsLast', null)
+
+const id = register != null ? register() : 0
+
+onUnmounted(() => {
+	if (unregister != null && id > 0) unregister(id)
+})
+
+const style = computed(() : string => {
+	let text = props.grow ? 'flex:1;' : ''
+	// #ifndef WEB
+	const gap = gapOf != null ? gapOf() : ''
+	if (gap.length > 0) {
+		const vertical = verticalOf != null ? verticalOf() : false
+		const wrap = wrapOf != null ? wrapOf() : false
+		const last = isLast != null ? isLast(id) : true
+		if (wrap) text += 'margin-right:' + gap + ';margin-bottom:' + gap + ';'
+		else if (!last) text += (vertical ? 'margin-bottom:' : 'margin-right:') + gap + ';'
+	}
+	// #endif
+	return text
+})
+</script>
+
+<template>
+	<view :class="['am-space-item', rootClass]" :style="style">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+/* 不裁剪：徽标、阴影会伸出子元素 */
+.am-space-item { overflow: visible; }
+</style>
