@@ -1,0 +1,178 @@
+<script setup lang="uts">
+import { AmTabBarItem } from '../../types/tab-bar.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 标签栏（= antdv-next-mobile 的 TabBar）：页面底部的一级导航。items（key、title、icon、badge、disabled）、
+// v-model:activeKey、defaultActiveKey、fixed（固定在屏幕底部）、placeholder（fixed 时在文档流里留出同样的高度）、
+// safeArea（加上底部安全区域）、bordered（顶部的分隔线）、zIndex 同名同义；事件 update:activeKey、change；
+// 插槽 icon、title，参数是 { item, index, active }。只有标题没有图标的项，标题用大一号的字。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - key 是字符串；空字符串表示“没传”（这时用 defaultActiveKey，再没有就是第一项）；
+// - 项的 title 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据）；icon 不能是按选中状态返回节点的函数，
+//   选中时要换图标就写 activeIcon，或用 icon 插槽；
+// - 项没有 class / style（传给内部节点的类在 App 端不生效）；
+// - 顶部的分隔线是 1px（没有伪元素与 0.5 倍缩放）；徽标自己画（同 am-badge 的样子），不限制最大值
+defineOptions({ name: 'AmTabBar' })
+
+const props = defineProps({
+	items: { type: Array as PropType<AmTabBarItem[]>, default: () : AmTabBarItem[] => [] },
+	activeKey: { type: String, default: '' },
+	defaultActiveKey: { type: String, default: '' },
+	fixed: { type: Boolean, default: false },
+	placeholder: { type: Boolean, default: false },
+	safeArea: { type: Boolean, default: true },
+	bordered: { type: Boolean, default: true },
+	zIndex: { type: Number, default: 100 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:activeKey', 'change'])
+
+const theme = useAmTheme()
+
+/** 非受控时的 key */
+const inner = ref(props.defaultActiveKey)
+const current = computed(() : string => {
+	if (props.activeKey.length > 0) return props.activeKey
+	if (inner.value.length > 0) return inner.value
+	return props.items.length > 0 ? props.items[0].key : ''
+})
+
+function isActive(item : AmTabBarItem) : boolean {
+	return item.key == current.value
+}
+
+function onItem(item : AmTabBarItem) {
+	if (item.disabled == true || isActive(item)) return
+	inner.value = item.key
+	emit('update:activeKey', item.key)
+	emit('change', item.key)
+}
+
+/** slotted：使用方有没有写 icon 插槽（模板里的 $slots） */
+function hasIcon(item : AmTabBarItem, slotted : boolean) : boolean {
+	return slotted || (item.icon ?? '').length > 0
+}
+
+function hasTitle(item : AmTabBarItem, slotted : boolean) : boolean {
+	return slotted || (item.title ?? '').length > 0
+}
+
+function iconName(item : AmTabBarItem) : string {
+	const active = item.activeIcon ?? ''
+	return isActive(item) && active.length > 0 ? active : (item.icon ?? '')
+}
+
+// 选中 / 未选中的颜色：图标的颜色只能用属性传，文字的写在 :style 上
+function colorOf(item : AmTabBarItem) : string {
+	return isActive(item) ? theme().colorPrimary : theme().colorTextSecondary
+}
+
+function titleStyle(item : AmTabBarItem) : string {
+	return 'color:' + colorOf(item) + ';'
+}
+
+/** 徽标是不是小红点（badge 为 true） */
+function isDot(item : AmTabBarItem) : boolean {
+	const badge = item.badge
+	return badge != null && typeof badge == 'boolean' && (badge as boolean)
+}
+
+/** 徽标上的文字；空字符串表示没有文字徽标 */
+function badgeText(item : AmTabBarItem) : string {
+	const badge = item.badge
+	if (badge == null) return ''
+	if (typeof badge == 'number') return (badge as number) == 0 ? '' : '' + badge
+	if (typeof badge == 'string') return badge as string
+	return ''
+}
+
+const contentStyle = computed(() : string => props.fixed ? 'z-index:' + props.zIndex + ';' : '')
+</script>
+
+<template>
+	<view :class="['am-tab-bar', rootClass]">
+		<!-- fixed 时在文档流里留出同样的高度 -->
+		<view v-if="fixed && placeholder">
+			<view class="am-tab-bar__bar"></view>
+			<view v-if="safeArea" class="am-tab-bar__safe-area"></view>
+		</view>
+		<view :class="['am-tab-bar__content', fixed ? 'am-tab-bar__content--fixed' : '', bordered ? 'am-tab-bar__content--bordered' : '']" :style="contentStyle">
+			<view class="am-tab-bar__bar">
+				<view
+					v-for="(item, index) in items"
+					:key="item.key"
+					:class="['am-tab-bar__item', item.disabled == true ? 'am-tab-bar__item--disabled' : '']"
+					:hover-class="item.disabled == true ? 'none' : 'am-tab-bar__item--active'"
+					@click="onItem(item)"
+				>
+					<view v-if="hasIcon(item, $slots['icon'] != null)" class="am-tab-bar__icon">
+						<slot name="icon" :item="item" :index="index" :active="isActive(item)">
+							<am-icon :name="iconName(item)" :size="24" :color="colorOf(item)" />
+						</slot>
+						<view v-if="isDot(item)" class="am-tab-bar__badge am-tab-bar__badge--dot"></view>
+						<view v-else-if="badgeText(item).length > 0" class="am-tab-bar__badge">
+							<text class="am-tab-bar__badge-text">{{ badgeText(item) }}</text>
+						</view>
+					</view>
+					<view v-if="hasTitle(item, $slots['title'] != null)" :class="['am-tab-bar__title', hasIcon(item, $slots['icon'] != null) ? 'am-tab-bar__title--below' : '']">
+						<slot name="title" :item="item" :index="index" :active="isActive(item)">
+							<text :class="['am-tab-bar__title-text', hasIcon(item, $slots['icon'] != null) ? '' : 'am-tab-bar__title-text--only']" :style="titleStyle(item)">{{ item.title }}</text>
+						</slot>
+						<view v-if="!hasIcon(item, $slots['icon'] != null) && isDot(item)" class="am-tab-bar__badge am-tab-bar__badge--dot"></view>
+						<view v-else-if="!hasIcon(item, $slots['icon'] != null) && badgeText(item).length > 0" class="am-tab-bar__badge">
+							<text class="am-tab-bar__badge-text">{{ badgeText(item) }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+			<view v-if="safeArea" class="am-tab-bar__safe-area"></view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-tab-bar__content { background-color: var(--am-color-bg-container, #ffffff); }
+.am-tab-bar__content--fixed { position: fixed; left: 0; right: 0; bottom: 0; }
+.am-tab-bar__content--bordered {
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-tab-bar__bar { flex-direction: row; height: 50px; }
+.am-tab-bar__safe-area { height: var(--uni-safe-area-inset-bottom, 0px); }
+.am-tab-bar__item {
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+	transition-property: opacity;
+	transition-duration: 200ms;
+}
+.am-tab-bar__item--active { opacity: 0.7; }
+.am-tab-bar__item--disabled { opacity: 0.4; }
+/* 徽标伸出图标 / 标题的右上角 */
+.am-tab-bar__icon { height: 24px; flex-direction: row; align-items: center; justify-content: center; overflow: visible; }
+.am-tab-bar__title { flex-direction: row; align-items: center; overflow: visible; }
+.am-tab-bar__title--below { margin-top: 2px; }
+.am-tab-bar__title-text { font-size: 10px; line-height: 15px; white-space: nowrap; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.am-tab-bar__title-text--only { font-size: var(--am-font-size-lg, 16px); line-height: 24px; }
+.am-tab-bar__badge {
+	position: absolute;
+	top: 0;
+	left: 100%;
+	z-index: 1;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	border-radius: 8px;
+	background-color: var(--am-color-error, #ff4d4f);
+	transform: translateX(-50%) translateY(-25%);
+}
+.am-tab-bar__badge--dot { min-width: 8px; width: 8px; height: 8px; padding: 0; border-radius: 4px; transform: translateX(-50%) translateY(0); }
+/* 不换行：徽标是绝对定位的，没有可用宽度时 App 端会把长数字折成两行 */
+.am-tab-bar__badge-text { white-space: nowrap; font-size: 10px; line-height: 12px; font-weight: 500; color: var(--am-color-text-light-solid, #ffffff); }
+</style>

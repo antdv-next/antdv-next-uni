@@ -1,0 +1,5 @@
+{
+  "missingEmits": {
+    "remove": "uvue 里没有 MutationObserver，别的代码也拿不到水印层的节点（不存在被外部删改的情况）"
+  }
+}

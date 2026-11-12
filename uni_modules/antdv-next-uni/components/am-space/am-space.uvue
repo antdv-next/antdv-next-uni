@@ -1,0 +1,78 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 间距（= antdv-next-mobile 的 Space）：给一排（或一列）子元素之间留出相同的间距。
+// size（small 8 / middle 16 / large 24，或像素数）、orientation / direction / vertical、align（start / end / center /
+// baseline / stretch；横向默认 center）、wrap（横向时自动换行）、block（撑满父元素）同名同义；插槽 default。
+// 预设的间距取主题的 paddingXS / padding / paddingLG（紧凑主题下跟着变小）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 间距用容器上的 CSS `gap`（HBuilderX 5.34 起 App 端可以编译）：容器包不了插槽里的子元素，没有 `.am-space-item` 这一层；
+// - 因为包不了子元素，也就不能在子元素之间插入内容：没有 `separator` 属性与插槽（分隔线请自己写在子元素之间）；
+// - `size` 是一个值（字符串或数字），没有 [横向, 纵向] 的数组写法；其他 CSS 长度原样写进 gap；
+// - App 端没有 align-items: baseline，`align="baseline"` 按 flex-end 处理（Web 端是 baseline）
+defineOptions({ name: 'AmSpace' })
+
+const props = defineProps({
+	size: { type: [String, Number], default: 'small' },
+	orientation: { type: String, default: '' },
+	/** orientation 的别名 */
+	direction: { type: String, default: '' },
+	vertical: { type: Boolean, default: false },
+	align: { type: String, default: '' },
+	wrap: { type: Boolean, default: false },
+	block: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+const isVertical = computed(() : boolean => {
+	if (props.vertical) return true
+	const orientation = props.orientation.length > 0 ? props.orientation : props.direction
+	return orientation == 'vertical'
+})
+
+/** gap 的值（带单位） */
+const gap = computed(() : string => {
+	const size = props.size
+	if (typeof size == 'number') return (size as number) + 'px'
+	const text = size as string
+	if (text == 'small' || text.length == 0) return theme().paddingXS + 'px'
+	if (text == 'middle' || text == 'medium') return theme().padding + 'px'
+	if (text == 'large') return theme().paddingLG + 'px'
+	return /^\d+(\.\d+)?$/.test(text) ? text + 'px' : text
+})
+
+const ALIGNS = new Map<string, string>([
+	['start', 'flex-start'], ['end', 'flex-end'], ['center', 'center'], ['stretch', 'stretch']
+])
+
+const style = computed(() : string => {
+	let text = 'flex-direction:' + (isVertical.value ? 'column' : 'row') + ';gap:' + gap.value + ';'
+	let align = props.align.length > 0 ? props.align : (isVertical.value ? '' : 'center')
+	if (align == 'baseline') {
+		align = 'flex-end'
+		// #ifdef WEB
+		align = 'baseline'
+		// #endif
+	} else if (align.length > 0) {
+		align = ALIGNS.get(align) ?? align
+	}
+	if (align.length > 0) text += 'align-items:' + align + ';'
+	if (props.wrap && !isVertical.value) text += 'flex-wrap:wrap;'
+	return text
+})
+</script>
+
+<template>
+	<view :class="['am-space', block ? 'am-space--block' : '', rootClass]" :style="style">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+/* App 端 view 默认裁剪超出的内容，布局容器与 Web 一致不裁剪（徽标、阴影会伸出子元素） */
+.am-space { align-self: flex-start; overflow: visible; }
+.am-space--block { align-self: stretch; }
+</style>

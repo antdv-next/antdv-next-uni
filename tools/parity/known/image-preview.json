@@ -1,0 +1,10 @@
+{
+  "missingProps": {
+    "defaultOpen": "UTS 里分不出“没传”和 false，非受控用法请用 v-model:open",
+    "defaultCurrent": "同 defaultOpen，请用 v-model:current",
+    "swipeToClose": "翻页用内置的 swiper，纵向的拖动手势要和它在原生层协调，uvue 里做不了；点一下或返回键关闭",
+    "maxZoom": "没有缩放：双指缩放与 swiper 的手势要在原生层协调。需要缩放时用 utils/image-preview.uts 的 previewAmImage()（系统的预览）",
+    "minZoom": "同 maxZoom",
+    "doubleTapZoom": "同 maxZoom"
+  }
+}

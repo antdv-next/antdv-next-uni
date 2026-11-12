@@ -1,0 +1,94 @@
+<script setup lang="uts">
+import { previewAmImage } from '@/uni_modules/antdv-next-uni/utils/image-preview.uts'
+
+// 图片预览：组件（自己画的全屏图层，可以放页码、底部内容，没有缩放）与函数（系统的预览，带缩放）
+const images : string[] = ['/static/logo.png', '/static/logo.png', '/static/logo.png', '/static/not-found.png']
+
+const basicOpen = ref(false)
+const startOpen = ref(false)
+const startCurrent = ref(2)
+const closableOpen = ref(false)
+const plainOpen = ref(false)
+const footerOpen = ref(false)
+const footerCurrent = ref(0)
+const log = ref('')
+
+function onChange(current : number) {
+	log.value = '切到第 ' + (current + 1) + ' 张'
+}
+
+function onAfterOpenChange(open : boolean) {
+	log.value = open ? '打开的动画结束' : '关闭的动画结束'
+}
+
+function openSystem() {
+	previewAmImage({ images: images, current: 1 })
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法：点一下图片关闭</text>
+		<view class="demo__card">
+			<am-button text="预览 4 张图片" block @click="basicOpen = true" />
+			<text class="demo__hint">最后一张的地址是坏的，显示“加载失败”。{{ log }}</text>
+		</view>
+
+		<text class="demo__title">从第 3 张开始（v-model:current）</text>
+		<view class="demo__card">
+			<am-button text="从第 3 张开始" block @click="startOpen = true" />
+			<text class="demo__hint">当前第 {{ startCurrent + 1 }} 张</text>
+		</view>
+
+		<text class="demo__title">关闭按钮（closable），点图片不关闭</text>
+		<view class="demo__card">
+			<am-button text="带关闭按钮" block @click="closableOpen = true" />
+		</view>
+
+		<text class="demo__title">不循环、不显示页码</text>
+		<view class="demo__card">
+			<am-button text="loop / showIndex 为 false" block @click="plainOpen = true" />
+		</view>
+
+		<text class="demo__title">自定义页码与底部内容（index / footer 插槽）</text>
+		<view class="demo__card">
+			<am-button text="带说明文字" block @click="footerOpen = true" />
+		</view>
+
+		<text class="demo__title">函数式：previewAmImage()（系统的预览，可以缩放）</text>
+		<view class="demo__card">
+			<am-button text="系统的图片预览" block @click="openSystem" />
+		</view>
+		<view class="demo__footer"></view>
+
+		<am-image-preview v-model:open="basicOpen" :images="images" @change="onChange" @afterOpenChange="onAfterOpenChange" />
+		<am-image-preview v-model:open="startOpen" v-model:current="startCurrent" :images="images" />
+		<am-image-preview v-model:open="closableOpen" :images="images" closable :close-on-click="false" />
+		<am-image-preview v-model:open="plainOpen" :images="images" :loop="false" :show-index="false" />
+		<am-image-preview v-model:open="footerOpen" v-model:current="footerCurrent" :images="images">
+			<template #index="{ current, total }">
+				<text class="demo__index">第 {{ current + 1 }} 张，共 {{ total }} 张</text>
+			</template>
+			<template #footer="{ current }">
+				<view class="demo__caption">
+					<text class="demo__caption-text">这是第 {{ current + 1 }} 张图片的说明文字</text>
+				</view>
+			</template>
+		</am-image-preview>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__index { margin-top: 16px; font-size: 14px; line-height: 22px; color: #ffffff; }
+.demo__caption { padding: 12px 16px; background-color: rgba(0, 0, 0, 0.45); }
+.demo__caption-text { font-size: 14px; line-height: 22px; color: #ffffff; text-align: center; }
+</style>

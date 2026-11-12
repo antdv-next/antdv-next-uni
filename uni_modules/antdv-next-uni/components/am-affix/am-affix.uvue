@@ -1,0 +1,143 @@
+<script setup lang="uts">
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 固钉（= antdv-next-mobile 的 Affix）：内容滚出屏幕时把它钉在顶部（或底部）。
+// offsetTop（离顶部多远时钉住，两个偏移都没给时为 0）、offsetBottom、zIndex 同名同义；事件 change（affixed）；
+// 方法 updatePosition()（重新量位置：上方的内容高度变了、或在自己的滚动区域里滚动时调用）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 没有 position: sticky，也没有元素的 scroll 事件可以订阅：监听的是**页面的滚动**（组件里的 onPageScroll，
+//   HBuilderX 5.21 起各端的蒸汽模式都支持）。位置在挂载时量一次，滚动中按 scrollTop 直接算（Android 上异步量一次
+//   要 200ms 左右，每次滚动都量会慢半拍），停下来后再量一次校正；
+// - 没有 `target`（指定滚动容器）：放在 scroll-view 里时页面不滚，要在 scroll-view 的 @scroll 里调用 updatePosition()
+//   （每次都要异步量，Android 上会晚一点才钉住）；
+// - offsetTop / offsetBottom 没给时是 -1（UTS 里没有 undefined）；
+// - 钉住时内容是 position: fixed，原来的位置留一个同样高的占位；宽度、左边距取占位的（量出来的）。
+//   fixed 的内容盖不住原生导航栏，offsetTop 从导航栏下面算起
+defineOptions({ name: 'AmAffix' })
+
+const props = defineProps({
+	/** 离顶部不到这个距离时钉住（像素）；-1 为没给 */
+	offsetTop: { type: Number, default: -1 },
+	/** 离底部不到这个距离时钉住（像素）；-1 为没给 */
+	offsetBottom: { type: Number, default: -1 },
+	zIndex: { type: Number, default: 10 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['change'])
+
+const uid = amUid('am-affix')
+
+/** 钉在哪：'' 没钉、'top'、'bottom' */
+const pinned = ref('')
+/** 占位（根节点）在窗口里的位置与大小：钉住时内容的 left / width、占位的高度用它 */
+const box = ref<AmRect | null>(null)
+/** 量 box 时页面的 scrollTop（-1：还不知道页面滚到哪了） */
+let boxScroll = -1
+/** 页面现在的 scrollTop（-1：还没有收到过滚动事件） */
+let pageScroll = -1
+let reported = false
+let settleTimer = 0
+
+const mergedTop = computed(() : number => props.offsetTop < 0 && props.offsetBottom < 0 ? 0 : props.offsetTop)
+
+/** 按占位现在的位置（窗口坐标）决定钉不钉 */
+function decide(top : number, height : number) {
+	const info = uni.getWindowInfo()
+	// Web 上原生导航栏也在窗口坐标里（windowTop）；App 上页面从导航栏下面开始，windowTop 为 0
+	const viewTop = info.windowTop
+	const viewBottom = info.windowTop + info.windowHeight
+	let next = ''
+	if (mergedTop.value >= 0 && top < viewTop + mergedTop.value) next = 'top'
+	else if (props.offsetBottom >= 0 && top + height > viewBottom - props.offsetBottom) next = 'bottom'
+	if (next != pinned.value) pinned.value = next
+	const affixed = next.length > 0
+	if (affixed != reported) {
+		reported = affixed
+		emit('change', affixed)
+	}
+}
+
+/** 量占位的位置（它一直在文档流里，钉住时也量得到），再决定钉不钉 */
+function measure() {
+	measureById(uid).then((rect : AmRect | null) => {
+		// 量不到、或者不可见（宽高都是 0）：保持现状
+		if (rect == null || (rect.width == 0 && rect.height == 0)) return
+		// 钉住时占位的高度是写死的，不用量到的（内容可能已经变了，见 updatePosition）
+		const height = pinned.value.length > 0 && box.value != null ? box.value!.height : rect.height
+		const next : AmRect = { left: rect.left, top: rect.top, width: rect.width, height: height }
+		box.value = next
+		boxScroll = pageScroll
+		decide(next.top, next.height)
+	})
+}
+
+function settle() {
+	clearTimeout(settleTimer)
+	settleTimer = setTimeout(() => { measure() }, 120)
+}
+
+onPageScroll((event : OnPageScrollOptions) => {
+	pageScroll = event.scrollTop
+	const rect = box.value
+	// 量的时候知道页面滚到哪：占位现在的位置直接算，不用等异步的量
+	if (rect != null && boxScroll >= 0) decide(rect.top - (pageScroll - boxScroll), rect.height)
+	else measure()
+	// 停下来后再量一次：上方的内容高度可能变了
+	settle()
+})
+
+/** 重新量位置。钉住时先放回文档流量出内容现在的高度 */
+function updatePosition() {
+	if (pinned.value.length == 0) {
+		measure()
+		return
+	}
+	pinned.value = ''
+	box.value = null
+	setTimeout(() => { measure() }, 30)
+}
+
+onMounted(() => {
+	setTimeout(() => { measure() }, 30)
+	setTimeout(() => { measure() }, 400)
+})
+onPageShow(() => { setTimeout(() => { measure() }, 30) })
+onUnmounted(() => { clearTimeout(settleTimer) })
+
+watch(() : string => props.offsetTop + '|' + props.offsetBottom, () => { measure() })
+
+const rootStyle = computed(() : string => {
+	const rect = box.value
+	if (pinned.value.length == 0 || rect == null) return ''
+	return 'height:' + rect.height + 'px;'
+})
+
+const contentStyle = computed(() : string => {
+	const rect = box.value
+	if (pinned.value.length == 0 || rect == null) return ''
+	const info = uni.getWindowInfo()
+	let text = 'position:fixed;left:' + rect.left + 'px;width:' + rect.width + 'px;z-index:' + props.zIndex + ';'
+	if (pinned.value == 'top') text += 'top:' + (info.windowTop + mergedTop.value) + 'px;'
+	else text += 'bottom:' + (info.windowBottom + props.offsetBottom) + 'px;'
+	return text
+})
+
+defineExpose({
+	updatePosition: () => { updatePosition() }
+})
+</script>
+
+<template>
+	<view :id="uid" :class="['am-affix-wrapper', rootClass]" :style="rootStyle">
+		<view class="am-affix" :style="contentStyle">
+			<slot></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+/* 钉住的内容不被占位裁掉（App 端 view 默认 overflow: hidden） */
+.am-affix-wrapper { overflow: visible; }
+</style>

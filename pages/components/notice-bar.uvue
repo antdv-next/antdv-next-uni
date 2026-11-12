@@ -1,0 +1,81 @@
+<script setup lang="uts">
+const colors : string[] = ['default', 'info', 'success', 'warning', 'error']
+const long = '这是一条很长的通告：国庆期间全场包邮，订单满 199 元再减 20 元，活动截止到 10 月 7 日 24 点，先到先得。'
+const rounds = ref(0)
+const closed = ref(0)
+const barRef = ref<AmNoticeBarComponentPublicInstance | null>(null)
+const text = ref(long)
+
+function onReplay() {
+	rounds.value++
+}
+
+function onClose() {
+	closed.value++
+}
+
+function changeText() {
+	text.value = text.value == long ? '短通告' : long
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（放不下时滚动，已滚 {{ rounds }} 轮）</text>
+		<am-notice-bar :content="long" @replay="onReplay" />
+
+		<text class="demo__title">颜色</text>
+		<am-notice-bar v-for="item in colors" :key="item" root-class="demo__bar" :color="item" :content="'color = ' + item" />
+
+		<text class="demo__title">可关闭、附加内容（关闭了 {{ closed }} 次）</text>
+		<am-notice-bar content="系统将于今晚 23:00 维护" closable extra="查看详情" @close="onClose" />
+		<am-notice-bar root-class="demo__bar" color="info" icon="info" content="extra 插槽里放按钮" closable>
+			<template #extra>
+				<am-button size="small" type="link" text="去设置" />
+			</template>
+		</am-notice-bar>
+
+		<text class="demo__title">换行显示 / 不滚动（省略号）/ 没有图标</text>
+		<am-notice-bar :content="long" wrap closable />
+		<am-notice-bar root-class="demo__bar" :content="long" :scrollable="false" />
+		<am-notice-bar root-class="demo__bar" icon="none" content="icon = none：没有图标" />
+
+		<text class="demo__title">总是滚动、速度与等待</text>
+		<am-notice-bar content="短文字也滚动（scrollable）" scrollable :delay="500" :speed="80" />
+
+		<text class="demo__title">形状与边框</text>
+		<view class="demo__card">
+			<am-notice-bar shape="neutral" content="shape = neutral" />
+			<am-notice-bar root-class="demo__bar" shape="rounded" content="shape = rounded" />
+			<am-notice-bar root-class="demo__bar" shape="neutral" :bordered="false" content="bordered = false" />
+			<am-notice-bar root-class="demo__bar" bordered color="error" content="bordered = true（四边）" />
+		</view>
+
+		<text class="demo__title">内容变化后重新开始；reset()</text>
+		<am-notice-bar ref="barRef" :content="text" :delay="1000" />
+		<view class="demo__card demo__bar">
+			<view class="demo__row">
+				<am-button class="demo__item" text="换内容" @click="changeText" />
+				<am-button class="demo__item" text="reset()" @click="barRef?.reset()" />
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { padding-top: 8px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__bar { margin-top: 8px; }
+</style>

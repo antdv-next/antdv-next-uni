@@ -1,0 +1,150 @@
+<script setup lang="uts">
+// 虚拟列表：一万条数据。等高（fixed）时 scrollTo 可以居中 / 靠底；不等高时只能滚到某一项的顶部
+function makeRows(count : number) : UTSJSONObject[] {
+	const list : UTSJSONObject[] = []
+	for (let i = 0; i < count; i++) {
+		list.push({ id: 'row-' + i, title: '第 ' + (i + 1) + ' 条', lines: i % 3 + 1 } as UTSJSONObject)
+	}
+	return list
+}
+
+const rows = ref<UTSJSONObject[]>(makeRows(10000))
+const more = ref<UTSJSONObject[]>(makeRows(30))
+const log = ref('')
+const fixedList = ref<AmVirtualListComponentPublicInstance | null>(null)
+const autoList = ref<AmVirtualListComponentPublicInstance | null>(null)
+
+function titleOf(item : any) : string {
+	return (item as UTSJSONObject).getString('title') ?? ''
+}
+
+/** 不等高的演示：第 i 条有 1 ~ 3 行说明 */
+function noteOf(item : any) : string {
+	const lines = (item as UTSJSONObject).getNumber('lines') ?? 1
+	let text = '这一条有 ' + lines + ' 行说明'
+	for (let i = 1; i < lines; i++) text += '\n说明的第 ' + (i + 1) + ' 行'
+	return text
+}
+
+function toMiddle() {
+	fixedList.value?.scrollTo({ index: 4999, align: 'center' })
+}
+
+function toKey() {
+	fixedList.value?.scrollTo({ key: 'row-9999', align: 'end' })
+}
+
+function toTop() {
+	fixedList.value?.scrollTo(0)
+}
+
+function showTop() {
+	const top = fixedList.value?.getScrollTop() ?? 0
+	log.value = 'scrollTop = ' + Math.round(top)
+}
+
+function toItem() {
+	autoList.value?.scrollTo({ index: 20 })
+}
+
+function loadMore() {
+	if (more.value.length >= 90) return
+	const list = [...more.value]
+	const start = list.length
+	for (let i = 0; i < 30; i++) {
+		list.push({ id: 'row-' + (start + i), title: '第 ' + (start + i + 1) + ' 条', lines: (start + i) % 3 + 1 } as UTSJSONObject)
+	}
+	more.value = list
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">一万条，每条 48px（fixed）</text>
+		<view class="demo__card">
+			<am-virtual-list ref="fixedList" :data="rows" :height="320" :item-height="48" item-key="id" fixed>
+				<template #header>
+					<view class="demo__head"><text class="demo__head-text">header 插槽：跟着列表一起滚</text></view>
+				</template>
+				<template #default="{ item, index }">
+					<view class="demo__row">
+						<text class="demo__row-text">{{ titleOf(item) }}</text>
+						<text class="demo__row-index">#{{ index }}</text>
+					</view>
+				</template>
+				<template #footer>
+					<view class="demo__head"><text class="demo__head-text">footer 插槽：到底了</text></view>
+				</template>
+			</am-virtual-list>
+			<view class="demo__actions">
+				<view class="demo__action"><am-button size="small" text="第 5000 条居中" @click="toMiddle" /></view>
+				<view class="demo__action"><am-button size="small" text="最后一条（按 key）" @click="toKey" /></view>
+				<view class="demo__action"><am-button size="small" text="回到顶部" @click="toTop" /></view>
+				<view class="demo__action"><am-button size="small" text="getScrollTop()" @click="showTop" /></view>
+			</view>
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">高度由内容决定；滚到底加载更多（reachEnd）</text>
+		<view class="demo__card">
+			<am-virtual-list ref="autoList" :data="more" :height="280" item-key="id" @reachEnd="loadMore">
+				<template #default="{ item }">
+					<view class="demo__block">
+						<text class="demo__row-text">{{ titleOf(item) }}</text>
+						<text class="demo__note">{{ noteOf(item) }}</text>
+					</view>
+				</template>
+			</am-virtual-list>
+			<view class="demo__actions">
+				<view class="demo__action"><am-button size="small" text="滚到第 21 条" @click="toItem" /></view>
+			</view>
+			<text class="demo__hint">已加载 {{ more.length }} 条{{ more.length >= 90 ? '，没有更多了' : '' }}</text>
+		</view>
+
+		<text class="demo__title">virtual 为 false：普通的 scroll-view，每一项都渲染</text>
+		<view class="demo__card">
+			<am-virtual-list :data="more" :height="200" item-key="id" :virtual="false">
+				<template #default="{ item }">
+					<view class="demo__row">
+						<text class="demo__row-text">{{ titleOf(item) }}</text>
+					</view>
+				</template>
+			</am-virtual-list>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__head { height: 36px; justify-content: center; align-items: center; background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.demo__head-text { font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__row {
+	height: 48px;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(5, 5, 5, 0.06));
+}
+.demo__row-text { font-size: 15px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__row-index { font-size: 12px; color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.demo__block {
+	padding: 10px 0;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(5, 5, 5, 0.06));
+}
+.demo__note { margin-top: 4px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__actions { flex-direction: row; flex-wrap: wrap; margin-top: 12px; }
+.demo__action { margin-right: 8px; margin-bottom: 8px; }
+.demo__hint { margin-top: 4px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+</style>

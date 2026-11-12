@@ -1,0 +1,10 @@
+// <am-calendar> 的类型（= antdv-next-mobile 的 calendar/interface.ts）。
+// 日期一律是 YYYY-MM-DD 字符串（uni-app x 上没有 dayjs）
+
+/** monthShow 事件的参数：滚动到了某个月 */
+export type AmCalendarMonthInfo = {
+	/** 这个月的 1 号，YYYY-MM-DD */
+	date : string
+	/** 月份的标题（语言包的 Calendar.monthFormat） */
+	title : string
+}

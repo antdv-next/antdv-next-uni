@@ -1,0 +1,118 @@
+<script setup lang="uts">
+import { addAmOverlay, removeAmOverlay } from '../../utils/overlay.uts'
+
+// 遮罩（= antdv-next-mobile 的 Mask）：铺满屏幕的半透明层，内容放在默认插槽里。v-model:open、zIndex、
+// lockScroll（在遮罩上滑动时页面不跟着滚）、color（default 用主题的遮罩色，white 为半透明的白，或任意颜色值）、
+// closable（点击遮罩时发出 update:open false）、destroyOnHidden 同名同义；事件 update:open、click、afterOpenChange。
+// 点击插槽里的内容不算点击遮罩。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 没有挂到 body 的 Teleport（也就没有 getContainer）：根节点 fixed 铺满屏幕，要放在页面根节点下，
+//   不要放在会裁剪内容的容器里；
+// - lockScroll 只拦住遮罩本身上的滑动；插槽里的内容滚到头之后页面是否跟着滚由平台决定；
+// - closable 的遮罩打开时登记到弹出层栈：Android 的返回键先关掉它（utils/overlay.uts）
+//
+// 打开时先以透明的状态渲染一帧再变为不透明，关闭时先变透明、等过渡结束再隐藏；透明度写在 :style 上
+defineOptions({ name: 'AmMask' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	lockScroll: { type: Boolean, default: true },
+	color: { type: String, default: 'default' },
+	closable: { type: Boolean, default: false },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'click', 'afterOpenChange'])
+
+/** 过渡的时长（毫秒），与样式里的 transition-duration 一致 */
+const DURATION = 300
+
+const rendered = ref(false)
+const visible = ref(false)
+const shown = ref(false)
+let timer = 0
+let overlayId = 0
+
+function unregister() {
+	if (overlayId > 0) removeAmOverlay(overlayId)
+	overlayId = 0
+}
+
+watch(
+	() : boolean => props.open,
+	(open : boolean) => {
+		clearTimeout(timer)
+		unregister()
+		if (open) {
+			if (props.closable) overlayId = addAmOverlay(() => { emit('update:open', false) })
+			rendered.value = true
+			visible.value = true
+			// 先以透明的状态渲染一帧，再切到不透明，过渡才会生效
+			timer = setTimeout(() => {
+				shown.value = true
+				timer = setTimeout(() => { emit('afterOpenChange', true) }, DURATION)
+			}, 20)
+		} else if (visible.value) {
+			shown.value = false
+			timer = setTimeout(() => {
+				visible.value = false
+				if (props.destroyOnHidden) rendered.value = false
+				emit('afterOpenChange', false)
+			}, DURATION)
+		}
+	},
+	{ immediate: true }
+)
+
+onUnmounted(() => {
+	clearTimeout(timer)
+	unregister()
+})
+
+const rootStyle = computed(() : string => 'z-index:' + props.zIndex + ';opacity:' + (shown.value ? 1 : 0) + ';')
+
+const backdropStyle = computed(() : string => {
+	if (props.color == 'default' || props.color.length == 0) return ''
+	return 'background-color:' + (props.color == 'white' ? 'rgba(255, 255, 255, 0.6)' : props.color) + ';'
+})
+
+function onClick(event : UniPointerEvent) {
+	emit('click', event)
+	if (props.closable) emit('update:open', false)
+}
+
+function onTouchMove(event : UniTouchEvent) {
+	if (props.lockScroll) event.preventDefault()
+}
+</script>
+
+<template>
+	<view v-if="rendered" v-show="visible" :class="['am-mask', rootClass]" :style="rootStyle">
+		<!-- 底色单独一层：点击、滑动只算落在它上面的，插槽里的内容是它的兄弟节点 -->
+		<view class="am-mask__backdrop" :style="backdropStyle" @click="onClick" @touchmove="onTouchMove"></view>
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-mask {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	transition-property: opacity;
+	transition-duration: 300ms;
+}
+.am-mask__backdrop {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+}
+</style>

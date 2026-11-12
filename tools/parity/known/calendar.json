@@ -1,0 +1,11 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和空值，非受控用法请用 v-model:value",
+    "valueFormat": "没有 dayjs：值固定是 YYYY-MM-DD 字符串（single 为字符串，range / multiple 为字符串数组）",
+    "disabledDate": "UTS 的函数属性在 App 端受限；范围用 minDate / maxDate",
+    "formatter": "UTS 的函数属性在 App 端受限：日期格子的文字固定为日 + 今天 / 开始 / 结束",
+    "cellRender": "返回节点的渲染函数无法表达，作用域插槽在循环里的性能与 App 端表现未验证，暂不提供",
+    "defaultOpen": "UTS 的布尔属性分不出“没传”：不绑定 open 时组件自己管开关",
+    "id": "触发器是 view，没有原生控件的 id"
+  }
+}

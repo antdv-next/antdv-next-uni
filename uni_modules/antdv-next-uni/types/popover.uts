@@ -1,0 +1,12 @@
+// <am-popover> 的类型（= antdv-next-mobile 的 popover/interface.ts）
+
+/** 菜单模式的一项（= PopoverAction）。没有 onClick（UTS 的类型里不放函数）：用 action 事件 */
+export type AmPopoverAction = {
+	key : string
+	/** 文字 */
+	text : string
+	/** 图标名（<am-icon> 的 name） */
+	icon ?: string | null
+	disabled ?: boolean | null
+	danger ?: boolean | null
+}

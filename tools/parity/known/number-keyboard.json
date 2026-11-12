@@ -1,0 +1,7 @@
+{
+  "missingProps": {
+    "defaultOpen": "UTS 的布尔属性分不出“没传”：不绑定 open 时组件自己管开关",
+    "defaultValue": "UTS 里分不出“没传”和空字符串，非受控用法请用 v-model:value",
+    "hideOnClickOutside": "App 端没有“触摸组件以外的区域”的全局事件，键盘又没有遮罩（页面要照常可点）；由页面把 open 改成 false，blur 事件在 Android 返回键收起键盘时发出"
+  }
+}

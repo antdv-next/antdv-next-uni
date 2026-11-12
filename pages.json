@@ -19,6 +19,12 @@
 			}
 		},
 		{
+			"path": "pages/components/affix",
+			"style": {
+				"navigationBarTitleText": "Affix 固钉"
+			}
+		},
+		{
 			"path": "pages/components/alert",
 			"style": {
 				"navigationBarTitleText": "Alert 警告提示"
@@ -31,6 +37,18 @@
 			}
 		},
 		{
+			"path": "pages/components/avatar-group",
+			"style": {
+				"navigationBarTitleText": "AvatarGroup 头像组"
+			}
+		},
+		{
+			"path": "pages/components/back-top",
+			"style": {
+				"navigationBarTitleText": "BackTop 回到顶部"
+			}
+		},
+		{
 			"path": "pages/components/badge",
 			"style": {
 				"navigationBarTitleText": "Badge 徽标数"
@@ -40,6 +58,12 @@
 			"path": "pages/components/button",
 			"style": {
 				"navigationBarTitleText": "Button 按钮"
+			}
+		},
+		{
+			"path": "pages/components/calendar",
+			"style": {
+				"navigationBarTitleText": "Calendar 日历"
 			}
 		},
 		{
@@ -127,6 +151,18 @@
 			}
 		},
 		{
+			"path": "pages/components/float-button-group",
+			"style": {
+				"navigationBarTitleText": "FloatButtonGroup 悬浮按钮组"
+			}
+		},
+		{
+			"path": "pages/components/floating-panel",
+			"style": {
+				"navigationBarTitleText": "FloatingPanel 浮动面板"
+			}
+		},
+		{
 			"path": "pages/components/form",
 			"style": {
 				"navigationBarTitleText": "Form 表单"
@@ -142,6 +178,12 @@
 			"path": "pages/components/image",
 			"style": {
 				"navigationBarTitleText": "Image 图片"
+			}
+		},
+		{
+			"path": "pages/components/image-preview",
+			"style": {
+				"navigationBarTitleText": "ImagePreview 图片预览"
 			}
 		},
 		{
@@ -176,9 +218,21 @@
 			}
 		},
 		{
+			"path": "pages/components/input-otp",
+			"style": {
+				"navigationBarTitleText": "InputOTP 一次性密码框"
+			}
+		},
+		{
 			"path": "pages/components/list",
 			"style": {
 				"navigationBarTitleText": "List 列表"
+			}
+		},
+		{
+			"path": "pages/components/mask",
+			"style": {
+				"navigationBarTitleText": "Mask 背景蒙层"
 			}
 		},
 		{
@@ -200,6 +254,18 @@
 			}
 		},
 		{
+			"path": "pages/components/notice-bar",
+			"style": {
+				"navigationBarTitleText": "NoticeBar 通告栏"
+			}
+		},
+		{
+			"path": "pages/components/number-keyboard",
+			"style": {
+				"navigationBarTitleText": "NumberKeyboard 数字键盘"
+			}
+		},
+		{
 			"path": "pages/components/pagination",
 			"style": {
 				"navigationBarTitleText": "Pagination 分页"
@@ -215,6 +281,12 @@
 			"path": "pages/components/picker-view",
 			"style": {
 				"navigationBarTitleText": "PickerView 选择器视图"
+			}
+		},
+		{
+			"path": "pages/components/popover",
+			"style": {
+				"navigationBarTitleText": "Popover 气泡卡片"
 			}
 		},
 		{
@@ -273,6 +345,18 @@
 			}
 		},
 		{
+			"path": "pages/components/selector",
+			"style": {
+				"navigationBarTitleText": "Selector 选择组"
+			}
+		},
+		{
+			"path": "pages/components/side-bar",
+			"style": {
+				"navigationBarTitleText": "SideBar 侧边导航"
+			}
+		},
+		{
 			"path": "pages/components/skeleton",
 			"style": {
 				"navigationBarTitleText": "Skeleton 骨架屏"
@@ -282,6 +366,12 @@
 			"path": "pages/components/slider",
 			"style": {
 				"navigationBarTitleText": "Slider 滑动输入条"
+			}
+		},
+		{
+			"path": "pages/components/space",
+			"style": {
+				"navigationBarTitleText": "Space 间距"
 			}
 		},
 		{
@@ -315,6 +405,12 @@
 			}
 		},
 		{
+			"path": "pages/components/tab-bar",
+			"style": {
+				"navigationBarTitleText": "TabBar 标签栏"
+			}
+		},
+		{
 			"path": "pages/components/tabs",
 			"style": {
 				"navigationBarTitleText": "Tabs 标签页"
@@ -342,6 +438,24 @@
 			"path": "pages/components/typography",
 			"style": {
 				"navigationBarTitleText": "Typography 排版"
+			}
+		},
+		{
+			"path": "pages/components/upload",
+			"style": {
+				"navigationBarTitleText": "Upload 上传"
+			}
+		},
+		{
+			"path": "pages/components/virtual-list",
+			"style": {
+				"navigationBarTitleText": "VirtualList 虚拟列表"
+			}
+		},
+		{
+			"path": "pages/components/watermark",
+			"style": {
+				"navigationBarTitleText": "Watermark 水印"
 			}
 		}
 	],

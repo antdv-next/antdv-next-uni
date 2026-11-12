@@ -1,5 +1,9 @@
 {
   "missingProps": {
-    "formatter": "是函数（返回节点），UTS 里函数不能返回节点；用同名插槽 formatter（参数 value）"
+    "formatter": "是函数（返回节点），UTS 里函数不能返回节点；用同名插槽 formatter（参数 value）",
+    "animation": "移动端库后加的数字滚动动画，待实现"
+  },
+  "missingEmits": {
+    "animationEnd": "同 animation"
   }
 }

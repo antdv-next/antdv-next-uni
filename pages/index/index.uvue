@@ -16,9 +16,11 @@ const groups : DemoGroup[] = [
 	{
 		title: '通用',
 		entries: [
+			{ title: 'BackTop', subtitle: '回到顶部', icon: 'appstore', url: '/pages/components/back-top' },
 			{ title: 'Button', subtitle: '按钮', icon: 'appstore', url: '/pages/components/button' },
 			{ title: 'ConfigProvider', subtitle: '全局化配置', icon: 'appstore', url: '/pages/components/config-provider' },
 			{ title: 'FloatButton', subtitle: '悬浮按钮', icon: 'appstore', url: '/pages/components/float-button' },
+			{ title: 'FloatButtonGroup', subtitle: '悬浮按钮组', icon: 'appstore', url: '/pages/components/float-button-group' },
 			{ title: 'Typography', subtitle: '排版', icon: 'appstore', url: '/pages/components/typography' }
 		]
 	},
@@ -28,7 +30,8 @@ const groups : DemoGroup[] = [
 			{ title: 'Divider', subtitle: '分割线', icon: 'appstore', url: '/pages/components/divider' },
 			{ title: 'Flex', subtitle: '弹性布局', icon: 'appstore', url: '/pages/components/flex' },
 			{ title: 'Grid', subtitle: '栅格', icon: 'appstore', url: '/pages/components/grid' },
-			{ title: 'SafeArea', subtitle: '安全区', icon: 'appstore', url: '/pages/components/safe-area' }
+			{ title: 'SafeArea', subtitle: '安全区', icon: 'appstore', url: '/pages/components/safe-area' },
+			{ title: 'Space', subtitle: '间距', icon: 'appstore', url: '/pages/components/space' }
 		]
 	},
 	{
@@ -39,13 +42,16 @@ const groups : DemoGroup[] = [
 			{ title: 'NavBar', subtitle: '导航栏', icon: 'right', url: '/pages/components/nav-bar' },
 			{ title: 'Pagination', subtitle: '分页', icon: 'right', url: '/pages/components/pagination' },
 			{ title: 'Segmented', subtitle: '分段控制器', icon: 'right', url: '/pages/components/segmented' },
+			{ title: 'SideBar', subtitle: '侧边导航', icon: 'right', url: '/pages/components/side-bar' },
 			{ title: 'Steps', subtitle: '步骤条', icon: 'right', url: '/pages/components/steps' },
+			{ title: 'TabBar', subtitle: '标签栏', icon: 'right', url: '/pages/components/tab-bar' },
 			{ title: 'Tabs', subtitle: '标签页', icon: 'right', url: '/pages/components/tabs' }
 		]
 	},
 	{
 		title: '数据录入',
 		entries: [
+			{ title: 'Calendar', subtitle: '日历', icon: 'edit', url: '/pages/components/calendar' },
 			{ title: 'Cascader', subtitle: '级联选择', icon: 'edit', url: '/pages/components/cascader' },
 			{ title: 'Checkbox', subtitle: '多选框', icon: 'edit', url: '/pages/components/checkbox' },
 			{ title: 'DatePicker', subtitle: '日期选择器', icon: 'edit', url: '/pages/components/date-picker' },
@@ -53,20 +59,25 @@ const groups : DemoGroup[] = [
 			{ title: 'Input', subtitle: '文本域 / 搜索 / 密码', icon: 'edit', url: '/pages/components/input-more' },
 			{ title: 'Input', subtitle: '输入框', icon: 'edit', url: '/pages/components/input' },
 			{ title: 'InputNumber', subtitle: '数字输入框', icon: 'edit', url: '/pages/components/input-number' },
+			{ title: 'InputOTP', subtitle: '一次性密码框', icon: 'edit', url: '/pages/components/input-otp' },
+			{ title: 'NumberKeyboard', subtitle: '数字键盘', icon: 'edit', url: '/pages/components/number-keyboard' },
 			{ title: 'Picker', subtitle: '选择器', icon: 'edit', url: '/pages/components/picker' },
 			{ title: 'PickerView', subtitle: '选择器视图', icon: 'edit', url: '/pages/components/picker-view' },
 			{ title: 'Radio', subtitle: '单选框', icon: 'edit', url: '/pages/components/radio' },
 			{ title: 'Rate', subtitle: '评分', icon: 'edit', url: '/pages/components/rate' },
 			{ title: 'Select', subtitle: '选择器', icon: 'edit', url: '/pages/components/select' },
+			{ title: 'Selector', subtitle: '选择组', icon: 'edit', url: '/pages/components/selector' },
 			{ title: 'Slider', subtitle: '滑动输入条', icon: 'edit', url: '/pages/components/slider' },
 			{ title: 'Switch', subtitle: '开关', icon: 'edit', url: '/pages/components/switch' },
-			{ title: 'TimePicker', subtitle: '时间选择器', icon: 'edit', url: '/pages/components/time-picker' }
+			{ title: 'TimePicker', subtitle: '时间选择器', icon: 'edit', url: '/pages/components/time-picker' },
+			{ title: 'Upload', subtitle: '上传', icon: 'edit', url: '/pages/components/upload' }
 		]
 	},
 	{
 		title: '数据展示',
 		entries: [
 			{ title: 'Avatar', subtitle: '头像', icon: 'file', url: '/pages/components/avatar' },
+			{ title: 'AvatarGroup', subtitle: '头像组', icon: 'file', url: '/pages/components/avatar-group' },
 			{ title: 'Badge', subtitle: '徽标数', icon: 'file', url: '/pages/components/badge' },
 			{ title: 'Card', subtitle: '卡片', icon: 'file', url: '/pages/components/card' },
 			{ title: 'Carousel', subtitle: '走马灯', icon: 'file', url: '/pages/components/carousel' },
@@ -74,11 +85,14 @@ const groups : DemoGroup[] = [
 			{ title: 'Descriptions', subtitle: '描述列表', icon: 'file', url: '/pages/components/descriptions' },
 			{ title: 'Empty', subtitle: '空状态', icon: 'file', url: '/pages/components/empty' },
 			{ title: 'Image', subtitle: '图片', icon: 'file', url: '/pages/components/image' },
+			{ title: 'ImagePreview', subtitle: '图片预览', icon: 'file', url: '/pages/components/image-preview' },
 			{ title: 'List', subtitle: '列表', icon: 'file', url: '/pages/components/list' },
 			{ title: 'Result', subtitle: '结果', icon: 'file', url: '/pages/components/result' },
 			{ title: 'Statistic', subtitle: '统计数值', icon: 'file', url: '/pages/components/statistic' },
 			{ title: 'Tag', subtitle: '标签', icon: 'file', url: '/pages/components/tag' },
-			{ title: 'Timeline', subtitle: '时间轴', icon: 'file', url: '/pages/components/timeline' }
+			{ title: 'Timeline', subtitle: '时间轴', icon: 'file', url: '/pages/components/timeline' },
+			{ title: 'VirtualList', subtitle: '虚拟列表', icon: 'file', url: '/pages/components/virtual-list' },
+			{ title: 'Watermark', subtitle: '水印', icon: 'file', url: '/pages/components/watermark' }
 		]
 	},
 	{
@@ -87,7 +101,10 @@ const groups : DemoGroup[] = [
 			{ title: 'ActionSheet', subtitle: '动作面板', icon: 'message', url: '/pages/components/action-sheet' },
 			{ title: 'Alert', subtitle: '警告提示', icon: 'message', url: '/pages/components/alert' },
 			{ title: 'Drawer', subtitle: '抽屉', icon: 'message', url: '/pages/components/drawer' },
+			{ title: 'Mask', subtitle: '背景蒙层', icon: 'message', url: '/pages/components/mask' },
 			{ title: 'Modal', subtitle: '对话框', icon: 'message', url: '/pages/components/modal' },
+			{ title: 'NoticeBar', subtitle: '通告栏', icon: 'message', url: '/pages/components/notice-bar' },
+			{ title: 'Popover', subtitle: '气泡卡片', icon: 'message', url: '/pages/components/popover' },
 			{ title: 'Popup', subtitle: '弹出层', icon: 'message', url: '/pages/components/popup' },
 			{ title: 'Progress', subtitle: '进度条', icon: 'message', url: '/pages/components/progress' },
 			{ title: 'Skeleton', subtitle: '骨架屏', icon: 'message', url: '/pages/components/skeleton' },
@@ -98,6 +115,8 @@ const groups : DemoGroup[] = [
 	{
 		title: '手势与其他',
 		entries: [
+			{ title: 'Affix', subtitle: '固钉', icon: 'setting', url: '/pages/components/affix' },
+			{ title: 'FloatingPanel', subtitle: '浮动面板', icon: 'setting', url: '/pages/components/floating-panel' },
 			{ title: 'InfiniteScroll', subtitle: '无限滚动', icon: 'setting', url: '/pages/components/infinite-scroll' },
 			{ title: 'PullToRefresh', subtitle: '下拉刷新', icon: 'setting', url: '/pages/components/pull-to-refresh' },
 			{ title: 'SwipeAction', subtitle: '滑动操作', icon: 'setting', url: '/pages/components/swipe-action' }

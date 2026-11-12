@@ -1,0 +1,131 @@
+<script setup lang="uts">
+import { AM_FLOAT_BUTTON_NO_BADGE, AmFloatButtonBadge } from '../../types/float-button.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+
+// 悬浮按钮组（= antdv-next-mobile 的 FloatButtonGroup）：固定在右下角的一组 <am-float-button>（放在默认插槽里）。
+// 不写 trigger 时按钮竖着排开一直显示；trigger="click" 是菜单模式：只显示一个触发按钮，点击后在 placement
+// （top / bottom / left / right）的方向展开。shape（组里每个按钮的形状）、trigger、v-model:open、defaultOpen、placement、
+// icon / closeIcon（触发按钮收起 / 展开时的图标）、content、type、badge 同名同义；
+// 事件 update:open、openChange、click（点了触发按钮）；插槽 default、icon、closeIcon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - icon / closeIcon 是图标名（<am-icon> 的 name），content 是文字；自定义内容用同名插槽；
+// - 属性没有 undefined，分不出“受控”与“非受控”：点击后自己先切换并发出事件，`open` 变化时再跟随它；
+// - 展开 / 收起是淡入 + 从触发按钮的方向滑出 12px（没有 transform-origin 的缩放）；
+// - 方形、不带触发按钮的组不会合成一张卡片（改不了插槽里按钮的圆角、阴影，也没有伪元素画分隔线），仍是分开的按钮；
+// - 组里的按钮之间的 12px 间距由按钮自己留（<am-float-button> 知道自己在组里）
+//
+// 位置：同 <am-float-button>，外层是贴着底部安全区域的 0 尺寸锚点，触发按钮在锚点里距右 24、距底 48
+defineOptions({ name: 'AmFloatButtonGroup' })
+
+const props = defineProps({
+	shape: { type: String, default: 'circle' },
+	trigger: { type: String, default: '' },
+	open: { type: Boolean, default: false },
+	defaultOpen: { type: Boolean, default: false },
+	placement: { type: String, default: 'top' },
+	closeIcon: { type: String, default: 'close' },
+	icon: { type: String, default: '' },
+	content: { type: String, default: '' },
+	type: { type: String, default: 'default' },
+	badge: { type: Object as PropType<AmFloatButtonBadge>, default: () : AmFloatButtonBadge => AM_FLOAT_BUTTON_NO_BADGE },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'openChange', 'click'])
+
+const theme = useAmTheme()
+
+const isMenu = computed(() : boolean => props.trigger == 'click')
+
+// 组里的 <am-float-button>（含触发按钮）从这里知道自己在组里：形状跟随组，间距留在朝向触发按钮的一侧
+provide('amFloatButtonGroupShape', () : string => props.shape)
+provide('amFloatButtonGroupPlacement', () : string => isMenu.value ? props.placement : 'top')
+
+const opened = ref(props.open || props.defaultOpen)
+watch(() : boolean => props.open, (value : boolean) => { opened.value = value })
+
+/** 列表是否渲染（收起的过渡结束后才隐藏）、是否处于展开的样式 */
+const visible = ref(opened.value)
+const shown = ref(opened.value)
+let timer = 0
+
+watch(() : boolean => opened.value, (value : boolean) => {
+	clearTimeout(timer)
+	if (value) {
+		visible.value = true
+		// 先以收起的状态渲染一帧，再切到展开，过渡才会生效
+		timer = setTimeout(() => { shown.value = true }, 20)
+	} else {
+		shown.value = false
+		timer = setTimeout(() => { visible.value = false }, AM_DURATION_MID)
+	}
+})
+
+onUnmounted(() => { clearTimeout(timer) })
+
+function onTrigger(event : UniPointerEvent) {
+	opened.value = !opened.value
+	emit('update:open', opened.value)
+	emit('openChange', opened.value)
+	emit('click', event)
+}
+
+/** 收起时列表朝触发按钮的方向偏 12px */
+const listStyle = computed(() : string => {
+	if (!isMenu.value) return ''
+	let transform = 'translateY(12px)'
+	if (props.placement == 'bottom') transform = 'translateY(-12px)'
+	else if (props.placement == 'left') transform = 'translateX(12px)'
+	else if (props.placement == 'right') transform = 'translateX(-12px)'
+	if (shown.value) transform = 'translateX(0px) translateY(0px)'
+	return 'opacity:' + (shown.value ? 1 : 0) + ';transform:' + transform + ';' + amTransition('opacity, transform', AM_DURATION_MID)
+})
+
+const listClasses = computed(() : string[] => {
+	const list : string[] = ['am-float-button-group__list']
+	if (!isMenu.value) list.push('am-float-button-group__list--plain')
+	else list.push('am-float-button-group__list--' + props.placement)
+	return list
+})
+
+const triggerIcon = computed(() : string => props.icon.length > 0 ? props.icon : 'file')
+const iconColor = computed(() : string => props.type == 'primary' ? theme().colorTextLightSolid : theme().colorText)
+/** 同 <am-float-button>：有文字时图标小一号 */
+const iconSize = computed(() : number => props.content.length > 0 && !opened.value ? 16 : 20)
+</script>
+
+<template>
+	<view :class="['am-float-button-group', rootClass]">
+		<view v-if="!isMenu || visible" :class="listClasses" :style="listStyle">
+			<slot></slot>
+		</view>
+		<view v-if="isMenu" class="am-float-button-group__trigger">
+			<am-float-button :type="type" :badge="badge" :content="opened ? '' : content" @click="onTrigger">
+				<template #icon>
+					<slot v-if="opened" name="closeIcon">
+						<am-icon :name="closeIcon" :size="20" :color="iconColor" />
+					</slot>
+					<slot v-else name="icon">
+						<am-icon :name="triggerIcon" :size="iconSize" :color="iconColor" />
+					</slot>
+				</template>
+			</am-float-button>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-float-button-group { position: fixed; right: 0; bottom: var(--uni-safe-area-inset-bottom, 0px); z-index: 99; overflow: visible; }
+.am-float-button-group__trigger { position: absolute; right: 24px; bottom: 48px; width: 48px; height: 48px; overflow: visible; }
+/* 按钮的阴影、徽标伸出列表 */
+.am-float-button-group__list { position: absolute; overflow: visible; }
+/* 没有触发按钮：从右下角的默认位置往上排（每个按钮下面留 12px，最下面的 12px 算进 bottom） */
+.am-float-button-group__list--plain { right: 24px; bottom: 36px; flex-direction: column; align-items: center; }
+/* 菜单：从触发按钮（距右 24、距底 48，边长 48）的四边展开，间距由按钮朝向触发按钮一侧的外边距留出 */
+.am-float-button-group__list--top { right: 24px; bottom: 96px; flex-direction: column; align-items: center; }
+.am-float-button-group__list--bottom { right: 24px; top: -48px; flex-direction: column; align-items: center; }
+.am-float-button-group__list--left { right: 72px; bottom: 48px; flex-direction: row; align-items: center; }
+.am-float-button-group__list--right { left: -24px; bottom: 48px; flex-direction: row; align-items: center; }
+</style>

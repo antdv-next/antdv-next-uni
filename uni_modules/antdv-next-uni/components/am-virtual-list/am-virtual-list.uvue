@@ -1,0 +1,249 @@
+<script setup lang="uts">
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+import { sameValue } from '../../utils/value.uts'
+
+// 虚拟列表（= antdv-next-mobile 的 VirtualList）：上万条数据的长列表，只渲染屏幕附近的项。
+// data、height、itemHeight、itemKey、virtual、fixed 同名同义；事件 scroll、reachEnd（离底部不到 40px）；
+// 插槽 default（参数 { item, index }）、header / footer（在滚动区域里，跟着一起滚）；方法 scrollTo(target)、getScrollTop()。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 用内置的 list-view + list-item（Android、iOS、鸿蒙上是原生的复用回收列表，Web 上只渲染屏幕附近的项，微信小程序 4.41 起支持），
+//   不是自己算窗口：没有 overscan、component，也没有 visibleChange 事件（渲染了哪些项由原生决定，拿不到）；
+// - `virtual` 为 false 时退回普通的 scroll-view + v-for（每一项都渲染）：支付宝小程序等没有 list-view 的平台用它；
+// - height 是像素数字，0（默认）为 flex: 1 占满父元素——list-view 必须有确定的高度，父元素要有确定的高度；
+// - itemHeight：`fixed` 时每一项的高度就是它；不 fixed 时高度由内容决定（原生列表自己量），它只是 scrollTo 跳到
+//   还没渲染的项时用的估计值；
+// - itemKey 只能是字段名（不能是函数），空为用序号。数据是带类型的对象时每次换数据都要走一遍 JSON 才能按名字取字段，
+//   上万条数据请用 UTSJSONObject，或不传 itemKey；
+// - scrollTo(数字) 滚到这个位置（没渲染过的项只有估计的高度，很远的位置不一定准）；scrollTo({ index }) / scrollTo({ key })
+//   滚到某一项：用原生的 scroll-into-view，align（center / end）与 offset 在落定后用元素的 scrollBy 再挪
+//   （微信小程序没有 scrollBy，只能滚到顶部）；没有 align: 'auto'、nativeElement；
+// - Web 上 header 插槽不是 list-item：Web 的 list-view 拿第一个量到的 list-item 的高度当作没渲染的项的估计高度，
+//   头部是 list-item 时整个列表的位置都会估偏；
+// - list-item 上不能有 margin（蒸汽模式），项之间的间距写在插槽内容的 padding 上
+defineOptions({ name: 'AmVirtualList' })
+
+const props = defineProps({
+	data: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	/** 滚动区域的高度（像素），0 为占满父元素（flex: 1） */
+	height: { type: Number, default: 0 },
+	/** 每一项的高度（像素）：`fixed` 时就是它，否则只是估计值 */
+	itemHeight: { type: Number, default: 44 },
+	/** 每一项的唯一标识的字段名，空为用序号 */
+	itemKey: { type: String, default: '' },
+	/** false 时每一项都渲染（普通的 scroll-view） */
+	virtual: { type: Boolean, default: true },
+	/** 每一项的高度都是 itemHeight */
+	fixed: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['scroll', 'reachEnd'])
+
+/** 离底部不到这个距离时发出 reachEnd（同移动端库） */
+const REACH_END_THRESHOLD = 40
+
+const uid = amUid('am-virtual-list')
+
+/** 每一项的 key：换数据时算一次 */
+const keys = computed(() : any[] => {
+	const list = props.data
+	const result : any[] = []
+	const name = props.itemKey
+	for (let i = 0; i < list.length; i++) {
+		const item = list[i]
+		if (name.length == 0 || item == null || typeof item != 'object') {
+			result.push(i)
+			continue
+		}
+		let value : any | null = null
+		if (item instanceof UTSJSONObject) value = (item as UTSJSONObject).get(name)
+		else {
+			// 带类型的对象不能按名字取字段，走一遍 JSON
+			const object = JSON.parseObject(JSON.stringify(item) ?? '{}')
+			if (object != null) value = object.get(name)
+		}
+		result.push(value == null ? i : value)
+	}
+	return result
+})
+
+function keyAt(index : number) : any {
+	const list = keys.value
+	return index < list.length ? list[index] : index
+}
+
+const rootStyle = computed(() : string => props.height > 0 ? 'height:' + props.height + 'px;' : '')
+const itemStyle = computed(() : string => props.fixed ? 'height:' + props.itemHeight + 'px;' : '')
+
+// ---------- 滚动 ----------
+let currentTop = 0
+
+function onScroll(event : UniScrollEvent) {
+	currentTop = event.detail.scrollTop
+	emit('scroll', event)
+}
+
+function onReachEnd() {
+	emit('reachEnd')
+}
+
+// 设置 scroll-top（同一个值再设一次不生效，所以交替加一点点）
+const scrollTop = ref(0)
+const intoView = ref('')
+const animated = ref(false)
+let nudge = false
+
+function applyTop(top : number, smooth : boolean) {
+	animated.value = smooth
+	nudge = !nudge
+	scrollTop.value = Math.max(0, top) + (nudge ? 0.01 : 0)
+	currentTop = Math.max(0, top)
+}
+
+let seekTimer = 0
+
+/** 这一项已经渲染出来时，把它挪到要的位置：离可视区域顶部 offset（居中 / 靠底时再加上相应的距离） */
+function settle(itemId : string, align : string, offset : number) {
+	Promise.all([measureById(uid), measureById(itemId)]).then((rects : (AmRect | null)[]) => {
+		const viewport = rects[0]
+		const item = rects[1]
+		if (viewport == null || item == null) return
+		let wanted = offset
+		if (align == 'center') wanted += (viewport.height - item.height) / 2
+		else if (align == 'end') wanted += viewport.height - item.height
+		const delta = item.top - viewport.top - wanted
+		if (Math.abs(delta) < 1) return
+		// #ifndef MP
+		uni.getElementById(uid)?.scrollBy(0, delta)
+		// #endif
+	})
+}
+
+/**
+ * 滚到某一项。复用回收的列表里没渲染过的项只有估计的位置，按高度算出来的 scroll-top 不一定准，所以分几步：
+ * 1. 交给原生的 scroll-into-view（这一项的节点在时直接到位）；
+ * 2. 节点不在（Web 上只渲染屏幕上下各十屏）：按 itemHeight 估一个位置跳过去，让它渲染出来，再 scroll-into-view；
+ * 3. 落定后量一次，用元素的 scrollBy 挪到 align / offset 要的位置
+ */
+function scrollToIndex(index : number, align : string, offset : number, smooth : boolean) {
+	if (index < 0 || index >= props.data.length) return
+	const itemId = uid + '-item-' + index
+	const plain = align != 'center' && align != 'end' && offset == 0
+	const wait = smooth ? 450 : 80
+	clearTimeout(seekTimer)
+	animated.value = smooth
+	// 先清空，同一项才能再滚一次
+	intoView.value = ''
+	nextTick(() => { intoView.value = itemId })
+	seekTimer = setTimeout(() => {
+		if (uni.getElementById(itemId) != null) {
+			if (!plain) settle(itemId, align, offset)
+			return
+		}
+		measureById(uid + '-header').then((header : AmRect | null) => {
+			applyTop((header == null ? 0 : header.height) + index * props.itemHeight, false)
+			seekTimer = setTimeout(() => {
+				if (uni.getElementById(itemId) == null) return
+				intoView.value = ''
+				nextTick(() => { intoView.value = itemId })
+				if (!plain) seekTimer = setTimeout(() => { settle(itemId, align, offset) }, 80)
+			}, 80)
+		})
+	}, wait)
+}
+
+/**
+ * 数字：滚到这个位置（像素）；对象 { index, key, align, offset, behavior }：滚到某一项
+ * （AmVirtualListScrollToConfig，直接写对象字面量也可以）
+ */
+function scrollTo(target : any) {
+	if (typeof target == 'number') {
+		applyTop(target as number, false)
+		return
+	}
+	const config = JSON.parseObject(JSON.stringify(target) ?? '{}')
+	if (config == null) return
+	let index = config.getNumber('index') ?? -1
+	const key = config.get('key')
+	if (index < 0 && key != null) {
+		const list = keys.value
+		for (let i = 0; i < list.length; i++) {
+			if (sameValue(list[i], key)) {
+				index = i
+				break
+			}
+		}
+	}
+	scrollToIndex(index, config.getString('align') ?? 'start', config.getNumber('offset') ?? 0, config.getString('behavior') == 'smooth')
+}
+
+onUnmounted(() => { clearTimeout(seekTimer) })
+
+defineExpose({
+	scrollTo: (target : any) => { scrollTo(target) },
+	getScrollTop: () : number => currentTop
+})
+</script>
+
+<template>
+	<list-view
+		v-if="virtual"
+		:id="uid"
+		:class="['am-virtual-list', height > 0 ? '' : 'am-virtual-list--fill', rootClass]"
+		:style="rootStyle"
+		direction="vertical"
+		:scroll-top="scrollTop"
+		:scroll-into-view="intoView"
+		:scroll-with-animation="animated"
+		:lower-threshold="REACH_END_THRESHOLD"
+		@scroll="onScroll"
+		@scrolltolower="onReachEnd"
+	>
+		<!-- 头、尾各自一种 type：不与数据项共用回收池 -->
+		<!-- #ifdef WEB -->
+		<view :id="uid + '-header'">
+			<slot name="header"></slot>
+		</view>
+		<!-- #endif -->
+		<!-- #ifndef WEB -->
+		<list-item :id="uid + '-header'" :type="1">
+			<slot name="header"></slot>
+		</list-item>
+		<!-- #endif -->
+		<list-item v-for="(item, index) in data" :key="keyAt(index)" :id="uid + '-item-' + index" :type="0" class="am-virtual-list__item" :style="itemStyle">
+			<slot :item="item" :index="index"></slot>
+		</list-item>
+		<list-item :type="2">
+			<slot name="footer"></slot>
+		</list-item>
+	</list-view>
+	<scroll-view
+		v-else
+		:id="uid"
+		:class="['am-virtual-list', height > 0 ? '' : 'am-virtual-list--fill', rootClass]"
+		:style="rootStyle"
+		direction="vertical"
+		:scroll-top="scrollTop"
+		:scroll-into-view="intoView"
+		:scroll-with-animation="animated"
+		:lower-threshold="REACH_END_THRESHOLD"
+		@scroll="onScroll"
+		@scrolltolower="onReachEnd"
+	>
+		<view :id="uid + '-header'">
+			<slot name="header"></slot>
+		</view>
+		<view v-for="(item, index) in data" :key="keyAt(index)" :id="uid + '-item-' + index" class="am-virtual-list__item" :style="itemStyle">
+			<slot :item="item" :index="index"></slot>
+		</view>
+		<view>
+			<slot name="footer"></slot>
+		</view>
+	</scroll-view>
+</template>
+
+<style>
+.am-virtual-list--fill { flex: 1; }
+.am-virtual-list__item { overflow: hidden; }
+</style>

@@ -1,0 +1,71 @@
+<script setup lang="uts">
+import { AmWatermarkFont } from '@/uni_modules/antdv-next-uni/types/watermark.uts'
+
+// 水印：盖在内容上的一层，不挡下面的点击
+const multi : string[] = ['Antdv Next', '内部资料 请勿外传']
+const font : AmWatermarkFont = { color: 'rgba(22, 119, 255, 0.25)', fontSize: 14, fontWeight: 'bold' }
+const gap : number[] = [40, 60]
+const offset : number[] = [10, 10]
+const count = ref(0)
+const fullPage = ref(false)
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-watermark content="Antdv Next">
+				<view class="demo__area">
+					<text class="demo__text">水印不挡操作：点下面的按钮试试。</text>
+					<view class="demo__action"><am-button size="small" :text="'点了 ' + count + ' 次'" @click="count++" /></view>
+				</view>
+			</am-watermark>
+		</view>
+
+		<text class="demo__title">多行文字（content 为数组）</text>
+		<view class="demo__card">
+			<am-watermark :content="multi">
+				<view class="demo__area"></view>
+			</am-watermark>
+		</view>
+
+		<text class="demo__title">图片水印（image、width、height）</text>
+		<view class="demo__card">
+			<am-watermark image="/static/logo.png" :width="48" :height="48">
+				<view class="demo__area"></view>
+			</am-watermark>
+		</view>
+
+		<text class="demo__title">字体、角度、间距、偏移（font、rotate、gap、offset）</text>
+		<view class="demo__card">
+			<am-watermark content="机密" :font="font" :rotate="-45" :gap="gap" :offset="offset">
+				<view class="demo__area"></view>
+			</am-watermark>
+		</view>
+
+		<text class="demo__title">盖住整个页面（fullPage）</text>
+		<view class="demo__card">
+			<view class="demo__line">
+				<text class="demo__text">整页水印</text>
+				<am-switch v-model:checked="fullPage" />
+			</view>
+		</view>
+		<am-watermark v-if="fullPage" content="整页水印" full-page />
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__area { height: 200px; padding: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__action { margin-top: 12px; flex-direction: row; }
+.demo__line { flex-direction: row; align-items: center; justify-content: space-between; }
+.demo__footer { height: 40px; }
+</style>

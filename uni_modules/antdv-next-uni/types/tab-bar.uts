@@ -1,0 +1,15 @@
+// am-tab-bar 的 items（= antdv-next-mobile 的 TabBarItem）。
+// title 是文字、icon 是图标名（UTS 里不能把 VNode 放进数据），自定义内容用插槽 icon / title
+
+export type AmTabBarItem = {
+	/** 唯一标识（字符串） */
+	key : string
+	title ?: string | null
+	/** 图标名（<am-icon> 的 name） */
+	icon ?: string | null
+	/** 选中时的图标名（如 home-fill）；不写时与 icon 相同。移动端库用 icon 的渲染函数按选中状态返回不同的图标 */
+	activeIcon ?: string | null
+	/** 徽标：数字或文字；true 为小红点；0、空字符串、false 不显示 */
+	badge ?: any | null
+	disabled ?: boolean | null
+}

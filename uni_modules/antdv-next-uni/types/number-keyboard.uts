@@ -1,0 +1,10 @@
+// <am-number-keyboard> 的类型（= antdv-next-mobile 的 number-keyboard/interface.ts）
+
+/** 键盘上的一个键（内部排版用） */
+export type AmNumberKeyboardKey = {
+	text : string
+	/** digit / extra / delete / confirm / blank（= NumberKeyboardKeyType） */
+	type : string
+	/** 占几列（custom 主题最后一行的 0 可以占 2、3 列） */
+	span : number
+}

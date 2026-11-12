@@ -1,0 +1,97 @@
+<script setup lang="uts">
+const code = ref('')
+const masked = ref('')
+const four = ref('')
+const text = ref('')
+const sized = ref('12')
+const styled = ref('123')
+const log = ref('')
+const otpRef = ref<AmInputOtpComponentPublicInstance | null>(null)
+
+function onChange(value : string) {
+	log.value = 'change（填满了）: ' + value
+}
+
+function onInput(cells : string[]) {
+	log.value = 'input: [' + cells.join(', ') + ']'
+}
+
+function focusIt() {
+	otpRef.value?.focus()
+}
+
+function clearIt() {
+	code.value = ''
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（6 位数字）</text>
+		<view class="demo__card">
+			<am-input-otp ref="otpRef" v-model:value="code" @change="onChange" @input="onInput" />
+			<text class="demo__hint">v-model:value = {{ code }}</text>
+			<text class="demo__hint">{{ log }}</text>
+			<view class="demo__row">
+				<am-button class="demo__item" size="small" text="focus()" @click="focusIt" />
+				<am-button class="demo__item" size="small" text="清空" @click="clearIt" />
+			</view>
+		</view>
+
+		<text class="demo__title">遮住内容（mask）</text>
+		<view class="demo__card">
+			<am-input-otp class="demo__block" v-model:value="masked" mask />
+			<am-input-otp v-model:value="masked" mask="*" />
+		</view>
+
+		<text class="demo__title">长度与分隔符</text>
+		<view class="demo__card">
+			<am-input-otp class="demo__block" v-model:value="four" :length="4" separator="-" />
+			<am-input-otp v-model:value="four" :length="4">
+				<template #separator="{ index }">
+					<text class="demo__separator">{{ index == 1 ? '—' : '·' }}</text>
+				</template>
+			</am-input-otp>
+		</view>
+
+		<text class="demo__title">文字键盘（inputMode = text）</text>
+		<view class="demo__card">
+			<am-input-otp v-model:value="text" :length="5" input-mode="text" />
+			<text class="demo__hint">{{ text }}</text>
+		</view>
+
+		<text class="demo__title">尺寸</text>
+		<view class="demo__card">
+			<am-input-otp class="demo__block" v-model:value="sized" :length="4" size="small" />
+			<am-input-otp class="demo__block" v-model:value="sized" :length="4" />
+			<am-input-otp v-model:value="sized" :length="4" size="large" />
+		</view>
+
+		<text class="demo__title">变体与状态</text>
+		<view class="demo__card">
+			<am-input-otp class="demo__block" v-model:value="styled" variant="filled" />
+			<am-input-otp class="demo__block" v-model:value="styled" variant="borderless" />
+			<am-input-otp class="demo__block" v-model:value="styled" variant="underlined" />
+			<am-input-otp class="demo__block" v-model:value="styled" status="error" />
+			<am-input-otp class="demo__block" v-model:value="styled" status="warning" variant="filled" />
+			<am-input-otp v-model:value="styled" disabled />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.demo__item { margin-right: 8px; }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__separator { font-size: 20px; color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.demo__footer { height: 40px; }
+</style>

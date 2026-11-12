@@ -1,0 +1,22 @@
+// ImagePreview 的类型（= antdv-next-mobile 的 image-preview/interface.ts）
+
+/** 页码信息（= ImagePreviewIndexInfo）：index / footer 插槽的参数 */
+export type AmImagePreviewIndexInfo = {
+	/** 当前是第几张（从 0 开始） */
+	current : number
+	total : number
+}
+
+/**
+ * previewAmImage() 的参数（= ImagePreviewShowOptions 里系统预览能做到的部分）。
+ * 用系统的 uni.previewImage：带双指缩放，但界面是系统的（没有 closable、footer、自定义页码）
+ */
+export type AmImagePreviewShowOptions = {
+	images : string[]
+	/** 先显示第几张（从 0 开始） */
+	current ?: number | null
+	/** 滑到最后一张后回到第一张（只有 Android、iOS 支持） */
+	loop ?: boolean | null
+	/** 显示“2 / 5”页码（只有 Android、iOS 支持） */
+	showIndex ?: boolean | null
+}

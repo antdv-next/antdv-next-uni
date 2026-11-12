@@ -1,0 +1,103 @@
+<script setup lang="uts">
+import { AmFloatingPanelChangeInfo } from '@/uni_modules/antdv-next-uni/types/floating-panel.uts'
+
+const anchors : number[] = [72, 220, 400]
+const height = ref(72)
+const log = ref('拖动面板顶部的横条，或者直接拖内容')
+const panelRef = ref<AmFloatingPanelComponentPublicInstance | null>(null)
+
+const rows : string[] = []
+for (let i = 1; i <= 24; i++) rows.push('第 ' + i + ' 行')
+
+function onHeightChange(value : number, info : AmFloatingPanelChangeInfo) {
+	log.value = 'heightChange: ' + Math.round(value) + (info.animating ? '（吸附）' : '（拖动中）')
+}
+
+function setTo(value : number) {
+	panelRef.value?.setHeight(value)
+}
+
+function jumpTo(value : number) {
+	panelRef.value?.setHeight(value, true)
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">{{ log }}</text>
+		<!-- fixed = false：面板相对这个容器定位（容器自己裁剪） -->
+		<view class="demo__stage">
+			<view class="demo__map">
+				<text class="demo__map-text">背景内容（比如地图）</text>
+				<text class="demo__map-text">v-model:height = {{ Math.round(height) }}</text>
+			</view>
+			<am-floating-panel ref="panelRef" v-model:height="height" :anchors="anchors" :fixed="false" :safe-area="false" @height-change="onHeightChange">
+				<view v-for="row in rows" :key="row" class="demo__cell">
+					<text class="demo__cell-text">{{ row }}</text>
+				</view>
+			</am-floating-panel>
+		</view>
+
+		<text class="demo__title">用方法改高度</text>
+		<view class="demo__card demo__row">
+			<am-button class="demo__item" size="small" text="setHeight(72)" @click="setTo(72)" />
+			<am-button class="demo__item" size="small" text="setHeight(220)" @click="setTo(220)" />
+			<am-button class="demo__item" size="small" text="setHeight(400)" @click="setTo(400)" />
+			<am-button class="demo__item" size="small" text="不带动画到 220" @click="jumpTo(220)" />
+		</view>
+
+		<text class="demo__title">只有头部能拖（contentDraggable = false）、自定义头部</text>
+		<view class="demo__stage demo__stage--small">
+			<view class="demo__map">
+				<text class="demo__map-text">内容区一直可以滚动</text>
+			</view>
+			<am-floating-panel :anchors="[60, 240]" :fixed="false" :safe-area="false" :content-draggable="false">
+				<template #header>
+					<view class="demo__header">
+						<text class="demo__header-text">播放列表（拖这里）</text>
+					</view>
+				</template>
+				<view v-for="row in rows" :key="row" class="demo__cell">
+					<text class="demo__cell-text">{{ row }}</text>
+				</view>
+			</am-floating-panel>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px 16px 6px 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 8px; margin-bottom: 10px; }
+.demo__stage {
+	position: relative;
+	height: 460px;
+	margin: 0 12px;
+	overflow: hidden;
+	border-radius: 12px;
+	background-color: var(--am-color-primary-bg, #ecf4ff);
+}
+.demo__stage--small { height: 300px; }
+.demo__map { padding: 24px 16px; align-items: center; }
+.demo__map-text { font-size: 14px; line-height: 24px; color: var(--am-color-primary, #1677ff); }
+.demo__header { height: 44px; flex: 1; flex-direction: row; align-items: center; justify-content: center; }
+.demo__header-text { font-size: 15px; font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__cell {
+	height: 44px;
+	padding: 0 16px;
+	flex-direction: row;
+	align-items: center;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.demo__cell-text { font-size: 15px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+</style>

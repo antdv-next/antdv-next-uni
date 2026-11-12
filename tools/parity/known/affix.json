@@ -1,0 +1,5 @@
+{
+  "missingProps": {
+    "target": "uvue 里拿不到别的滚动容器的元素、也订阅不了它的 scroll：监听的是页面滚动（onPageScroll）；放在 scroll-view 里时在它的 @scroll 里调用 updatePosition()"
+  }
+}

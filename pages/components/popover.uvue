@@ -1,0 +1,150 @@
+<script setup lang="uts">
+import { AmPopoverAction } from '@/uni_modules/antdv-next-uni/types/popover.uts'
+
+const placements : string[] = ['top', 'topLeft', 'topRight', 'bottom', 'bottomLeft', 'bottomRight', 'left', 'leftTop', 'leftBottom', 'right', 'rightTop', 'rightBottom']
+
+const actions : AmPopoverAction[] = [
+	{ key: 'scan', text: '扫一扫', icon: 'scan' },
+	{ key: 'share', text: '分享', icon: 'share' },
+	{ key: 'edit', text: '编辑（禁用）', icon: 'edit', disabled: true },
+	{ key: 'delete', text: '删除', icon: 'delete', danger: true }
+]
+const plain : AmPopoverAction[] = [
+	{ key: 'a', text: '选项一' },
+	{ key: 'b', text: '选项二' },
+	{ key: 'c', text: '选项三' }
+]
+
+const controlled = ref(false)
+const log = ref('点按钮弹出气泡，点别处收起')
+const manualRef = ref<AmPopoverComponentPublicInstance | null>(null)
+
+function onAction(action : AmPopoverAction, index : number) {
+	log.value = 'action: ' + action.key + '（第 ' + index + ' 项）'
+}
+
+function onOpenChange(open : boolean) {
+	log.value = 'openChange: ' + open
+}
+
+function showManual() {
+	manualRef.value?.show()
+}
+
+function hideManual() {
+	manualRef.value?.hide()
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">{{ log }}</text>
+		<view class="demo__card demo__row">
+			<view class="demo__item">
+				<am-popover content="这是一段气泡里的内容" @open-change="onOpenChange">
+					<am-button text="基础用法" />
+				</am-popover>
+			</view>
+			<view class="demo__item">
+				<am-popover title="标题" content="带标题的气泡，内容比较长的时候会自动换行，最宽 280 像素。">
+					<am-button text="带标题" />
+				</am-popover>
+			</view>
+			<view class="demo__item">
+				<am-popover content="没有箭头" :arrow="false">
+					<am-button text="没有箭头" />
+				</am-popover>
+			</view>
+		</view>
+
+		<text class="demo__title">深色与自定义背景色</text>
+		<view class="demo__card demo__row">
+			<view class="demo__item">
+				<am-popover mode="dark" content="深色的气泡" placement="bottom">
+					<am-button text="mode = dark" />
+				</am-popover>
+			</view>
+			<view class="demo__item">
+				<am-popover mode="dark" color="#722ed1" content="自定义背景色" placement="bottom">
+					<am-button text="color" />
+				</am-popover>
+			</view>
+		</view>
+
+		<text class="demo__title">菜单（actions）</text>
+		<view class="demo__card demo__row">
+			<view class="demo__item">
+				<am-popover :actions="actions" placement="bottomLeft" @action="onAction">
+					<am-button icon="more" text="带图标" />
+				</am-popover>
+			</view>
+			<view class="demo__item">
+				<am-popover :actions="plain" mode="dark" placement="bottom" @action="onAction">
+					<am-button text="深色菜单" />
+				</am-popover>
+			</view>
+			<view class="demo__item">
+				<am-popover :actions="plain" :close-on-action="false" placement="bottomRight" @action="onAction">
+					<am-button text="点了不关" />
+				</am-popover>
+			</view>
+		</view>
+
+		<text class="demo__title">12 个方位（放不下时自动翻到对面）</text>
+		<view class="demo__card demo__row">
+			<view v-for="item in placements" :key="item" class="demo__item">
+				<am-popover :placement="item" :content="'placement = ' + item">
+					<am-button size="small" :text="item" />
+				</am-popover>
+			</view>
+		</view>
+
+		<text class="demo__title">受控与手动</text>
+		<view class="demo__card demo__row">
+			<view class="demo__item">
+				<am-popover v-model:open="controlled" content="v-model:open" placement="top">
+					<am-button :text="controlled ? '已打开' : 'v-model:open'" />
+				</am-popover>
+			</view>
+			<view class="demo__item">
+				<am-popover ref="manualRef" trigger="manual" :close-on-click-away="false" content="trigger = manual：只能用方法开关" placement="top">
+					<am-tag text="手动的目标" />
+				</am-popover>
+			</view>
+			<am-button class="demo__item" size="small" text="show()" @click="showManual" />
+			<am-button class="demo__item" size="small" text="hide()" @click="hideManual" />
+		</view>
+
+		<text class="demo__title">自定义内容（content 插槽）</text>
+		<view class="demo__card demo__row">
+			<view class="demo__item">
+				<am-popover placement="bottomLeft">
+					<am-button type="primary" text="插槽" />
+					<template #content>
+						<view class="demo__custom">
+							<am-icon name="success-fill" :size="18" color="#52c41a" />
+							<text class="demo__custom-text">操作成功</text>
+						</view>
+					</template>
+				</am-popover>
+			</view>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px 16px 6px 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.demo__item { margin-right: 8px; margin-bottom: 10px; }
+.demo__custom { flex-direction: row; align-items: center; }
+.demo__custom-text { margin-left: 6px; font-size: 14px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__footer { height: 40px; }
+</style>

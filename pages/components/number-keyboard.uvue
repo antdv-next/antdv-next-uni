@@ -1,0 +1,118 @@
+<script setup lang="uts">
+const value = ref('')
+const basic = ref(false)
+const titled = ref(false)
+const extra = ref(false)
+const custom = ref(false)
+const customExtra = ref(false)
+const random = ref(false)
+const limited = ref(false)
+const code = ref('')
+const log = ref('点下面的按钮打开键盘；键盘没有遮罩，页面照常可以点')
+
+function closeAll() {
+	basic.value = false
+	titled.value = false
+	extra.value = false
+	custom.value = false
+	customExtra.value = false
+	random.value = false
+	limited.value = false
+}
+
+function show(name : string) {
+	closeAll()
+	if (name == 'basic') basic.value = true
+	else if (name == 'titled') titled.value = true
+	else if (name == 'extra') extra.value = true
+	else if (name == 'custom') custom.value = true
+	else if (name == 'customExtra') customExtra.value = true
+	else if (name == 'random') random.value = true
+	else limited.value = true
+}
+
+function onInput(key : string) {
+	log.value = 'input: ' + key
+}
+
+function onDelete() {
+	log.value = 'delete'
+}
+
+function onConfirm() {
+	log.value = 'confirm'
+}
+
+function onClose() {
+	log.value = 'close'
+}
+
+function onBlur() {
+	log.value = 'blur（返回键收起）'
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">{{ log }}</text>
+		<view class="demo__card">
+			<view class="demo__field">
+				<text :class="['demo__value', value.length == 0 ? 'demo__value--empty' : '']">{{ value.length > 0 ? value : '已输入的内容' }}</text>
+			</view>
+			<am-button class="demo__block" block text="默认样式" @click="show('basic')" />
+			<am-button class="demo__block" block text="带标题与关闭按钮" @click="show('titled')" />
+			<am-button class="demo__block" block text="额外的键（小数点）" @click="show('extra')" />
+			<am-button class="demo__block" block text="custom 主题：右侧删除 + 确定" @click="show('custom')" />
+			<am-button class="demo__block" block text="custom 主题 + 额外的键（X）" @click="show('customExtra')" />
+			<am-button class="demo__block" block text="随机排列数字" @click="show('random')" />
+			<am-button block text="收起键盘、清空" @click="closeAll(); value = ''" />
+		</view>
+
+		<text class="demo__title">maxlength：配合验证码输入</text>
+		<view class="demo__card">
+			<view class="demo__field" @click="show('limited')">
+				<text :class="['demo__value', code.length == 0 ? 'demo__value--empty' : '']">{{ code.length > 0 ? code : '点这里输入 6 位数字' }}</text>
+			</view>
+			<text class="demo__hint">v-model:value = {{ code }}</text>
+		</view>
+
+		<text class="demo__title">就地显示（poppable = false）</text>
+		<am-number-keyboard v-model:value="value" :poppable="false" extra-key="." @input="onInput" @delete="onDelete" />
+		<view class="demo__footer"></view>
+
+		<am-number-keyboard v-model:open="basic" v-model:value="value" @input="onInput" @delete="onDelete" @blur="onBlur" />
+		<am-number-keyboard v-model:open="titled" v-model:value="value" title="安全键盘" close-button-text="完成" @input="onInput" @close="onClose" />
+		<am-number-keyboard v-model:open="extra" v-model:value="value" extra-key="." close-button-text="完成" @input="onInput" />
+		<am-number-keyboard v-model:open="custom" v-model:value="value" theme="custom" confirm-text="付款" @input="onInput" @confirm="onConfirm" @close="onClose" />
+		<am-number-keyboard v-model:open="customExtra" v-model:value="value" theme="custom" extra-key="X" @input="onInput" @confirm="onConfirm" />
+		<am-number-keyboard v-model:open="random" v-model:value="value" random-key-order close-button-text="完成" @input="onInput" />
+		<am-number-keyboard v-model:open="limited" v-model:value="code" :maxlength="6" title="验证码" close-button-text="完成" />
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__field {
+	height: 44px;
+	margin-bottom: 12px;
+	padding: 0 12px;
+	flex-direction: row;
+	align-items: center;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	border-radius: 8px;
+}
+.demo__value { font-size: 18px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__value--empty { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+/* 给贴底的键盘留出位置 */
+.demo__footer { height: 320px; }
+</style>

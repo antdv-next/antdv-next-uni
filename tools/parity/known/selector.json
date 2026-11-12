@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和空数组，非受控用法请用 v-model:value",
+    "fieldNames": "暂不提供：选项按 { label, description, value, disabled } 读取（字符串 / 数字也可以直接当选项）"
+  }
+}

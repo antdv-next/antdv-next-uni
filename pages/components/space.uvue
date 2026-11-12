@@ -1,0 +1,188 @@
+<script setup lang="uts">
+import { AmOption } from '@/uni_modules/antdv-next-uni/types/index.uts'
+
+const sizes : string[] = ['small', 'middle', 'large']
+const size = ref('small')
+const custom = ref(20)
+const tags : string[] = ['手机', '电脑', '平板', '耳机', '手表', '显示器', '键盘', '鼠标']
+
+const cities : AmOption[] = [
+	{ label: '北京', value: 'beijing' },
+	{ label: '上海', value: 'shanghai' },
+	{ label: '广州', value: 'guangzhou' }
+]
+const keyword = ref('')
+const site = ref('antdv-next')
+const city = ref<any | null>('beijing')
+const address = ref('')
+const date = ref('')
+const amount = ref<number | null>(100)
+const count = ref<number | null>(1)
+const compactSize = ref('middle')
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（横向，默认 small）</text>
+		<view class="demo__card">
+			<am-space>
+				<am-button type="primary" text="主按钮" />
+				<am-button text="默认" />
+				<am-tag text="标签" />
+				<text class="demo__text">文字</text>
+			</am-space>
+		</view>
+
+		<text class="demo__title">间距：small / middle / large 或像素数</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in sizes" :key="item" class="demo__item" size="small" :type="size == item ? 'primary' : 'default'" :text="item" @click="size = item" />
+			</view>
+			<am-space :size="size">
+				<am-button text="按钮" />
+				<am-button text="按钮" />
+				<am-button text="按钮" />
+			</am-space>
+			<am-slider v-model:value="custom" :min="0" :max="48" />
+			<am-space :size="custom">
+				<am-button text="按钮" />
+				<am-button text="按钮" />
+				<am-button :text="custom + 'px'" />
+			</am-space>
+		</view>
+
+		<text class="demo__title">纵向与撑满（vertical / block）</text>
+		<view class="demo__card">
+			<am-space vertical block size="middle">
+				<am-button block type="primary" text="提交" />
+				<am-button block text="保存草稿" />
+				<am-button block type="text" text="取消" />
+			</am-space>
+		</view>
+
+		<text class="demo__title">对齐（align）</text>
+		<view class="demo__card">
+			<am-space align="start" root-class="demo__stage">
+				<text class="demo__text">start</text>
+				<am-button text="按钮" />
+				<view class="demo__tall"><text class="demo__block-text">高</text></view>
+			</am-space>
+			<am-space align="end" root-class="demo__stage">
+				<text class="demo__text">end</text>
+				<am-button text="按钮" />
+				<view class="demo__tall"><text class="demo__block-text">高</text></view>
+			</am-space>
+		</view>
+
+		<text class="demo__title">自动换行（wrap）</text>
+		<view class="demo__card">
+			<am-space wrap block>
+				<am-tag v-for="item in tags" :key="item" :text="item" />
+				<am-button v-for="item in tags" :key="item" size="small" :text="item" />
+			</am-space>
+		</view>
+
+		<text class="demo__title">Flex 的 gap</text>
+		<view class="demo__card">
+			<am-flex gap="middle" wrap>
+				<view v-for="n in 7" :key="n" class="demo__block"><text class="demo__block-text">{{ n }}</text></view>
+			</am-flex>
+			<am-flex vertical :gap="4" root-class="demo__gap-top">
+				<view class="demo__bar"><text class="demo__block-text">:gap="4"</text></view>
+				<view class="demo__bar"><text class="demo__block-text">:gap="4"</text></view>
+			</am-flex>
+		</view>
+
+		<text class="demo__title">紧凑组合：按钮</text>
+		<view class="demo__card">
+			<am-space-compact>
+				<am-button icon="left" />
+				<am-button text="上一页" />
+				<am-button text="下一页" />
+				<am-button icon="right" />
+			</am-space-compact>
+			<am-space-compact root-class="demo__gap-top">
+				<am-button type="primary" text="保存" />
+				<am-button type="primary" icon="down" />
+			</am-space-compact>
+			<am-space-compact block root-class="demo__gap-top">
+				<am-button block text="取消" />
+				<am-button block type="primary" text="确定" />
+			</am-space-compact>
+		</view>
+
+		<text class="demo__title">紧凑组合：输入框 + 按钮 / 附加块</text>
+		<view class="demo__card">
+			<am-space-compact block>
+				<am-input v-model:value="keyword" placeholder="搜索商品" allow-clear />
+				<am-button type="primary" text="搜索" />
+			</am-space-compact>
+			<am-space-compact block root-class="demo__gap-top">
+				<am-space-addon text="https://" />
+				<am-input v-model:value="site" />
+				<am-space-addon text=".com" />
+			</am-space-compact>
+			<am-space-compact block root-class="demo__gap-top">
+				<am-space-addon text="¥" />
+				<am-input-number v-model:value="amount" mode="input" :min="0" />
+				<am-space-addon variant="filled" text="元" />
+			</am-space-compact>
+			<am-space-compact root-class="demo__gap-top">
+				<am-space-addon text="数量" />
+				<am-input-number v-model:value="count" :min="1" :max="99" />
+			</am-space-compact>
+		</view>
+
+		<text class="demo__title">紧凑组合：选择器（基于 am-picker-trigger 的字段）</text>
+		<view class="demo__card">
+			<am-space-compact block>
+				<am-select v-model:value="city" :options="cities" placeholder="城市" />
+				<am-input v-model:value="address" placeholder="详细地址" />
+			</am-space-compact>
+			<am-space-compact block root-class="demo__gap-top">
+				<am-date-picker v-model:value="date" placeholder="选择日期" />
+				<am-button type="primary" text="查询" />
+			</am-space-compact>
+		</view>
+
+		<text class="demo__title">紧凑组合：尺寸与纵向</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in sizes" :key="item" class="demo__item" size="small" :type="compactSize == item ? 'primary' : 'default'" :text="item" @click="compactSize = item" />
+			</view>
+			<am-space-compact block :size="compactSize">
+				<am-space-addon text="+86" />
+				<am-input placeholder="手机号" type="number" />
+				<am-button text="获取验证码" />
+			</am-space-compact>
+			<am-space-compact vertical block root-class="demo__gap-top">
+				<am-input placeholder="账号" />
+				<am-input placeholder="密码" type="password" />
+				<am-button type="primary" text="登录" />
+			</am-space-compact>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { padding-top: 8px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__stage { margin-bottom: 8px; padding: 8px; background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); border-radius: 8px; }
+.demo__tall { width: 40px; height: 64px; align-items: center; justify-content: center; background-color: var(--am-color-primary, #1677ff); border-radius: 6px; }
+.demo__block { width: 64px; height: 40px; align-items: center; justify-content: center; background-color: var(--am-color-primary, #1677ff); border-radius: 6px; }
+.demo__bar { height: 32px; align-items: center; justify-content: center; background-color: var(--am-color-primary, #1677ff); border-radius: 6px; }
+.demo__block-text { font-size: 14px; color: #ffffff; }
+.demo__gap-top { margin-top: 12px; }
+</style>

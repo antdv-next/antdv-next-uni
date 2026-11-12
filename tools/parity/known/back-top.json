@@ -1,0 +1,9 @@
+{
+  "missingProps": {
+    "target": "UTS 里取不到滚动的元素：默认监听页面的滚动（onPageScroll）；内容在自己的 scroll-view 里滚动时用 scrollTop 属性",
+    "ariaLabel": "view 不支持 aria-label 等无障碍属性"
+  },
+  "extraProps": {
+    "scrollTop": "代替 target：把自己的滚动区域滚过的距离传进来（-1 为监听页面的滚动），并在 click 事件里把它滚回顶部"
+  }
+}

@@ -1,0 +1,304 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmSize } from '../../utils/config.uts'
+import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
+
+// 一次性密码输入框（= antdv-next-mobile 的 InputOTP）：验证码、支付密码那种一格一个字符的输入。
+// length、v-model:value、mask（true 显示圆点，字符串则用它的第一个字符）、separator、disabled、status、size、variant、
+// inputMode（默认 numeric：数字键盘）、autoFocus、name、id 同名同义；事件 update:value（每次输入）、change（填满时）、
+// input（每一格的内容）、focus、blur；插槽 separator（参数 index）；方法 focus() / blur()。
+// 做法同移动端库：格子是按值画出来的，上面盖一个透明的原生 input 管焦点、键盘与粘贴。
+// 是表单字段：禁用、状态、变体跟随所在的 Form / FormItem，值变化、失焦时通知 FormItem（utils/form-field.uts）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - separator 是字符串，自定义内容用 separator 插槽；
+// - 没有 formatter（函数属性在 App 端受限）：需要过滤字符时在 update:value 里自己处理；
+// - 没有 defaultValue（UTS 里分不出“没传”和空字符串），请用 v-model:value；
+// - inputMode 只认 numeric（数字键盘）、decimal（带小数点）、tel、text，对应原生 input 的 type；
+// - 光标是按定时器闪的（没有 @keyframes）；原生 input 的光标位置不可控，总是当作在末尾输入
+defineOptions({ name: 'AmInputOtp' })
+
+const props = defineProps({
+	length: { type: Number, default: 6 },
+	value: { type: String, default: '' },
+	/** true 显示圆点；字符串则用它的第一个字符遮住内容（值不变） */
+	mask: { type: [Boolean, String], default: false },
+	/** 格子之间的分隔文字 */
+	separator: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	size: { type: String, default: '' },
+	/** outlined / filled / borderless / underlined；空为跟随表单，否则 outlined */
+	variant: { type: String, default: '' },
+	/** numeric / decimal / tel / text */
+	inputMode: { type: String, default: 'numeric' },
+	autoFocus: { type: Boolean, default: false },
+	name: { type: String, default: '' },
+	id: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change', 'input', 'focus', 'blur'])
+
+const theme = useAmTheme()
+const sizeOf = useAmSize(() : string => props.size)
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const variantOf = useAmFieldVariant(() : string => props.variant)
+const variant = computed(() : string => variantOf())
+const statusOf = useAmFieldStatus(() : string => props.status)
+const status = computed(() : string => statusOf())
+const notifyChange = useAmFieldChange()
+const notifyBlur = useAmFieldBlur()
+
+function normalize(text : string) : string {
+	const count = Math.max(props.length, 0)
+	return text.length > count ? text.substring(0, count) : text
+}
+
+/** 当前的值：绑定了 value 时跟着它 */
+const inner = ref(normalize(props.value))
+/** 交给原生 input 的值（输入超长时先跟着原生的内容，下一帧再改回截短后的值，原生 input 才会被改回来） */
+const native = ref(inner.value)
+
+watch(() : string => props.value, (value : string) => {
+	inner.value = normalize(value)
+	native.value = inner.value
+})
+watch(() : number => props.length, () => {
+	inner.value = normalize(inner.value)
+	native.value = inner.value
+})
+
+const focused = ref(false)
+/** 要不要让原生 input 获得焦点（点格子、focus() / blur() 改它） */
+const wantFocus = ref(props.autoFocus)
+
+function cellsOf(text : string) : string[] {
+	const list : string[] = []
+	for (let i = 0; i < props.length; i++) list.push(i < text.length ? text.charAt(i) : '')
+	return list
+}
+
+const cells = computed(() : string[] => cellsOf(inner.value))
+/** 下一个字符落在哪一格（填满后是最后一格） */
+const activeIndex = computed(() : number => Math.min(inner.value.length, props.length - 1))
+
+const maskChar = computed(() : string => {
+	const mask = props.mask
+	if (typeof mask == 'string') {
+		const text = mask as string
+		return text.length > 0 ? text.charAt(0) : '•'
+	}
+	return mask == true ? '•' : ''
+})
+
+const inputType = computed(() : string => {
+	if (props.inputMode == 'numeric') return 'number'
+	if (props.inputMode == 'decimal') return 'digit'
+	if (props.inputMode == 'tel') return 'tel'
+	return 'text'
+})
+
+// ---------- 光标：没有 @keyframes，按定时器闪 ----------
+const caretOn = ref(true)
+let caretTimer = 0
+
+function stopCaret() {
+	if (caretTimer != 0) clearInterval(caretTimer)
+	caretTimer = 0
+}
+
+function startCaret() {
+	stopCaret()
+	caretOn.value = true
+	caretTimer = setInterval(() => { caretOn.value = !caretOn.value }, 500)
+}
+
+onUnmounted(() => { stopCaret() })
+
+// ---------- 输入 ----------
+function onInput(event : UniInputEvent) {
+	const raw = event.detail.value
+	const next = normalize(raw)
+	if (raw != next) {
+		native.value = raw
+		nextTick(() => { native.value = inner.value })
+	} else {
+		native.value = next
+	}
+	if (next == inner.value) return
+	inner.value = next
+	emit('update:value', next)
+	emit('input', cellsOf(next))
+	if (next.length == props.length) emit('change', next)
+	notifyChange()
+}
+
+function onFocus(event : UniInputFocusEvent) {
+	focused.value = true
+	startCaret()
+	emit('focus', event)
+}
+
+function onBlur(event : UniInputBlurEvent) {
+	focused.value = false
+	wantFocus.value = false
+	stopCaret()
+	emit('blur', event)
+	notifyBlur()
+}
+
+function onTap() {
+	if (!disabled.value) wantFocus.value = true
+}
+
+function focus() {
+	wantFocus.value = true
+}
+
+function blur() {
+	wantFocus.value = false
+}
+
+defineExpose({ focus, blur })
+
+// ---------- 样式：边框色、背景色写在 style 上（Android 上只切换类名时没有过渡） ----------
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-input-otp']
+	if (disabled.value) list.push('am-input-otp--disabled')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+function cellClass(index : number) : string[] {
+	const list : string[] = ['am-input-otp__cell', 'am-input-otp__cell--' + size.value]
+	if (variant.value == 'underlined') list.push('am-input-otp__cell--underlined')
+	else list.push('am-input-otp__cell--box-' + size.value)
+	if (index > 0 && props.separator.length == 0) list.push('am-input-otp__cell--gap')
+	return list
+}
+
+function cellStyle(index : number) : string {
+	const current = theme()
+	const active = focused.value && index == activeIndex.value
+	let accent = current.colorPrimary
+	let border = current.colorBorder
+	let filled = current.colorFillTertiary
+	if (status.value == 'error') {
+		accent = current.colorError
+		border = current.colorError
+		filled = current.colorErrorBg
+	} else if (status.value == 'warning') {
+		accent = current.colorWarning
+		border = current.colorWarning
+		filled = current.colorWarningBg
+	}
+	const kind = variant.value
+	if (kind == 'underlined') return 'border-bottom-color:' + (active ? accent : border) + ';'
+	if (kind == 'filled') return 'border-color:' + (active ? accent : 'transparent') + ';background-color:' + (active ? current.colorBgContainer : filled) + ';'
+	if (kind == 'borderless') return 'border-color:' + (active ? accent : 'transparent') + ';background-color:' + filled + ';'
+	return 'border-color:' + (active ? accent : border) + ';background-color:' + current.colorBgContainer + ';'
+}
+
+const caretStyle = computed(() : string => {
+	const current = theme()
+	const color = status.value == 'error' ? current.colorError : (status.value == 'warning' ? current.colorWarning : current.colorPrimary)
+	return 'background-color:' + color + ';opacity:' + (caretOn.value ? 1 : 0) + ';'
+})
+</script>
+
+<template>
+	<view :class="classes" @click="onTap">
+		<template v-for="(char, index) in cells" :key="index">
+			<view :class="cellClass(index)" :style="cellStyle(index)">
+				<text v-if="char.length > 0" :class="['am-input-otp__text', 'am-input-otp__text--' + size]">{{ maskChar.length > 0 ? maskChar : char }}</text>
+				<view v-else-if="focused && index == activeIndex" :class="['am-input-otp__caret', 'am-input-otp__caret--' + size]" :style="caretStyle"></view>
+			</view>
+			<view v-if="index < length - 1 && (separator.length > 0 || $slots['separator'] != null)" class="am-input-otp__separator">
+				<slot name="separator" :index="index">
+					<text class="am-input-otp__separator-text">{{ separator }}</text>
+				</slot>
+			</view>
+		</template>
+		<!-- 一个透明的原生 input 盖在格子上：点哪里都是它获得焦点，粘贴、短信验证码自动填充也由它处理 -->
+		<input
+			:id="id"
+			:name="name"
+			class="am-input-otp__input"
+			:value="native"
+			:type="inputType"
+			:maxlength="length"
+			:disabled="disabled"
+			:focus="wantFocus"
+			cursor-color="transparent"
+			confirm-type="done"
+			@input="onInput"
+			@focus="onFocus"
+			@blur="onBlur"
+		/>
+	</view>
+</template>
+
+<style>
+/* 占满一行、格子靠左：放不下时格子一起变窄（max-width 不支持百分比，所以不做成按内容定宽） */
+.am-input-otp { flex-direction: row; align-items: center; }
+.am-input-otp--disabled { opacity: 0.4; }
+.am-input-otp__input {
+	position: absolute;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	font-size: 16px;
+	color: transparent;
+	background-color: transparent;
+}
+.am-input-otp__cell {
+	flex-shrink: 1;
+	align-items: center;
+	justify-content: center;
+	transition-property: border-color, background-color;
+	transition-duration: 200ms;
+}
+.am-input-otp__cell--gap { margin-left: 8px; }
+.am-input-otp__cell--middle { width: var(--am-control-height-lg, 48px); height: var(--am-control-height-lg, 48px); }
+.am-input-otp__cell--small { width: var(--am-control-height, 40px); height: var(--am-control-height, 40px); }
+.am-input-otp__cell--large { width: 56px; height: 56px; }
+.am-input-otp__cell--box-middle {
+	border-width: 1px;
+	border-style: solid;
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-input-otp__cell--box-small {
+	border-width: 1px;
+	border-style: solid;
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-input-otp__cell--box-large {
+	border-width: 1px;
+	border-style: solid;
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+.am-input-otp__cell--underlined { border-bottom-width: 2px; border-bottom-style: solid; }
+.am-input-otp__text { font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-input-otp__text--middle { font-size: 24px; line-height: 28px; }
+.am-input-otp__text--small { font-size: var(--am-font-size-xl, 18px); line-height: 22px; }
+.am-input-otp__text--large { font-size: 30px; line-height: 36px; }
+.am-input-otp__caret { width: 2px; border-radius: 1px; }
+.am-input-otp__caret--middle { height: 22px; }
+.am-input-otp__caret--small { height: 18px; }
+.am-input-otp__caret--large { height: 26px; }
+.am-input-otp__separator { margin-left: 8px; margin-right: 8px; flex-direction: row; align-items: center; }
+.am-input-otp__separator-text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+</style>

@@ -1,0 +1,530 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+import { AM_UPLOAD_LIST_IGNORE, amUploadFileName, amUploadUid, cloneAmUploadFile, isAmUploadImage } from '../../utils/upload.uts'
+import { AmUploadBeforeRemove, AmUploadBeforeUpload, AmUploadChangeParam, AmUploadCustomRequest, AmUploadFile, AmUploadIsImageUrl, AmUploadRequestOption } from '../../types/upload.uts'
+
+// 上传（= antdv-next-mobile 的 Upload，picture-card 形态）：方形缩略图排成网格，最后一格是“+”。
+// v-model:fileList、accept、multiple、maxCount（1 为替换当前的文件）、maxSize（字节）、disabled、action、headers、data、
+// name、customRequest、beforeUpload、beforeRemove、showUploadList、capture、isImageUrl、columns、preview 同名同义；
+// 事件 update:fileList、change（{ file, fileList }）、preview（file）、remove（file）、exceed（files, reason）；
+// 默认插槽是“+”那一格的内容；方法 chooseFile()、upload(file)、abort(file)。
+// 没有 action 也没有 customRequest 时选出来的文件只是收进列表（status 为 done）。它是表单字段：列表变化后通知表单项。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 选文件用 uni.chooseImage / uni.chooseVideo，不是 <input type="file">：`accept` 只分图片与视频（含 video 时选视频，
+//   其余选图片；Web 以外没有通用的文件选择），所以也没有 listType="text"；`capture` 非空 / true 时只开相机
+//   （选视频时 'user' 为前置摄像头）；`multiple` 只对图片有效（视频一次一个）；
+// - 文件是本地路径不是 File 对象：AmUploadFile 没有 originFileObj，本地路径在 `path`；exceed 的第一个参数是 AmUploadFile[]；
+// - 上传用 uni.uploadFile：只能 POST、multipart（没有 method / withCredentials）；`action`、`data` 只能是字符串 / 对象，
+//   不能是函数；HTTP 状态码不是 2xx 算失败；
+// - beforeUpload 必须返回 Promise，不能返回替换用的文件；customRequest 没有返回值（不能 abort）、没有 defaultRequest；
+// - showUploadList 只有布尔值；没有 previewFile / iconRender（不是图片的文件显示文件图标与文件名；是不是图片默认按
+//   type 与扩展名判断，可用 isImageUrl 改）、itemRender 插槽；没有 defaultFileList（用 v-model:fileList）；
+// - 格子的边长由量出来的宽度算（没有 CSS grid 与 aspect-ratio）：容器的宽度变化后调用 refresh()
+defineOptions({ name: 'AmUpload' })
+
+const props = defineProps({
+	fileList: { type: Array as PropType<AmUploadFile[]>, default: () : AmUploadFile[] => [] },
+	/** 含 video 时选视频，其余（含空）选图片 */
+	accept: { type: String, default: '' },
+	multiple: { type: Boolean, default: false },
+	/** 最多几个文件，0 为不限；到了以后“+”隐藏；1 时新选的替换当前的 */
+	maxCount: { type: Number, default: 0 },
+	/** 单个文件的最大字节数，0 为不限；超过的不进列表，由 exceed 报告 */
+	maxSize: { type: Number, default: 0 },
+	disabled: { type: Boolean, default: false },
+	/** 上传的地址 */
+	action: { type: String, default: '' },
+	headers: { type: Object as PropType<UTSJSONObject | null>, default: null },
+	/** 一起提交的表单数据 */
+	data: { type: Object as PropType<UTSJSONObject | null>, default: null },
+	/** 文件字段名 */
+	name: { type: String, default: 'file' },
+	customRequest: { type: Function as PropType<AmUploadCustomRequest | null>, default: null },
+	beforeUpload: { type: Function as PropType<AmUploadBeforeUpload | null>, default: null },
+	beforeRemove: { type: Function as PropType<AmUploadBeforeRemove | null>, default: null },
+	showUploadList: { type: Boolean, default: true },
+	/** true / 'user' / 'environment'：直接开相机 */
+	capture: { type: [Boolean, String], default: false },
+	/** 文件是不是按图片显示（默认按 type 与扩展名判断） */
+	isImageUrl: { type: Function as PropType<AmUploadIsImageUrl | null>, default: null },
+	/** 每行几格 */
+	columns: { type: Number, default: 4 },
+	/** 点已完成的图片时打开内置的图片预览 */
+	preview: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:fileList', 'change', 'preview', 'remove', 'exceed'])
+
+/** 格子之间的间距（= --am-upload-gap，主题的 marginXS） */
+const GAP = 8
+
+const theme = useAmTheme()
+const locale = useAmLocale()
+const uid = amUid('am-upload')
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const notifyChange = useAmFieldChange()
+
+// 列表存在本地：上传的回调要同步读到最新的列表，不能等父组件把 update:fileList 传回来
+const list = ref<AmUploadFile[]>(props.fileList)
+watch(() : AmUploadFile[] => props.fileList, (value : AmUploadFile[]) => { list.value = value })
+
+function commit(next : AmUploadFile[], file : AmUploadFile) {
+	list.value = next
+	emit('update:fileList', next)
+	const info : AmUploadChangeParam = { file: file, fileList: next }
+	emit('change', info)
+	notifyChange()
+}
+
+function findFile(fileUid : string) : AmUploadFile | null {
+	const items = list.value
+	for (let i = 0; i < items.length; i++) if (items[i].uid == fileUid) return items[i]
+	return null
+}
+
+/** 换掉列表里的一个文件；已经不在列表里的不管 */
+function updateFile(file : AmUploadFile) {
+	const items = list.value
+	let position = -1
+	for (let i = 0; i < items.length; i++) if (items[i].uid == file.uid) position = i
+	if (position < 0) return
+	const next = [...items]
+	next[position] = file
+	commit(next, file)
+}
+
+// ---------- 上传 ----------
+const tasks = new Map<string, UploadTask>()
+
+function abortOne(fileUid : string) {
+	const task = tasks.get(fileUid)
+	if (task != null) task.abort()
+	tasks.delete(fileUid)
+}
+
+function abort(file : AmUploadFile | null) {
+	if (file != null) {
+		abortOne(file.uid)
+		return
+	}
+	tasks.forEach((task : UploadTask) => { task.abort() })
+	tasks.clear()
+}
+
+function setProgress(fileUid : string, percent : number) {
+	const current = findFile(fileUid)
+	if (current == null || current.status != 'uploading') return
+	const next = cloneAmUploadFile(current)
+	next.percent = Math.min(Math.max(percent, 0), 100)
+	updateFile(next)
+}
+
+function succeed(fileUid : string, response : any | null) {
+	tasks.delete(fileUid)
+	const current = findFile(fileUid)
+	if (current == null || current.status != 'uploading') return
+	const next = cloneAmUploadFile(current)
+	next.status = 'done'
+	next.percent = 100
+	next.response = response
+	updateFile(next)
+}
+
+function fail(fileUid : string, error : any | null, response : any | null) {
+	tasks.delete(fileUid)
+	const current = findFile(fileUid)
+	if (current == null || current.status != 'uploading') return
+	const next = cloneAmUploadFile(current)
+	next.status = 'error'
+	next.error = error
+	next.response = response
+	updateFile(next)
+}
+
+/** 服务器返回的文本：是 JSON 就解析，否则原样给出 */
+function parseResponse(text : string) : any | null {
+	try {
+		return JSON.parse(text)
+	} catch (_) {
+		return text
+	}
+}
+
+const hasRequest = computed(() : boolean => props.action.length > 0 || props.customRequest != null)
+
+function startUpload(fileUid : string) {
+	const file = findFile(fileUid)
+	if (file == null) return
+	const filePath = file.path ?? file.url ?? ''
+	if (filePath.length == 0) return
+	const data = props.data ?? ({} as UTSJSONObject)
+	const headers = props.headers ?? ({} as UTSJSONObject)
+	if (props.customRequest != null) {
+		const options : AmUploadRequestOption = {
+			action: props.action,
+			filename: props.name,
+			filePath: filePath,
+			file: file,
+			data: data,
+			headers: headers,
+			onProgress: (percent : number) => { setProgress(fileUid, percent) },
+			onSuccess: (response : any | null) => { succeed(fileUid, response) },
+			onError: (error : any | null) => { fail(fileUid, error, null) }
+		}
+		props.customRequest!(options)
+		return
+	}
+	const task = uni.uploadFile({
+		url: props.action,
+		filePath: filePath,
+		name: props.name,
+		header: headers,
+		formData: data,
+		success: (result) => {
+			const response = parseResponse(result.data)
+			if (result.statusCode >= 200 && result.statusCode < 300) succeed(fileUid, response)
+			else fail(fileUid, 'HTTP ' + result.statusCode, response)
+		},
+		fail: (error) => {
+			fail(fileUid, error.errMsg, null)
+		}
+	})
+	tasks.set(fileUid, task)
+	task.onProgressUpdate((result) => {
+		// 100 留给 success：进度到头时服务器还没有响应
+		setProgress(fileUid, Math.min(result.progress, 99))
+	})
+}
+
+/** 重新上传列表里的一个文件（失败的、被 beforeUpload 拦下的） */
+function upload(file : AmUploadFile) {
+	const current = findFile(file.uid)
+	if (current == null || current.status == 'uploading' || !hasRequest.value) return
+	if ((current.path ?? current.url ?? '').length == 0) return
+	abortOne(current.uid)
+	const next = cloneAmUploadFile(current)
+	next.status = 'uploading'
+	next.percent = 0
+	next.error = null
+	next.response = null
+	updateFile(next)
+	startUpload(next.uid)
+}
+
+// ---------- 选文件 ----------
+const isVideo = computed(() : boolean => props.accept.indexOf('video') >= 0)
+const captureMode = computed(() : string => {
+	const capture = props.capture
+	if (typeof capture == 'string') return capture as string
+	return capture == true ? 'environment' : ''
+})
+
+/** beforeUpload 的结果：'upload' 上传、'keep' 留在列表里不上传、'ignore' 不进列表 */
+function checkBefore(file : AmUploadFile, files : AmUploadFile[]) : Promise<string> {
+	if (props.beforeUpload == null) return Promise.resolve('upload')
+	return props.beforeUpload!(file, files).then((result : any | null) : string => {
+		if (typeof result == 'boolean' && (result as boolean) == false) return 'keep'
+		if (typeof result == 'string' && (result as string) == AM_UPLOAD_LIST_IGNORE) return 'ignore'
+		return 'upload'
+	}).catch((_ : any | null) : string => 'keep')
+}
+
+function addFiles(picked : AmUploadFile[]) {
+	if (disabled.value || picked.length == 0) return
+	let files = picked
+	if (props.maxSize > 0) {
+		const oversize = files.filter((file) : boolean => (file.size ?? 0) > props.maxSize)
+		if (oversize.length > 0) {
+			emit('exceed', oversize, 'maxSize')
+			files = files.filter((file) : boolean => (file.size ?? 0) <= props.maxSize)
+		}
+	}
+	if (props.maxCount > 0) {
+		const remain = props.maxCount == 1 ? 1 : Math.max(props.maxCount - list.value.length, 0)
+		if (files.length > remain) {
+			emit('exceed', files.slice(remain), 'maxCount')
+			files = files.slice(0, remain)
+		}
+	}
+	if (files.length == 0) return
+	const accepted : AmUploadFile[] = files
+	const checks : Promise<string>[] = []
+	for (let i = 0; i < accepted.length; i++) checks.push(checkBefore(accepted[i], accepted))
+	Promise.all(checks).then((results : string[]) => {
+		const added : AmUploadFile[] = []
+		const uploads : string[] = []
+		for (let i = 0; i < accepted.length; i++) {
+			if (results[i] == 'ignore') continue
+			const willUpload = results[i] == 'upload' && hasRequest.value
+			const file = cloneAmUploadFile(accepted[i])
+			// 没有上传的地址时文件只是收进列表
+			file.status = willUpload ? 'uploading' : (results[i] == 'upload' ? 'done' : null)
+			file.percent = willUpload ? 0 : null
+			added.push(file)
+			if (willUpload) uploads.push(file.uid)
+		}
+		if (added.length == 0) return
+		if (props.maxCount == 1) {
+			abort(null)
+			const last = added[added.length - 1]
+			commit([last], last)
+			if (uploads.indexOf(last.uid) >= 0) startUpload(last.uid)
+			return
+		}
+		// 每加一个文件发一次 change（同移动端库：change 的 file 是单个文件）
+		let next = list.value
+		for (let i = 0; i < added.length; i++) {
+			next = [...next, added[i]]
+			commit(next, added[i])
+		}
+		for (let i = 0; i < uploads.length; i++) startUpload(uploads[i])
+	})
+}
+
+function pickedFile(path : string, size : number, name : string | null, type : string) : AmUploadFile {
+	const file : AmUploadFile = {
+		uid: amUploadUid(),
+		name: name != null && name.length > 0 ? name : amUploadFileName(path),
+		size: size,
+		type: type,
+		url: path,
+		path: path
+	}
+	return file
+}
+
+/** 打开系统的图片 / 视频选择 */
+function chooseFile() {
+	if (disabled.value) return
+	const sourceType : string[] = captureMode.value.length > 0 ? ['camera'] : ['album', 'camera']
+	if (isVideo.value) {
+		uni.chooseVideo({
+			sourceType: sourceType,
+			camera: captureMode.value == 'user' ? 'front' : 'back',
+			success: (result) => {
+				addFiles([pickedFile(result.tempFilePath, result.size, null, 'video')])
+			}
+		})
+		return
+	}
+	let count = 1
+	if (props.multiple && props.maxCount != 1) {
+		count = props.maxCount > 0 ? Math.max(props.maxCount - list.value.length, 1) : 9
+	}
+	uni.chooseImage({
+		count: count,
+		sourceType: sourceType,
+		success: (result) => {
+			const picked : AmUploadFile[] = []
+			const tempFiles = result.tempFiles
+			for (let i = 0; i < tempFiles.length; i++) {
+				// Web 上是 blob: 地址，看不出扩展名：type 记成 image
+				picked.push(pickedFile(tempFiles[i].path, tempFiles[i].size, tempFiles[i].name, 'image'))
+			}
+			addFiles(picked)
+		}
+	})
+}
+
+// ---------- 删除、预览 ----------
+function doRemove(file : AmUploadFile) {
+	const current = findFile(file.uid)
+	if (current == null) return
+	abortOne(current.uid)
+	const removed = cloneAmUploadFile(current)
+	removed.status = 'removed'
+	commit(list.value.filter((item) : boolean => item.uid != current.uid), removed)
+	emit('remove', removed)
+}
+
+function removeFile(file : AmUploadFile) {
+	if (disabled.value) return
+	if (props.beforeRemove == null) {
+		doRemove(file)
+		return
+	}
+	props.beforeRemove!(file).then((ok : boolean) => {
+		if (ok) doRemove(file)
+	}).catch((_ : any | null) => {})
+}
+
+function thumbOf(file : AmUploadFile) : string {
+	const image = props.isImageUrl != null ? props.isImageUrl!(file) : isAmUploadImage(file)
+	if (!image) return ''
+	return file.thumbUrl ?? file.url ?? file.path ?? ''
+}
+
+const previewOpen = ref(false)
+const previewCurrent = ref(0)
+const previewFiles = computed(() : AmUploadFile[] => list.value.filter((file) : boolean => file.status != 'uploading' && file.status != 'error' && thumbOf(file).length > 0))
+const previewImages = computed(() : string[] => previewFiles.value.map((file) : string => file.url ?? file.thumbUrl ?? file.path ?? ''))
+
+function previewItem(file : AmUploadFile) {
+	emit('preview', file)
+	if (!props.preview) return
+	const files = previewFiles.value
+	for (let i = 0; i < files.length; i++) {
+		if (files[i].uid == file.uid) {
+			previewCurrent.value = i
+			previewOpen.value = true
+			return
+		}
+	}
+}
+
+function onItemClick(file : AmUploadFile) {
+	if (file.status == 'uploading') return
+	if (file.status == 'error') {
+		if (!disabled.value) upload(file)
+		return
+	}
+	previewItem(file)
+}
+
+// ---------- 网格 ----------
+// 没有 CSS grid 与 aspect-ratio：量出容器的宽度，算成每格的边长。量到之前按“窗口宽度减去两侧各 16px”估计
+const width = ref(uni.getWindowInfo().windowWidth - 32)
+
+function measure() {
+	measureById(uid).then((rect : AmRect | null) => {
+		if (rect != null && rect.width > 0) width.value = rect.width
+	})
+}
+
+onMounted(() => {
+	setTimeout(() => { measure() }, 30)
+	setTimeout(() => { measure() }, 400)
+})
+onPageShow(() => { setTimeout(() => { measure() }, 30) })
+onUnmounted(() => { abort(null) })
+
+const mergedColumns = computed(() : number => props.columns > 0 ? props.columns : 4)
+const cellSize = computed(() : number => Math.floor((width.value - GAP * (mergedColumns.value - 1)) / mergedColumns.value))
+const showTrigger = computed(() : boolean => props.maxCount <= 0 || list.value.length < props.maxCount)
+const shownFiles = computed(() : AmUploadFile[] => props.showUploadList ? list.value : [])
+const cellCount = computed(() : number => shownFiles.value.length + (showTrigger.value ? 1 : 0))
+
+/** 第几格的大小与外边距：行内最后一格没有右边距，最后一行没有下边距 */
+function cellStyle(position : number) : string {
+	const columns = mergedColumns.value
+	const lastRow = Math.floor((cellCount.value - 1) / columns)
+	const right = position % columns == columns - 1 ? 0 : GAP
+	const bottom = Math.floor(position / columns) == lastRow ? 0 : GAP
+	return 'width:' + cellSize.value + 'px;height:' + cellSize.value + 'px;margin-right:' + right + 'px;margin-bottom:' + bottom + 'px;'
+}
+
+function percentText(file : AmUploadFile) : string {
+	const percent = file.percent ?? 0
+	return percent > 0 ? Math.round(percent) + '%' : locale().Upload.uploading
+}
+
+const spinnerStyle = computed(() : string => 'width:20px;height:20px;border-color:#ffffff;')
+const triggerColor = computed(() : string => theme().colorTextQuaternary)
+const fileColor = computed(() : string => theme().colorTextSecondary)
+const errorColor = computed(() : string => theme().colorError)
+const errorText = computed(() : string => locale().Upload.uploadError)
+
+defineExpose({
+	chooseFile: () => { chooseFile() },
+	upload: (file : AmUploadFile) => { upload(file) },
+	/** 中止一个文件的上传；传 null 中止全部 */
+	abort: (file : AmUploadFile | null) => { abort(file) },
+	/** 容器的宽度变化后重新算格子的边长 */
+	refresh: () => { measure() }
+})
+</script>
+
+<template>
+	<view :id="uid" :class="['am-upload', disabled ? 'am-upload--disabled' : '', rootClass]">
+		<view class="am-upload__list">
+			<view v-for="(file, position) in shownFiles" :key="file.uid" class="am-upload__item" :style="cellStyle(position)" @click="onItemClick(file)">
+				<image v-if="thumbOf(file).length > 0" class="am-upload__image" :src="thumbOf(file)" mode="aspectFill" />
+				<view v-else class="am-upload__file">
+					<am-icon name="file" :size="24" :color="fileColor" />
+					<text class="am-upload__name">{{ file.name }}</text>
+				</view>
+				<view v-if="file.status == 'uploading'" class="am-upload__mask">
+					<loading :style="spinnerStyle"></loading>
+					<text class="am-upload__mask-text">{{ percentText(file) }}</text>
+				</view>
+				<view v-else-if="file.status == 'error'" class="am-upload__mask">
+					<am-icon name="warning" :size="20" :color="errorColor" />
+					<text class="am-upload__mask-text">{{ errorText }}</text>
+				</view>
+				<view v-if="!disabled" class="am-upload__remove" @click.stop="removeFile(file)">
+					<view class="am-upload__remove-badge">
+						<am-icon name="close" :size="10" color="#ffffff" />
+					</view>
+				</view>
+			</view>
+			<view v-if="showTrigger" :class="['am-upload__trigger', disabled ? 'am-upload__trigger--disabled' : '']" :style="cellStyle(shownFiles.length)" hover-class="am-upload__trigger--active" @click="chooseFile">
+				<slot>
+					<am-icon name="plus" :size="28" :color="triggerColor" />
+				</slot>
+			</view>
+		</view>
+		<am-image-preview v-model:open="previewOpen" v-model:current="previewCurrent" :images="previewImages" />
+	</view>
+</template>
+
+<style>
+.am-upload__list { flex-direction: row; flex-wrap: wrap; }
+.am-upload__item {
+	position: relative;
+	overflow: hidden;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+	border-top-left-radius: var(--am-border-radius, 6px);
+	border-top-right-radius: var(--am-border-radius, 6px);
+	border-bottom-left-radius: var(--am-border-radius, 6px);
+	border-bottom-right-radius: var(--am-border-radius, 6px);
+}
+.am-upload__image { width: 100%; height: 100%; }
+.am-upload__file { flex: 1; align-items: center; justify-content: center; padding: 4px; }
+.am-upload__name {
+	margin-top: 4px;
+	font-size: var(--am-font-size-sm, 12px);
+	color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65));
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	overflow: hidden;
+}
+.am-upload__mask {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+}
+.am-upload__mask-text { margin-top: 4px; font-size: var(--am-font-size-sm, 12px); color: #ffffff; }
+/* 删除角标：右上角，左下角是圆角；外面一圈透明的区域是为了好点 */
+.am-upload__remove { position: absolute; right: 0; top: 0; width: 28px; height: 28px; align-items: flex-end; }
+.am-upload__remove-badge {
+	width: 18px;
+	height: 18px;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-bg-mask, rgba(0, 0, 0, 0.45));
+	border-bottom-left-radius: var(--am-border-radius, 6px);
+}
+.am-upload__trigger {
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+	border-top-left-radius: var(--am-border-radius, 6px);
+	border-top-right-radius: var(--am-border-radius, 6px);
+	border-bottom-left-radius: var(--am-border-radius, 6px);
+	border-bottom-right-radius: var(--am-border-radius, 6px);
+}
+.am-upload__trigger--active { background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06)); }
+.am-upload__trigger--disabled { opacity: 0.4; }
+</style>

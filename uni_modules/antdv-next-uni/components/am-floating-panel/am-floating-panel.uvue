@@ -1,0 +1,284 @@
+<script setup lang="uts">
+import { AmFloatingPanelChangeInfo } from '../../types/floating-panel.uts'
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 浮动面板（= antdv-next-mobile 的 FloatingPanel）：贴在底部、可以在几个高度之间拖动的面板（地图、播放列表那种）。
+// v-model:height（露出来的高度，像素）、anchors（可以停住的高度，默认 [100, 可用高度的 60%]）、contentDraggable、
+// duration（吸附动画的时长，毫秒）、safeArea、fixed（true 相对窗口；false 相对最近的定位父节点）、zIndex 同名同义；
+// 事件 update:height、heightChange（height, { animating }）；插槽 default、header（替换拖动条）；
+// 方法 setHeight(height, immediate)。手势同移动端库：跟着手指时没有过渡，拖过最高 / 最低的高度有阻尼，
+// 松手时吸到最近的高度，快速一划则去往那个方向的下一个高度。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 内容区是 scroll-view：面板没有展开到最高时它不滚动（direction 为 none），拖内容就是拖面板；展开到最高后内容可以滚，
+//   滚到顶再往下拉才拖动面板。contentDraggable 为 false 时内容一直可以滚，只有头部能拖；
+// - 没有 lockScroll：拖动时已经阻止了页面跟着滚（touchmove 的 preventDefault），页面的滚动锁不住也不需要；
+// - 高度没有绑定时用 -1 表示（没有 undefined），此时停在最低的高度；setHeight 的第二个参数是布尔值（不要动画）；
+// - `fixed` 为 false 时父节点的高度是量出来的（多渲染一个不可见的探针），量到之前按窗口高度算默认的 anchors；
+// - 用 touch 事件，电脑浏览器上不能用鼠标拖；没有 classes / styles
+defineOptions({ name: 'AmFloatingPanel' })
+
+const props = defineProps({
+	/** 露出来的高度（像素）；-1 为没有绑定（停在最低的高度） */
+	height: { type: Number, default: -1 },
+	anchors: { type: Array as PropType<number[]>, default: () : number[] => [] },
+	contentDraggable: { type: Boolean, default: true },
+	duration: { type: Number, default: 300 },
+	safeArea: { type: Boolean, default: true },
+	fixed: { type: Boolean, default: true },
+	zIndex: { type: Number, default: 999 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:height', 'heightChange'])
+
+/** 拖过头时面板跟手的比例 */
+const DAMP = 0.2
+/** 像素 / 毫秒：划得比它快就去往那个方向的下一个高度 */
+const VELOCITY = 0.5
+const DEFAULT_MIN = 100
+/** 面板下面多出来的一截（往上拖过最高的高度时不露出底下的页面） */
+const EXTRA = 240
+
+const uid = amUid('am-floating-panel')
+
+/** 面板可以用的高度：窗口，或定位父节点（量出来的） */
+const available = ref(uni.getWindowInfo().windowHeight)
+
+function measure() {
+	if (props.fixed) {
+		available.value = uni.getWindowInfo().windowHeight
+		return
+	}
+	measureById(uid + '-probe').then((rect : AmRect | null) => {
+		if (rect != null && rect.height > 0) available.value = rect.height
+	})
+}
+
+onMounted(() => {
+	setTimeout(() => { measure() }, 50)
+})
+watch(() : boolean => props.fixed, () => {
+	setTimeout(() => { measure() }, 50)
+})
+
+const anchorList = computed(() : number[] => {
+	if (props.anchors.length > 0) {
+		const list = props.anchors.slice(0)
+		list.sort((a, b) : number => a - b)
+		return list
+	}
+	return [DEFAULT_MIN, Math.max(Math.round(available.value * 0.6), DEFAULT_MIN)]
+})
+const minHeight = computed(() : number => anchorList.value[0])
+const maxHeight = computed(() : number => anchorList.value[anchorList.value.length - 1])
+
+/** 当前的高度：绑定了 height 时跟着它 */
+const inner = ref(props.height >= 0 ? props.height : minHeight.value)
+const dragging = ref(false)
+const immediate = ref(false)
+
+watch(() : number => props.height, (height : number) => {
+	if (height >= 0) inner.value = height
+})
+
+function closest(target : number) : number {
+	const list = anchorList.value
+	let best = list[0]
+	for (let i = 1; i < list.length; i++) {
+		if (Math.abs(list[i] - target) < Math.abs(best - target)) best = list[i]
+	}
+	return best
+}
+
+function change(height : number, animating : boolean) {
+	inner.value = height
+	emit('update:height', height)
+	const info : AmFloatingPanelChangeInfo = { animating: animating }
+	emit('heightChange', height, info)
+}
+
+let immediateTimer = 0
+
+function setHeight(height : number, noMotion : boolean = false) {
+	const next = Math.max(height, 0)
+	if (noMotion) {
+		immediate.value = true
+		clearTimeout(immediateTimer)
+		immediateTimer = setTimeout(() => { immediate.value = false }, 50)
+	}
+	if (next != inner.value) change(next, !noMotion)
+}
+
+// anchors 变了：停到离现在最近的高度上
+watch(() : string => anchorList.value.join(','), () => {
+	if (dragging.value) return
+	const next = closest(inner.value)
+	if (next != inner.value) change(next, true)
+})
+
+// ---------- 手势 ----------
+let tracking = false
+/** 这次触摸是从内容区开始的 */
+let fromContent = false
+let startY = 0
+let startHeight = 0
+let startTime = 0
+let lastDelta = 0
+/** 内容滚到了哪里；这次触摸期间内容滚动过，手势就归内容 */
+const scrollTop = ref(0)
+let contentScrolled = false
+
+/** 内容能不能滚：面板展开到最高了，或者不允许拖内容 */
+const scrollable = computed(() : boolean => !props.contentDraggable || inner.value >= maxHeight.value)
+
+function begin(event : UniTouchEvent, content : boolean) {
+	if (event.touches.length == 0) return
+	tracking = true
+	fromContent = content
+	startY = event.touches[0].clientY
+	startHeight = inner.value
+	startTime = Date.now()
+	lastDelta = 0
+	contentScrolled = scrollTop.value > 0
+}
+
+function onHeaderStart(event : UniTouchEvent) {
+	begin(event, false)
+}
+
+function onContentStart(event : UniTouchEvent) {
+	begin(event, true)
+}
+
+function onScroll(event : UniScrollEvent) {
+	scrollTop.value = event.detail.scrollTop
+	if (tracking && scrollTop.value > 0) contentScrolled = true
+}
+
+/** 拖过最高 / 最低的高度之后只跟一小部分 */
+function ease(height : number) : number {
+	const min = minHeight.value
+	const max = maxHeight.value
+	if (height > max) return max + (height - max) * DAMP
+	if (height < min) return Math.max(min - (min - height) * DAMP, 0)
+	return height
+}
+
+function onTouchMove(event : UniTouchEvent) {
+	if (!tracking || event.touches.length == 0) return
+	const delta = event.touches[0].clientY - startY
+	if (fromContent) {
+		if (!props.contentDraggable) return
+		// 已经展开到最高：内容在滚；只有内容在顶部、手指往下拉时才拖面板
+		if (startHeight >= maxHeight.value && (contentScrolled || scrollTop.value > 0 || delta <= 0)) return
+	}
+	if (!dragging.value) {
+		if (Math.abs(delta) < 3) return
+		dragging.value = true
+	}
+	// 拖面板时页面、内容都不跟着滚
+	event.preventDefault()
+	lastDelta = delta
+	const next = ease(startHeight - delta)
+	if (next != inner.value) change(next, false)
+}
+
+function onTouchEnd() {
+	if (!tracking) return
+	tracking = false
+	if (!dragging.value) return
+	dragging.value = false
+	const moved = inner.value != startHeight
+	const velocity = lastDelta / Math.max(Date.now() - startTime, 1)
+	const list = anchorList.value
+	let target = closest(inner.value)
+	if (moved && Math.abs(velocity) > VELOCITY && Math.abs(lastDelta) > 10) {
+		if (velocity < 0) {
+			// 往上划：比起点高的第一个
+			target = maxHeight.value
+			for (let i = 0; i < list.length; i++) {
+				if (list[i] > startHeight) {
+					target = list[i]
+					break
+				}
+			}
+		} else {
+			target = minHeight.value
+			for (let i = list.length - 1; i >= 0; i--) {
+				if (list[i] < startHeight) {
+					target = list[i]
+					break
+				}
+			}
+		}
+	}
+	if (target != inner.value || moved) change(target, true)
+}
+
+onUnmounted(() => { clearTimeout(immediateTimer) })
+
+defineExpose({ setHeight })
+
+// ---------- 样式：跟手时不带过渡，吸附时带（要动的值写在 style 上） ----------
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-floating-panel', props.fixed ? 'am-floating-panel--fixed' : 'am-floating-panel--absolute']
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const rootStyle = computed(() : string => {
+	const max = maxHeight.value
+	let text = 'height:' + (max + EXTRA) + 'px;bottom:' + (0 - EXTRA) + 'px;z-index:' + props.zIndex + ';'
+	text += 'transform:translateY(' + (max - Math.max(inner.value, 0)) + 'px);'
+	if (!dragging.value && !immediate.value) {
+		text += 'transition-property:transform;transition-duration:' + props.duration + 'ms;transition-timing-function:cubic-bezier(0.08, 0.82, 0.17, 1);'
+	}
+	return text
+})
+
+const bodyStyle = computed(() : string => 'height:' + maxHeight.value + 'px;')
+</script>
+
+<template>
+	<!-- fixed 为 false 时量父节点的高度用（上下贴边、不可见） -->
+	<view v-if="!fixed" :id="uid + '-probe'" class="am-floating-panel__probe"></view>
+	<view :class="classes" :style="rootStyle" @touchmove="onTouchMove" @touchend="onTouchEnd" @touchcancel="onTouchEnd">
+		<view class="am-floating-panel__body" :style="bodyStyle">
+			<view class="am-floating-panel__header" @touchstart="onHeaderStart">
+				<slot name="header">
+					<view class="am-floating-panel__bar"></view>
+				</slot>
+			</view>
+			<scroll-view
+				class="am-floating-panel__content"
+				:direction="scrollable ? 'vertical' : 'none'"
+				:bounces="false"
+				@scroll="onScroll"
+				@touchstart="onContentStart"
+			>
+				<slot></slot>
+				<view v-if="safeArea" class="am-floating-panel__safe-area"></view>
+			</scroll-view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-floating-panel {
+	left: 0;
+	right: 0;
+	background-color: var(--am-color-bg-elevated, #ffffff);
+	border-top-left-radius: var(--am-border-radius-xl, 16px);
+	border-top-right-radius: var(--am-border-radius-xl, 16px);
+	box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.08);
+}
+.am-floating-panel--fixed { position: fixed; }
+/* 在定位的父节点里（父节点自己裁剪：overflow: hidden） */
+.am-floating-panel--absolute { position: absolute; }
+.am-floating-panel__probe { position: absolute; left: 0; top: 0; bottom: 0; width: 1px; opacity: 0; }
+.am-floating-panel__header { min-height: 30px; flex-direction: row; align-items: center; justify-content: center; }
+.am-floating-panel__bar { width: 32px; height: 4px; border-radius: 4px; background-color: var(--am-color-fill, rgba(0, 0, 0, 0.15)); }
+.am-floating-panel__content { flex: 1; }
+.am-floating-panel__safe-area { height: var(--uni-safe-area-inset-bottom, 0px); }
+</style>

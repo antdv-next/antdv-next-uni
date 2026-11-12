@@ -1,0 +1,301 @@
+<script setup lang="uts">
+import { AmPopoverAction } from '../../types/popover.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+import { addAmOverlay, removeAmOverlay } from '../../utils/overlay.uts'
+import { AmPopoverPosition, computePopoverPosition, popoverSide } from '../../utils/popover.uts'
+
+// 气泡卡片（= antdv-next-mobile 的 Popover）：点触发元素，在它旁边弹出一个带箭头的气泡；给了 actions 就是一个菜单。
+// v-model:open、title、content、placement（top / bottom / left / right 及 topLeft、bottomRight、leftTop、rightBottom 等 12 个，
+// 默认 top）、trigger（click / manual）、arrow、color（自定义背景色）、mode（light / dark）、autoAdjustOverflow（放不下时翻到对面、
+// 沿着边挪进屏幕）、closeOnClickAway、destroyOnHidden、zIndex、actions（key、text、icon、disabled、danger）、closeOnAction 同名同义；
+// 事件 update:open、openChange、action（action, index）；插槽 default（触发元素）、title、content；
+// 方法 show() / hide() / updatePosition()。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 没有 Teleport（也就没有 getPopupContainer）：气泡是一块 fixed 的节点，位置按量到的触发元素（窗口坐标）和窗口大小算；
+//   量是异步的，所以打开时先透明地渲染、量好再显示；触发元素在滚动区域里时，打开后再滚动气泡不会跟着走（调用 updatePosition()）；
+// - closeOnClickAway：App 端没有“触摸组件以外的区域”的全局事件，做成气泡后面铺一层透明的遮罩，点它关闭（这一下点击不会落到页面上）；
+//   打开时登记到弹出层栈，Android 的返回键先关气泡；
+// - 触发元素包在一个 view 里，它在纵向排列的父节点里不撑满一行（align-self: flex-start），这样量到的才是内容的大小；
+// - title、content、actions 的 text 是字符串，icon 是图标名；自定义内容用 title / content 插槽；action 没有 onClick，用 action 事件；
+// - 箭头是一个旋转 45° 的小方块（没有伪元素）；气泡最宽 280px（且不超过窗口宽度 - 16px），缩放的原点在气泡中心；
+// - 没有 defaultOpen（UTS 的布尔属性分不出“没传”）：不绑定 open 时组件自己管开关；rootClass 加在气泡上
+defineOptions({ name: 'AmPopover' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	title: { type: String, default: '' },
+	content: { type: String, default: '' },
+	placement: { type: String, default: 'top' },
+	/** click：点触发元素开关；manual：只由 open / show() / hide() 控制 */
+	trigger: { type: String, default: 'click' },
+	arrow: { type: Boolean, default: true },
+	/** 自定义背景色 */
+	color: { type: String, default: '' },
+	mode: { type: String, default: 'light' },
+	autoAdjustOverflow: { type: Boolean, default: true },
+	closeOnClickAway: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	zIndex: { type: Number, default: 1000 },
+	/** 菜单模式：给了它就不再显示 title / content */
+	actions: { type: Array as PropType<AmPopoverAction[]>, default: () : AmPopoverAction[] => [] },
+	closeOnAction: { type: Boolean, default: true },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'openChange', 'action'])
+
+const theme = useAmTheme()
+const uid = amUid('am-popover')
+
+/** 气泡的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+watch(() : boolean => props.open, (open : boolean) => { opened.value = open })
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+// ---------- 显示与定位 ----------
+const rendered = ref(false)
+const visible = ref(false)
+/** 已经量好、放到位了 */
+const placed = ref(false)
+/** 处于“显示”的样式（触发过渡） */
+const shown = ref(false)
+const initialPosition : AmPopoverPosition = { left: 0, top: 0, side: popoverSide(props.placement), placement: props.placement, arrowOffset: 0 }
+const position = ref<AmPopoverPosition>(initialPosition)
+let timer = 0
+let overlayId = 0
+
+function unregister() {
+	if (overlayId > 0) removeAmOverlay(overlayId)
+	overlayId = 0
+}
+
+/** 量触发元素与气泡，算出位置；元素还没渲染出来时隔一会儿再量（最多几次） */
+function place(retry : number) {
+	measureById(uid).then((triggerRect : AmRect | null) => {
+		if (triggerRect == null) {
+			if (retry > 0 && opened.value) timer = setTimeout(() => { place(retry - 1) }, 80)
+			return
+		}
+		// 闭包里的参数不会被收窄成非空，另存一个确定非空的
+		const trigger : AmRect = triggerRect
+		measureById(uid + '-popup').then((popupRect : AmRect | null) => {
+			if (!opened.value) return
+			if (popupRect == null || popupRect.width == 0) {
+				if (retry > 0) timer = setTimeout(() => { place(retry - 1) }, 80)
+				return
+			}
+			const info = uni.getWindowInfo()
+			position.value = computePopoverPosition(
+				props.placement,
+				trigger.left,
+				trigger.top,
+				trigger.width,
+				trigger.height,
+				popupRect.width,
+				popupRect.height,
+				0,
+				info.windowTop,
+				info.windowWidth,
+				info.windowHeight,
+				props.arrow ? 10 : 6,
+				props.autoAdjustOverflow
+			)
+			if (placed.value) return
+			placed.value = true
+			// 先以缩小、透明的状态放到位，下一帧再显示，过渡才会生效
+			timer = setTimeout(() => { shown.value = true }, 20)
+		})
+	})
+}
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	clearTimeout(timer)
+	unregister()
+	if (open) {
+		overlayId = addAmOverlay(() => { setOpen(false) })
+		rendered.value = true
+		visible.value = true
+		timer = setTimeout(() => { place(5) }, 30)
+	} else if (visible.value) {
+		shown.value = false
+		timer = setTimeout(() => {
+			visible.value = false
+			placed.value = false
+			if (props.destroyOnHidden) rendered.value = false
+		}, 220)
+	}
+}, { immediate: true })
+
+function updatePosition() {
+	if (opened.value) place(0)
+}
+
+watch(() : string => props.placement, () => { updatePosition() })
+
+onUnmounted(() => {
+	clearTimeout(timer)
+	unregister()
+})
+
+function onTriggerClick() {
+	if (props.trigger == 'click') setOpen(!opened.value)
+}
+
+function onAway() {
+	setOpen(false)
+}
+
+function onAction(action : AmPopoverAction, index : number) {
+	if (action.disabled == true) return
+	emit('action', action, index)
+	if (props.closeOnAction) setOpen(false)
+}
+
+defineExpose({
+	show: () => { setOpen(true) },
+	hide: () => { setOpen(false) },
+	/** 重新计算位置（触发元素挪动之后） */
+	updatePosition: () => { updatePosition() }
+})
+
+// ---------- 样式 ----------
+// 气泡最宽 280px，且两边各留 8px（max-width 不支持百分比 / min()）
+const maxWidth = Math.min(280, uni.getWindowInfo().windowWidth - 16)
+
+const background = computed(() : string => {
+	if (props.color.length > 0) return props.color
+	return props.mode == 'dark' ? theme().colorBgSpotlight : theme().colorBgElevated
+})
+const textColor = computed(() : string => props.mode == 'dark' ? theme().colorTextLightSolid : theme().colorText)
+const splitColor = computed(() : string => props.mode == 'dark' ? 'rgba(255, 255, 255, 0.16)' : theme().colorSplit)
+
+const maskStyle = computed(() : string => 'z-index:' + props.zIndex + ';')
+
+const popupStyle = computed(() : string => {
+	let text = 'z-index:' + props.zIndex + ';max-width:' + maxWidth + 'px;left:' + position.value.left + 'px;top:' + position.value.top + 'px;'
+	// 还没量好：透明、不缩放（量到的才是真实大小）
+	if (!placed.value) return text + 'opacity:0;transform:scale(1);'
+	text += 'opacity:' + (shown.value ? 1 : 0) + ';transform:scale(' + (shown.value ? 1 : 0.85) + ');'
+	text += 'transition-property:opacity,transform;transition-duration:200ms;transition-timing-function:cubic-bezier(0.215, 0.61, 0.355, 1);'
+	return text
+})
+
+const arrowStyle = computed(() : string => {
+	const side = position.value.side
+	const offset = (position.value.arrowOffset - 4) + 'px;'
+	let text = 'background-color:' + background.value + ';'
+	if (side == 'top') text += 'bottom:-4px;left:' + offset
+	else if (side == 'bottom') text += 'top:-4px;left:' + offset
+	else if (side == 'left') text += 'right:-4px;top:' + offset
+	else text += 'left:-4px;top:' + offset
+	return text
+})
+
+const innerStyle = computed(() : string => 'background-color:' + background.value + ';')
+const textStyle = computed(() : string => 'color:' + textColor.value + ';')
+
+function itemStyle(index : number) : string {
+	return index > 0 ? 'border-top-width:1px;border-top-style:solid;border-top-color:' + splitColor.value + ';' : ''
+}
+
+function actionColor(action : AmPopoverAction) : string {
+	return action.danger == true ? theme().colorError : textColor.value
+}
+
+function actionIcon(action : AmPopoverAction) : string {
+	return action.icon ?? ''
+}
+</script>
+
+<template>
+	<view :id="uid" class="am-popover__trigger" @click="onTriggerClick">
+		<slot></slot>
+	</view>
+	<view v-if="rendered && closeOnClickAway" v-show="visible" class="am-popover__mask" :style="maskStyle" @click="onAway"></view>
+	<view v-if="rendered" v-show="visible" :id="uid + '-popup'" :class="['am-popover', rootClass]" :style="popupStyle">
+		<view v-if="arrow" class="am-popover__arrow" :style="arrowStyle"></view>
+		<view class="am-popover__inner" :style="innerStyle">
+			<view v-if="actions.length > 0" class="am-popover__menu">
+				<view
+					v-for="(action, index) in actions"
+					:key="action.key"
+					:class="['am-popover__item', action.disabled == true ? 'am-popover__item--disabled' : '']"
+					:style="itemStyle(index)"
+					:hover-class="action.disabled == true ? 'none' : 'am-popover__item--active'"
+					@click="onAction(action, index)"
+				>
+					<view v-if="actionIcon(action).length > 0" class="am-popover__item-icon">
+						<am-icon :name="actionIcon(action)" :size="18" :color="actionColor(action)" />
+					</view>
+					<text class="am-popover__item-text" :style="'color:' + actionColor(action) + ';'">{{ action.text }}</text>
+				</view>
+			</view>
+			<template v-else>
+				<view v-if="title.length > 0 || $slots['title'] != null" :class="['am-popover__title', content.length > 0 || $slots['content'] != null ? '' : 'am-popover__title--only']">
+					<slot name="title">
+						<text class="am-popover__title-text" :style="textStyle">{{ title }}</text>
+					</slot>
+				</view>
+				<view v-if="content.length > 0 || $slots['content'] != null" :class="['am-popover__content', title.length > 0 || $slots['title'] != null ? 'am-popover__content--titled' : '']">
+					<slot name="content">
+						<text class="am-popover__content-text" :style="textStyle">{{ content }}</text>
+					</slot>
+				</view>
+			</template>
+		</view>
+	</view>
+</template>
+
+<style>
+/* 相当于 inline-block：不撑满一行，量到的才是触发元素自己的大小 */
+.am-popover__trigger { align-self: flex-start; flex-direction: row; overflow: visible; }
+.am-popover__mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; }
+/* 箭头伸出气泡 4px：overflow 要放开（App 端 view 默认裁剪） */
+.am-popover { position: fixed; overflow: visible; }
+.am-popover__arrow { position: absolute; width: 8px; height: 8px; border-radius: 1px; transform: rotate(45deg); }
+.am-popover__inner {
+	overflow: hidden;
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+.am-popover__title {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-popover__title--only { padding-bottom: var(--am-padding-xs, 8px); }
+.am-popover__title-text { font-size: var(--am-font-size, 14px); line-height: 22px; font-weight: bold; }
+.am-popover__content {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+}
+.am-popover__content--titled { padding-top: var(--am-padding-xxs, 4px); }
+.am-popover__content-text { font-size: var(--am-font-size, 14px); line-height: 22px; }
+
+/* ---------- 菜单模式 ---------- */
+.am-popover__menu { min-width: 120px; }
+.am-popover__item {
+	flex-direction: row;
+	align-items: center;
+	height: 44px;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-popover__item--active { background-color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06)); }
+.am-popover__item--disabled { opacity: 0.4; }
+.am-popover__item-icon { margin-right: var(--am-padding-xs, 8px); }
+.am-popover__item-text { font-size: var(--am-font-size-lg, 16px); line-height: 24px; white-space: nowrap; }
+</style>

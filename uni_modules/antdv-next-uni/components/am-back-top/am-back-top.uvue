@@ -1,0 +1,61 @@
+<script setup lang="uts">
+import { AM_FLOAT_BUTTON_NO_BADGE, AmFloatButtonBadge } from '../../types/float-button.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+
+// 回到顶部（= antdv-next-mobile 的 BackTop）：页面滚过 visibilityHeight 之后出现的悬浮按钮，点击滚回顶部。
+// visibilityHeight（默认 400）、duration（滚动动画的时长，毫秒）、icon、content、type、shape、badge 同名同义；
+// 事件 click；插槽 default、icon。它就是一个 <am-float-button>，位置、外观都相同；放在 <am-float-button-group> 里也可以。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 没有 `target`（取不到滚动的元素）：默认监听页面的滚动（组件里的 onPageScroll）并用 uni.pageScrollTo 回到顶部；
+//   内容在自己的 scroll-view 里滚动时（页面本身不滚），把滚动的距离传给多出来的 `scrollTop` 属性，
+//   并在 click 事件里把 scroll-view 滚回顶部；
+// - `icon` 是图标名（默认 up：图标字体里没有 vertical-align-top），content 是文字；自定义内容用插槽；
+// - 出现 / 消失没有淡入淡出（透明度过渡写不到子组件的根节点上）；没有 ariaLabel
+defineOptions({ name: 'AmBackTop' })
+
+const props = defineProps({
+	visibilityHeight: { type: Number, default: 400 },
+	duration: { type: Number, default: 450 },
+	icon: { type: String, default: '' },
+	content: { type: String, default: '' },
+	type: { type: String, default: 'default' },
+	shape: { type: String, default: 'circle' },
+	badge: { type: Object as PropType<AmFloatButtonBadge>, default: () : AmFloatButtonBadge => AM_FLOAT_BUTTON_NO_BADGE },
+	/** 自己的滚动区域滚过的距离（像素）；-1 为监听页面的滚动 */
+	scrollTop: { type: Number, default: -1 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['click'])
+
+const theme = useAmTheme()
+
+/** 页面滚过的距离 */
+const pageTop = ref(0)
+
+onPageScroll((event : OnPageScrollOptions) => {
+	pageTop.value = event.scrollTop
+})
+
+const visible = computed(() : boolean => (props.scrollTop >= 0 ? props.scrollTop : pageTop.value) >= props.visibilityHeight)
+
+function onClick(event : UniPointerEvent) {
+	if (props.scrollTop < 0) uni.pageScrollTo({ scrollTop: 0, duration: Math.max(0, props.duration) })
+	emit('click', event)
+}
+
+const iconName = computed(() : string => props.icon.length > 0 ? props.icon : 'up')
+const iconColor = computed(() : string => props.type == 'primary' ? theme().colorTextLightSolid : theme().colorText)
+</script>
+
+<template>
+	<am-float-button v-if="visible" :type="type" :shape="shape" :badge="badge" :content="content" :root-class="rootClass" @click="onClick">
+		<template #icon>
+			<slot name="icon">
+				<am-icon :name="iconName" :size="content.length > 0 ? 16 : 20" :color="iconColor" />
+			</slot>
+		</template>
+		<slot></slot>
+	</am-float-button>
+</template>

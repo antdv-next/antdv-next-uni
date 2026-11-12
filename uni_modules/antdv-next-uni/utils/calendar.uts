@@ -1,0 +1,320 @@
+// 日历（am-calendar）的日期运算与选择规则：不用 dayjs（App 端不能用 npm 的 JS 库），也不依赖 Date 的时区——
+// 日期在内部是“儒略日”整数（连续的天数，相减即相差几天，对 7 取余即星期几），对外是 YYYY-MM-DD 字符串。
+// 这里全是纯函数（写法同时是合法的 TS），可以直接在 node 下测试
+
+/** 月份的简称（monthFormat 里的 MMM，同 dayjs 的默认语言） */
+const CAL_MONTH_NAMES : string[] = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function pad2(value : number) : string {
+	return value < 10 ? '0' + value : '' + value
+}
+
+/** 年月日 → 天数（儒略日） */
+export function calDayNumber(year : number, month : number, date : number) : number {
+	const a = Math.floor((14 - month) / 12)
+	const y = year + 4800 - a
+	const m = month + 12 * a - 3
+	return date + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045
+}
+
+/** 天数 → [年, 月, 日] */
+export function calParts(day : number) : number[] {
+	const a = day + 32044
+	const b = Math.floor((4 * a + 3) / 146097)
+	const c = a - Math.floor((146097 * b) / 4)
+	const d = Math.floor((4 * c + 3) / 1461)
+	const e = c - Math.floor((1461 * d) / 4)
+	const m = Math.floor((5 * e + 2) / 153)
+	const date = e - Math.floor((153 * m + 2) / 5) + 1
+	const month = m + 3 - 12 * Math.floor(m / 10)
+	const year = 100 * b + d - 4800 + Math.floor(m / 10)
+	return [year, month, date]
+}
+
+/** 某月的天数 */
+export function calDaysInMonth(year : number, month : number) : number {
+	if (month == 2) return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 ? 29 : 28
+	return month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31
+}
+
+/** 星期几：0 周日 … 6 周六 */
+export function calWeekday(day : number) : number {
+	return (day + 1) % 7
+}
+
+/** YYYY-MM-DD（后面带时间也可以）→ 天数；解析不了或日期不存在时为 -1 */
+export function calParse(text : string) : number {
+	if (text.length < 10) return -1
+	if (text.charAt(4) != '-' || text.charAt(7) != '-') return -1
+	const year = parseInt(text.substring(0, 4))
+	const month = parseInt(text.substring(5, 7))
+	const date = parseInt(text.substring(8, 10))
+	if (isNaN(year) || isNaN(month) || isNaN(date)) return -1
+	if (month < 1 || month > 12 || date < 1 || date > calDaysInMonth(year, month)) return -1
+	return calDayNumber(year, month, date)
+}
+
+/** 天数 → YYYY-MM-DD */
+export function calText(day : number) : string {
+	const parts = calParts(day)
+	return parts[0] + '-' + pad2(parts[1]) + '-' + pad2(parts[2])
+}
+
+/** 按格式输出：YYYY、MMM（英文简称）、MM、M、DD、D */
+export function calFormat(day : number, format : string) : string {
+	const parts = calParts(day)
+	let text = format.split('YYYY').join('' + parts[0])
+	if (text.indexOf('MMM') >= 0) text = text.split('MMM').join('\u0001')
+	text = text.split('MM').join(pad2(parts[1])).split('M').join('' + parts[1])
+	text = text.split('DD').join(pad2(parts[2])).split('D').join('' + parts[2])
+	return text.split('\u0001').join(CAL_MONTH_NAMES[parts[1] - 1])
+}
+
+/** 今天 */
+export function calToday() : number {
+	const now = new Date()
+	return calDayNumber(now.getFullYear(), now.getMonth() + 1, now.getDate())
+}
+
+/** 加减几个月（日超出当月天数时取当月最后一天） */
+export function calAddMonths(day : number, count : number) : number {
+	const parts = calParts(day)
+	const index = parts[0] * 12 + (parts[1] - 1) + count
+	const year = Math.floor(index / 12)
+	const month = index - year * 12 + 1
+	return calDayNumber(year, month, Math.min(parts[2], calDaysInMonth(year, month)))
+}
+
+/** 一个月的排版信息：高度是算出来的（标题 + 行数 × 行高），滚动位置、只渲染可见的月份都靠它 */
+export type AmCalendarMonth = {
+	/** YYYY-MM */
+	key : string
+	year : number
+	month : number
+	title : string
+	/** 1 号的天数（儒略日） */
+	first : number
+	/** 1 号前面空几格 */
+	offset : number
+	days : number
+	rows : number
+	height : number
+	/** 在滚动内容里的位置 */
+	top : number
+}
+
+/** min 到 max 之间的所有月份（含两端所在的月） */
+export function calMonths(min : number, max : number, weekStartsOn : number, rowHeight : number, titleHeight : number, monthFormat : string) : AmCalendarMonth[] {
+	const list : AmCalendarMonth[] = []
+	const from = calParts(min)
+	const to = calParts(max)
+	let year = from[0]
+	let month = from[1]
+	let top = 0
+	while (year < to[0] || (year == to[0] && month <= to[1])) {
+		const first = calDayNumber(year, month, 1)
+		const offset = (calWeekday(first) - weekStartsOn + 7) % 7
+		const days = calDaysInMonth(year, month)
+		const rows = Math.ceil((offset + days) / 7)
+		const height = titleHeight + rows * rowHeight
+		const item : AmCalendarMonth = {
+			key: year + '-' + pad2(month),
+			year: year,
+			month: month,
+			title: calFormat(first, monthFormat),
+			first: first,
+			offset: offset,
+			days: days,
+			rows: rows,
+			height: height,
+			top: top
+		}
+		list.push(item)
+		top += height
+		month++
+		if (month > 12) {
+			month = 1
+			year++
+		}
+	}
+	return list
+}
+
+/** 要渲染的月份的下标范围 [start, end)：可见区域前后各多留半屏 */
+export function calWindow(months : AmCalendarMonth[], scrollTop : number, viewHeight : number) : number[] {
+	const from = Math.max(scrollTop - viewHeight / 2, 0)
+	const to = scrollTop + viewHeight * 1.5
+	let start = -1
+	let end = 0
+	for (let i = 0; i < months.length; i++) {
+		const month = months[i]
+		if (month.top + month.height <= from) continue
+		if (month.top >= to) break
+		if (start < 0) start = i
+		end = i + 1
+	}
+	if (start < 0) {
+		// 滚过了头（内容变短了）：留最后一个月
+		start = Math.max(months.length - 1, 0)
+		end = months.length
+	}
+	return [start, end]
+}
+
+/** 这一天的类型：'' / selected / start / end / start-end / middle / disabled */
+export function calDayType(day : number, selected : number[], mode : string, min : number, max : number) : string {
+	if (day < min || day > max) return 'disabled'
+	if (mode != 'range') return selected.indexOf(day) >= 0 ? 'selected' : ''
+	if (selected.length == 0) return ''
+	const start = selected[0]
+	if (selected.length == 1) return day == start ? 'start' : ''
+	const end = selected[1]
+	if (day == start) return start == end ? 'start-end' : 'start'
+	if (day == end) return 'end'
+	return day > start && day < end ? 'middle' : ''
+}
+
+/** 点了某一天之后的选择 */
+export type AmCalendarSelection = {
+	days : number[]
+	/** 选择有没有变（点了已是开始的那一天且不允许同一天时不变） */
+	changed : boolean
+	/** 超出了 maxRange（范围被截短，或多选没有加进去） */
+	overRange : boolean
+}
+
+/**
+ * 点了某一天（已排除禁用的日期）：
+ * - single：就是这一天；
+ * - multiple：已选的再点取消，否则加入（按日期排序），超过 maxRange 个不加；
+ * - range：没有开始、已选完、或点在开始之前 → 重新从这一天开始；点开始的那一天 → allowSameDay 时选成同一天；
+ *   否则作为结束，超过 maxRange 天时截到第 maxRange 天
+ */
+export function calSelect(current : number[], day : number, mode : string, maxRange : number, allowSameDay : boolean) : AmCalendarSelection {
+	const result : AmCalendarSelection = { days: [], changed: true, overRange: false }
+	if (mode == 'single') {
+		result.days = [day]
+		return result
+	}
+	if (mode == 'multiple') {
+		const index = current.indexOf(day)
+		if (index >= 0) {
+			for (let i = 0; i < current.length; i++) if (i != index) result.days.push(current[i])
+			return result
+		}
+		if (maxRange > 0 && current.length >= maxRange) {
+			result.days = current.slice(0)
+			result.changed = false
+			result.overRange = true
+			return result
+		}
+		// 插到按日期排序的位置
+		let inserted = false
+		for (let i = 0; i < current.length; i++) {
+			if (!inserted && current[i] > day) {
+				result.days.push(day)
+				inserted = true
+			}
+			result.days.push(current[i])
+		}
+		if (!inserted) result.days.push(day)
+		return result
+	}
+	if (current.length != 1 || day < current[0]) {
+		result.days = [day]
+		return result
+	}
+	const start = current[0]
+	if (day == start) {
+		if (allowSameDay) result.days = [day, day]
+		else {
+			result.days = [start]
+			result.changed = false
+		}
+		return result
+	}
+	let last = day
+	if (maxRange > 0 && last - start + 1 > maxRange) {
+		last = start + maxRange - 1
+		result.overRange = true
+	}
+	if (last == start && !allowSameDay) {
+		result.days = [start]
+		result.changed = false
+		return result
+	}
+	result.days = [start, last]
+	return result
+}
+
+/** 选完了没有：range 要两端都有，其余至少一天 */
+export function calComplete(days : number[], mode : string) : boolean {
+	return mode == 'range' ? days.length == 2 : days.length > 0
+}
+
+/** 一格：day 为 0 是月初前 / 月末后的空格 */
+export type AmCalendarCell = {
+	day : number
+	text : string
+	type : string
+	today : boolean
+	/** 上方的小字（今天） */
+	top : string
+	/** 下方的小字（开始 / 结束） */
+	bottom : string
+}
+
+/** 一个月按周排好的格子（每周 7 格，不足的补空格） */
+export function calWeeks(
+	month : AmCalendarMonth,
+	selected : number[],
+	mode : string,
+	min : number,
+	max : number,
+	today : number,
+	todayText : string,
+	startText : string,
+	endText : string,
+	startEndText : string
+) : AmCalendarCell[][] {
+	const weeks : AmCalendarCell[][] = []
+	let week : AmCalendarCell[] = []
+	const total = month.rows * 7
+	for (let i = 0; i < total; i++) {
+		const date = i - month.offset + 1
+		if (date < 1 || date > month.days) {
+			const blank : AmCalendarCell = { day: 0, text: '', type: '', today: false, top: '', bottom: '' }
+			week.push(blank)
+		} else {
+			const day = month.first + date - 1
+			const type = calDayType(day, selected, mode, min, max)
+			const cell : AmCalendarCell = {
+				day: day,
+				text: '' + date,
+				type: type,
+				today: day == today,
+				top: day == today ? todayText : '',
+				bottom: type == 'start' ? startText : (type == 'end' ? endText : (type == 'start-end' ? startEndText : ''))
+			}
+			week.push(cell)
+		}
+		if (week.length == 7) {
+			weeks.push(week)
+			week = []
+		}
+	}
+	return weeks
+}
+
+/** 两组天数是否相同 */
+export function calSameDays(a : number[], b : number[]) : boolean {
+	if (a.length != b.length) return false
+	for (let i = 0; i < a.length; i++) if (a[i] != b[i]) return false
+	return true
+}
+
+/** 渲染用：一个月 + 它按周排好的格子 */
+export type AmCalendarMonthView = {
+	month : AmCalendarMonth
+	weeks : AmCalendarCell[][]
+}

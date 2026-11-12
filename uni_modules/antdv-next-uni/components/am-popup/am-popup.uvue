@@ -37,6 +37,9 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'close', 'maskClick', 'afterOpenChange'])
 
+// 弹出层里的内容不属于外面的 Space.Compact 分组（例如选择器弹层里的搜索框）：切断分组上下文
+provide('amCompactRegister', null)
+
 const theme = useAmTheme()
 // 子组件根节点上的类盖不过它自己的样式，图标的颜色用属性传
 const closeColor = computed(() : string => theme().colorTextTertiary)

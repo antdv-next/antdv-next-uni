@@ -1,0 +1,189 @@
+<script setup lang="uts">
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+import { AM_WATERMARK_DEFAULT_FONT, AmWatermarkFont } from '../../types/watermark.uts'
+
+// 水印（= antdv-next-mobile 的 Watermark）：在默认插槽的内容上盖一层不挡操作的水印。
+// content（字符串，数组为多行）、image（优先于 content）、width、height、rotate、zIndex、gap（[横, 纵]）、
+// offset（[左, 上]，默认 gap / 2）、font（color、fontSize、fontWeight、fontStyle）、fullPage（盖住整个页面）同名同义。
+// 排法同 Antdv Next：每一行的水印隔一个位置放一个，相邻两行错开。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 不是 canvas 画成背景图平铺（App 端没有 background-repeat），而是在一层绝对定位、pointer-events: none 的 view 里
+//   按量出来的大小排一批旋转的 <text> / <image>；最多 400 个（面积很大时调大 gap）；
+// - 文字的宽高量不到：没给 width / height 时按字数与字号估计（中日韩文字按 1 个字宽、其余按 0.6 个）；
+// - 没有 remove 事件：uvue 里没有 MutationObserver，别的代码也拿不到这一层的节点；
+// - font 没有 fontFamily / textAlign（多行总是居中）；
+// - 内容的大小变化后（列表加载了更多）调用 refresh() 重新量
+defineOptions({ name: 'AmWatermark' })
+
+const props = defineProps({
+	zIndex: { type: Number, default: 9 },
+	/** 旋转的角度 */
+	rotate: { type: Number, default: -22 },
+	/** 一个水印的宽度（像素），0 为按内容估计（图片为 120） */
+	width: { type: Number, default: 0 },
+	/** 一个水印的高度（像素），0 为按内容估计（图片为 64） */
+	height: { type: Number, default: 0 },
+	/** 图片水印的地址，优先于 content */
+	image: { type: String, default: '' },
+	/** 文字：字符串，或字符串数组（多行） */
+	content: { type: [String, Array] as PropType<any | null>, default: null },
+	font: { type: Object as PropType<AmWatermarkFont>, default: () : AmWatermarkFont => AM_WATERMARK_DEFAULT_FONT },
+	/** 水印之间的间距：[横向, 纵向] */
+	gap: { type: Array as PropType<number[]>, default: () : number[] => [100, 100] },
+	/** 第一个水印离左上角的距离：[左, 上]；空为 gap 的一半 */
+	offset: { type: Array as PropType<number[]>, default: () : number[] => [] },
+	/** 盖住整个页面（position: fixed），而不只是插槽的内容 */
+	fullPage: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+/** 最多画多少个水印 */
+const MAX_MARKS = 400
+
+const uid = amUid('am-watermark')
+
+const lines = computed(() : string[] => {
+	const content = props.content
+	const result : string[] = []
+	if (content == null) return result
+	if (Array.isArray(content)) {
+		const list = content as any[]
+		for (let i = 0; i < list.length; i++) result.push('' + list[i])
+	} else {
+		const text = '' + content
+		if (text.length > 0) result.push(text)
+	}
+	return result
+})
+
+const fontSize = computed(() : number => props.font.fontSize ?? 16)
+const lineHeight = computed(() : number => Math.ceil(fontSize.value * 1.4))
+
+/** 一行文字大约多宽：中日韩文字（及全角符号）按 1 个字宽，其余按 0.6 个 */
+function textWidth(text : string) : number {
+	let units = 0
+	for (let i = 0; i < text.length; i++) {
+		const code = text.charCodeAt(i)!
+		units += code > 0x2e7f ? 1 : 0.6
+	}
+	return Math.ceil(units * fontSize.value)
+}
+
+const markWidth = computed(() : number => {
+	if (props.width > 0) return props.width
+	if (props.image.length > 0) return 120
+	let width = 0
+	const list = lines.value
+	for (let i = 0; i < list.length; i++) width = Math.max(width, textWidth(list[i]))
+	return width
+})
+
+const markHeight = computed(() : number => {
+	if (props.height > 0) return props.height
+	if (props.image.length > 0) return 64
+	return lines.value.length * lineHeight.value
+})
+
+// ---------- 排位置 ----------
+/** 要盖住的区域的大小：fullPage 时是窗口，否则是量出来的根节点 */
+const area = ref<number[]>([0, 0])
+
+function measure() {
+	if (props.fullPage) {
+		const info = uni.getWindowInfo()
+		area.value = [info.windowWidth, info.windowHeight + info.windowTop]
+		return
+	}
+	measureById(uid).then((rect : AmRect | null) => {
+		if (rect == null) return
+		if (rect.width != area.value[0] || rect.height != area.value[1]) area.value = [rect.width, rect.height]
+	})
+}
+
+onMounted(() => {
+	measure()
+	setTimeout(() => { measure() }, 30)
+	setTimeout(() => { measure() }, 400)
+})
+onPageShow(() => { setTimeout(() => { measure() }, 30) })
+watch(() : boolean => props.fullPage, () => { measure() })
+
+type AmWatermarkMark = {
+	key : string
+	style : string
+}
+
+const marks = computed(() : AmWatermarkMark[] => {
+	const result : AmWatermarkMark[] = []
+	const width = markWidth.value
+	const height = markHeight.value
+	const areaWidth = area.value[0]
+	const areaHeight = area.value[1]
+	if (width <= 0 || height <= 0 || areaWidth <= 0 || areaHeight <= 0) return result
+	const gapX = props.gap.length > 0 ? props.gap[0] : 100
+	const gapY = props.gap.length > 1 ? props.gap[1] : gapX
+	const left = props.offset.length > 0 ? props.offset[0] : gapX / 2
+	const top = props.offset.length > 1 ? props.offset[1] : gapY / 2
+	const stepX = width + gapX
+	const stepY = height + gapY
+	const rest = 'width:' + width + 'px;height:' + height + 'px;transform:rotate(' + props.rotate + 'deg);'
+	for (let row = 0; top + row * stepY < areaHeight; row++) {
+		// 每一行隔一个位置放一个，奇数行错开一个位置
+		for (let column = row % 2; left + column * stepX < areaWidth; column += 2) {
+			if (result.length >= MAX_MARKS) return result
+			const mark : AmWatermarkMark = {
+				key: row + '-' + column,
+				style: 'left:' + (left + column * stepX) + 'px;top:' + (top + row * stepY) + 'px;' + rest
+			}
+			result.push(mark)
+		}
+	}
+	return result
+})
+
+const layerStyle = computed(() : string => 'z-index:' + props.zIndex + ';')
+
+const textStyle = computed(() : string => {
+	const font = props.font
+	let text = 'font-size:' + fontSize.value + 'px;line-height:' + lineHeight.value + 'px;'
+	const color = font.color ?? ''
+	if (color.length > 0) text += 'color:' + color + ';'
+	const weight = font.fontWeight ?? ''
+	if (weight.length > 0) text += 'font-weight:' + weight + ';'
+	if (font.fontStyle == 'italic' || font.fontStyle == 'oblique') text += 'font-style:italic;'
+	return text
+})
+
+defineExpose({
+	/** 内容的大小变化后重新量、重新排水印 */
+	refresh: () => { measure() }
+})
+</script>
+
+<template>
+	<view :id="uid" :class="['am-watermark', fullPage ? 'am-watermark--full-page' : '', rootClass]">
+		<slot></slot>
+		<view :class="['am-watermark__layer', fullPage ? 'am-watermark__layer--full-page' : '']" :style="layerStyle">
+			<view v-for="mark in marks" :key="mark.key" class="am-watermark__mark" :style="mark.style">
+				<image v-if="image.length > 0" class="am-watermark__image" :src="image" mode="aspectFit" />
+				<template v-else>
+					<text v-for="(line, index) in lines" :key="index" class="am-watermark__text" :style="textStyle">{{ line }}</text>
+				</template>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-watermark { position: relative; overflow: hidden; }
+/* 盖住整个页面时这一层是 fixed 的，不能被根节点裁掉 */
+.am-watermark--full-page { overflow: visible; }
+/* 不挡下面内容的点击、滚动 */
+.am-watermark__layer { position: absolute; left: 0; right: 0; top: 0; bottom: 0; overflow: hidden; pointer-events: none; }
+.am-watermark__layer--full-page { position: fixed; }
+/* 旋转后的文字会伸出自己的盒子 */
+.am-watermark__mark { position: absolute; align-items: center; justify-content: center; overflow: visible; pointer-events: none; }
+.am-watermark__image { width: 100%; height: 100%; }
+.am-watermark__text { white-space: nowrap; text-align: center; color: var(--am-color-fill, rgba(0, 0, 0, 0.15)); }
+</style>

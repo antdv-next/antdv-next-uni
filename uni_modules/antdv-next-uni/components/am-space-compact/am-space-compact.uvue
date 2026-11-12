@@ -1,0 +1,89 @@
+<script setup lang="uts">
+import { useAmSize } from '../../utils/config.uts'
+import { useAmCompactItem } from '../../utils/compact.uts'
+
+// 紧凑组合（= antdv-next-mobile 的 Space.Compact）：把带边框的组件（Button、Input、InputNumber、各种选择器、Space.Addon）
+// 拼成一个没有缝的控件。size（组里每一项的尺寸，子项自己的 size 优先）、orientation / direction / vertical、block
+// （撑满父元素，输入框与选择器平分剩余的宽度）同名同义；组可以嵌套，里面的组接着外面的组（只有最外侧保留圆角）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - uvue 没有后代选择器，也包不了插槽里的子元素：这里用 provide 给出登记表，子项（utils/compact.uts 的
+//   useAmCompactItem）自己画接缝。已接入的是 am-button、am-input、am-input-number、am-picker-trigger（所有选择器）、
+//   am-space-addon；其他组件放进来不会变形，但也不会去掉圆角；
+// - 子项的顺序按登记（setup）的先后：首次渲染等于模板里的顺序，之后用 v-if 插到中间的子项会被当成最后一个，
+//   这时给 <am-space-compact> 换一个 key；
+// - 两个实心按钮之间没有那条半透明的细线伪元素，改为后一个按钮的起始边框用半透明的容器色；
+// - 不是 block 的横向组里，输入框与选择器最少 120px 宽（App 端的 input 没有固有宽度）
+defineOptions({ name: 'AmSpaceCompact' })
+
+const props = defineProps({
+	size: { type: String, default: '' },
+	orientation: { type: String, default: '' },
+	/** orientation 的别名 */
+	direction: { type: String, default: '' },
+	vertical: { type: Boolean, default: false },
+	block: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+// 嵌套：自己是外层组的一项
+const parent = useAmCompactItem()
+
+const sizeOf = useAmSize(() : string => props.size.length > 0 ? props.size : parent.size())
+const isVertical = computed(() : boolean => {
+	if (props.vertical) return true
+	const orientation = props.orientation.length > 0 ? props.orientation : props.direction
+	return orientation == 'vertical'
+})
+
+/** 登记了的子项，按登记的先后 */
+const ids = ref<number[]>([])
+let seed = 0
+
+provide('amCompactRegister', () : number => {
+	seed++
+	ids.value = [...ids.value, seed]
+	return seed
+})
+provide('amCompactUnregister', (id : number) => {
+	ids.value = ids.value.filter((item : number) : boolean => item != id)
+})
+provide('amCompactFirst', (id : number) : boolean => {
+	if (ids.value.length == 0 || ids.value[0] != id) return false
+	return !parent.inCompact() || parent.isFirst()
+})
+provide('amCompactLast', (id : number) : boolean => {
+	if (ids.value.length == 0 || ids.value[ids.value.length - 1] != id) return false
+	return !parent.inCompact() || parent.isLast()
+})
+provide('amCompactVertical', () : boolean => isVertical.value)
+provide('amCompactSize', () : string => sizeOf())
+provide('amCompactBlock', () : boolean => props.block)
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-space-compact']
+	if (isVertical.value) list.push('am-space-compact--vertical')
+	if (props.block) list.push('am-space-compact--block')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+/** 嵌套在外层组里：和外层的前一项叠边框，并占满剩余的空间 */
+const style = computed(() : string => {
+	if (!parent.inCompact()) return ''
+	return parent.marginStyle() + (parent.vertical() ? '' : 'flex:1;')
+})
+</script>
+
+<template>
+	<view :class="classes" :style="style">
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+/* 子项的边框互相压着 1px，不能裁剪 */
+.am-space-compact { flex-direction: row; align-items: stretch; align-self: flex-start; overflow: visible; }
+.am-space-compact--vertical { flex-direction: column; }
+.am-space-compact--block { align-self: stretch; }
+</style>

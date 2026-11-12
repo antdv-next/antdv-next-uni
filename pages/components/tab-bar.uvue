@@ -1,0 +1,87 @@
+<script setup lang="uts">
+import { AmTabBarItem } from '@/uni_modules/antdv-next-uni/types/tab-bar.uts'
+
+const basic : AmTabBarItem[] = [
+	{ key: 'home', title: '首页', icon: 'home', activeIcon: 'home-fill' },
+	{ key: 'category', title: '分类', icon: 'appstore', activeIcon: 'appstore-fill' },
+	{ key: 'cart', title: '购物车', icon: 'cart' },
+	{ key: 'user', title: '我的', icon: 'user' }
+]
+const badges : AmTabBarItem[] = [
+	{ key: 'home', title: '首页', icon: 'home', badge: true },
+	{ key: 'message', title: '消息', icon: 'message', badge: 8 },
+	{ key: 'cart', title: '购物车', icon: 'cart', badge: '99+' },
+	{ key: 'user', title: '我的', icon: 'user', disabled: true }
+]
+const iconOnly : AmTabBarItem[] = [
+	{ key: 'home', icon: 'home' },
+	{ key: 'search', icon: 'search' },
+	{ key: 'heart', icon: 'heart', activeIcon: 'heart-fill' },
+	{ key: 'setting', icon: 'setting' }
+]
+const titleOnly : AmTabBarItem[] = [
+	{ key: 'all', title: '全部' },
+	{ key: 'pay', title: '待付款', badge: 2 },
+	{ key: 'done', title: '已完成' }
+]
+
+const active = ref('home')
+const badgeKey = ref('message')
+const iconKey = ref('home')
+const titleKey = ref('all')
+const fixedKey = ref('home')
+const fixed = ref(true)
+const log = ref('')
+
+function onChange(key : string) {
+	log.value = 'change: ' + key
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（activeKey = {{ active }}　{{ log }}）</text>
+		<am-tab-bar v-model:activeKey="active" :items="basic" :safe-area="false" @change="onChange" />
+
+		<text class="demo__title">徽标与禁用</text>
+		<am-tab-bar v-model:activeKey="badgeKey" :items="badges" :safe-area="false" />
+
+		<text class="demo__title">只有图标 / 只有标题</text>
+		<am-tab-bar v-model:activeKey="iconKey" :items="iconOnly" :safe-area="false" :bordered="false" />
+		<view class="demo__gap"></view>
+		<am-tab-bar v-model:activeKey="titleKey" :items="titleOnly" :safe-area="false" :bordered="false" />
+
+		<text class="demo__title">非受控（defaultActiveKey）与插槽</text>
+		<am-tab-bar :items="basic" default-active-key="cart" :safe-area="false">
+			<template #title="{ item, active }">
+				<text :class="['demo__custom', active ? 'demo__custom--active' : '']">{{ item.title }}{{ active ? ' ·' : '' }}</text>
+			</template>
+		</am-tab-bar>
+
+		<text class="demo__title">固定在底部（fixed + placeholder，带安全区域）</text>
+		<view class="demo__card">
+			<am-button :text="fixed ? '取消固定' : '固定到底部'" @click="fixed = !fixed" />
+		</view>
+		<view class="demo__footer"></view>
+		<am-tab-bar v-if="fixed" v-model:activeKey="fixedKey" :items="basic" fixed placeholder />
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { padding-top: 8px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__gap { height: 12px; }
+.demo__custom { font-size: 10px; line-height: 15px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__custom--active { color: var(--am-color-error, #ff4d4f); }
+</style>

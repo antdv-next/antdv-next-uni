@@ -1,0 +1,107 @@
+<script setup lang="uts">
+import { AmCalendarMonthInfo } from '@/uni_modules/antdv-next-uni/types/calendar.uts'
+
+// 值是 YYYY-MM-DD 字符串：single 是一个字符串，range 是 [开始, 结束]，multiple 是字符串数组
+const single = ref('')
+const range = ref<string[]>([])
+const multiple = ref<string[]>([])
+const quick = ref('')
+const picked = ref('')
+const inline = ref<string[]>([])
+const long = ref('')
+const open = ref(false)
+const longOpen = ref(false)
+const log = ref('')
+const calendarRef = ref<AmCalendarComponentPublicInstance | null>(null)
+
+function onChange(value : any, text : any) {
+	log.value = 'change: ' + JSON.stringify(value) + '（显示为 ' + JSON.stringify(text) + '）'
+}
+
+function onSelect(value : any) {
+	log.value = 'select: ' + JSON.stringify(value)
+}
+
+function onOverRange() {
+	log.value = 'overRange'
+}
+
+function onMonthShow(info : AmCalendarMonthInfo) {
+	log.value = 'monthShow: ' + info.title
+}
+
+function toChristmas() {
+	calendarRef.value?.scrollToDate('2027-12-25')
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">带触发区：选一天</text>
+		<view class="demo__card">
+			<am-calendar v-model:value="single" trigger allow-clear @change="onChange" @select="onSelect" />
+			<text class="demo__hint">当前值：{{ single }}</text>
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">日期范围（最多 7 天）</text>
+		<view class="demo__card">
+			<am-calendar v-model:value="range" selection-mode="range" :max-range="7" trigger allow-clear placeholder="请选择入住与离店日期" title="选择日期范围" format="M月D日" @change="onChange" @over-range="onOverRange" />
+			<text class="demo__hint">当前值：{{ range.join(' ~ ') }}</text>
+		</view>
+
+		<text class="demo__title">多个日期（最多 3 个）、周一开头</text>
+		<view class="demo__card">
+			<am-calendar v-model:value="multiple" selection-mode="multiple" :max-range="3" :week-starts-on="1" trigger variant="filled" placeholder="请选择日期" @change="onChange" />
+			<text class="demo__hint">当前值：{{ multiple.join('、') }}</text>
+		</view>
+
+		<text class="demo__title">不要确定按钮：选完就提交</text>
+		<view class="demo__card">
+			<am-calendar v-model:value="quick" :show-confirm="false" trigger placeholder="点一下日期就关闭" />
+		</view>
+
+		<text class="demo__title">不用触发区（v-model:open）、指定范围</text>
+		<view class="demo__card">
+			<am-button block :text="picked.length > 0 ? picked : '选择 2026 年的日期'" @click="open = true" />
+			<am-calendar v-model:value="picked" v-model:open="open" min-date="2026-01-01" max-date="2026-12-31" title="2026 年" ok-text="选好了" />
+		</view>
+
+		<text class="demo__title">很长的范围（三年，只渲染可见的月份）</text>
+		<view class="demo__card">
+			<am-button class="demo__block" block :text="long.length > 0 ? long : '2026-01-01 至 2028-12-31'" @click="longOpen = true" />
+			<am-calendar ref="calendarRef" v-model:value="long" v-model:open="longOpen" min-date="2026-01-01" max-date="2028-12-31" @month-show="onMonthShow">
+				<template #footer="{ disabled }">
+					<view class="demo__footbar">
+						<am-button class="demo__foot" text="滚到 2027-12-25" @click="toChristmas" />
+						<am-button class="demo__foot" type="primary" :disabled="disabled" text="关闭" @click="longOpen = false" />
+					</view>
+				</template>
+			</am-calendar>
+		</view>
+
+		<text class="demo__title">就地显示（poppable = false）：范围，可以同一天</text>
+		<view class="demo__inline">
+			<am-calendar v-model:value="inline" :poppable="false" selection-mode="range" allow-same-day :show-title="false" :row-height="56" min-date="2026-11-01" max-date="2027-01-31" @select="onSelect" />
+		</view>
+		<text class="demo__hint demo__hint--outer">当前值：{{ inline.join(' ~ ') }}</text>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__block { margin-bottom: 12px; }
+.demo__hint { margin-top: 8px; font-size: 13px; color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65)); }
+.demo__hint--outer { padding: 0 16px; }
+.demo__inline { margin: 0 12px; border-radius: 12px; overflow: hidden; }
+.demo__footbar { flex-direction: row; }
+.demo__foot { flex: 1; margin: 0 4px; }
+.demo__footer { height: 40px; }
+</style>

@@ -1,6 +1,7 @@
 <script setup lang="uts">
-import { useAmTheme } from '../../theme/theme.uts'
+import { alphaColor, useAmTheme } from '../../theme/theme.uts'
 import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+import { useAmCompactItem } from '../../utils/compact.uts'
 
 // 按钮（= antdv-next-mobile 的 Button）：type 是 color + variant 的语法糖，
 // color（default / primary / danger / success / warning）、variant（solid / outlined / dashed / filled / text / link）、
@@ -10,6 +11,9 @@ import { useAmDisabled, useAmSize } from '../../utils/config.uts'
 // - 文字用 `text` 属性：uvue 的样式不继承，写在默认插槽里的文字拿不到按钮的颜色与字号（插槽仍可放自定义内容）；
 // - `icon` 是图标名（<am-icon> 的 name），不是节点；自定义图标用 `icon` 插槽；
 // - `loading` 只有布尔值，没有 `{ delay }`；没有 `href` / `target` / `htmlType`
+//
+// 在 <am-space-compact> 里（utils/compact.uts）：尺寸跟随组，内侧的圆角去掉、边框与前一项叠在一起，
+// round / circle 变成普通的一段，block 的按钮平分一行
 defineOptions({ name: 'AmButton' })
 
 const props = defineProps({
@@ -32,7 +36,8 @@ const props = defineProps({
 const emit = defineEmits(['click'])
 
 const theme = useAmTheme()
-const sizeOf = useAmSize(() : string => props.size)
+const compact = useAmCompactItem()
+const sizeOf = useAmSize(() : string => props.size.length > 0 ? props.size : compact.size())
 const size = computed(() : string => sizeOf())
 const disabledOf = useAmDisabled(() : boolean => props.disabled)
 const disabled = computed(() : boolean => disabledOf())
@@ -76,9 +81,9 @@ const classes = computed(() : string[] => {
 	if (variant == 'dashed') list.push('am-button--border-dashed')
 	if (variant == 'link') list.push('am-button--link')
 	if (props.block) list.push('am-button--block')
-	if (props.shape == 'round') list.push('am-button--round')
+	if (props.shape == 'round' && !compact.inCompact()) list.push('am-button--round')
 	if (props.shape == 'circle' || (!hasText.value && variant != 'link')) list.push('am-button--icon-only-' + size.value)
-	if (props.shape == 'circle') list.push('am-button--round')
+	if (props.shape == 'circle' && !compact.inCompact()) list.push('am-button--round')
 	if (props.iconPlacement == 'end') list.push('am-button--icon-end')
 	if (disabled.value) list.push('am-button--disabled')
 	if (props.loading) list.push('am-button--loading')
@@ -116,6 +121,21 @@ const iconClass = computed(() : string => {
 const spinnerStyle = computed(() : string => 'width:' + iconSize.value + 'px;height:' + iconSize.value + 'px;border-color:' + contentColor.value + ';')
 const hoverClass = computed(() : string => disabled.value || props.loading ? 'none' : 'am-button--active')
 
+/** 紧凑组合里的接缝（不在组里时为空） */
+const compactStyle = computed(() : string => {
+	if (!compact.inCompact()) return ''
+	let text = compact.seamStyle()
+	if (props.block && !compact.vertical()) text += 'flex:1;'
+	const variant = mergedVariant.value
+	// 有颜色的边框压在相邻的灰色边框上面
+	if (mergedColor.value != 'default' && !props.ghost) text += 'z-index:1;'
+	// 两个实心 / 浅色按钮挨着时中间留一条细线（移动端库是伪元素）：起始一侧的边框用半透明的容器色
+	if ((variant == 'solid' || variant == 'filled') && !props.ghost && !compact.isFirst()) {
+		text += (compact.vertical() ? 'border-top-color:' : 'border-left-color:') + alphaColor(theme().colorBgContainer, 40) + ';'
+	}
+	return text
+})
+
 function onClick(event : UniPointerEvent) {
 	if (disabled.value || props.loading) return
 	emit('click', event)
@@ -123,7 +143,7 @@ function onClick(event : UniPointerEvent) {
 </script>
 
 <template>
-	<view :class="classes" :hover-class="hoverClass" @click="onClick">
+	<view :class="classes" :style="compactStyle" :hover-class="hoverClass" @click="onClick">
 		<loading v-if="loading" :style="spinnerStyle" :class="iconClass"></loading>
 		<am-icon v-else-if="icon.length > 0" :name="icon" :size="iconSize" :color="contentColor" :class="iconClass" />
 		<slot v-else name="icon"></slot>

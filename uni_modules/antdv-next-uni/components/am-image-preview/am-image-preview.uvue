@@ -1,0 +1,210 @@
+<script setup lang="uts">
+import { useAmLocale } from '../../locale/locale.uts'
+import { addAmOverlay, removeAmOverlay } from '../../utils/overlay.uts'
+import { AM_DURATION_SLOW, amTransition, amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 图片预览（= antdv-next-mobile 的 ImagePreview）：全屏的黑色图层，左右滑动翻页。
+// v-model:open、images、v-model:current（从 0 开始）、loop、showIndex（“2 / 5”）、closable、closeIcon、closeOnClick、
+// zIndex 同名同义；事件 update:open、update:current、change（current）、close、openChange、afterOpenChange；
+// 插槽 index / footer（参数 { current, total }）、image（参数 { src, index }，替换每一页的图片）、closeIcon。
+// 函数式用法（ImagePreview.show）是 utils/image-preview.uts 的 previewAmImage()：用系统的预览，带缩放。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 翻页用内置的 swiper（原生的手势），没有缩放：没有 maxZoom / minZoom / doubleTapZoom（双指缩放与 swiper 的
+//   手势要在原生层协调，uvue 里做不了；需要缩放时用 previewAmImage()），也没有 swipeToClose（下拉关闭）；
+// - images 只能是地址的数组（没有 { src, alt }：uvue 的 image 没有 alt）；closeIcon 是图标名（自定义内容用同名插槽）；
+// - 没有 Teleport：根节点 fixed 铺满页面（有原生导航栏的页面盖不住导航栏）；Android 的返回键会先关掉它；
+// - 没有 defaultOpen / defaultCurrent：UTS 里分不出“没传”，请用 v-model
+defineOptions({ name: 'AmImagePreview' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	images: { type: Array as PropType<string[]>, default: () : string[] => [] },
+	current: { type: Number, default: 0 },
+	loop: { type: Boolean, default: true },
+	showIndex: { type: Boolean, default: true },
+	closable: { type: Boolean, default: false },
+	/** 关闭图标的名称（<am-icon> 的 name）；自定义内容用 closeIcon 插槽 */
+	closeIcon: { type: String, default: 'close' },
+	closeOnClick: { type: Boolean, default: true },
+	zIndex: { type: Number, default: 1000 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'update:current', 'change', 'close', 'openChange', 'afterOpenChange'])
+
+const locale = useAmLocale()
+const uid = amUid('am-image-preview')
+
+const total = computed(() : number => props.images.length)
+
+function clamp(index : number) : number {
+	if (index < 0 || index >= props.images.length) return 0
+	return index
+}
+
+/** 当前第几张 */
+const index = ref(clamp(props.current))
+/** 根节点是否渲染（关闭的过渡结束后才拿掉） */
+const visible = ref(false)
+/** 是否处于“打开”的样式（用来触发过渡） */
+const shown = ref(false)
+/** 加载失败的页 */
+const failed = ref<number[]>([])
+/** swiper 要有确定的高度：先用窗口高度，打开后量根节点 */
+const height = ref(uni.getWindowInfo().windowHeight)
+let timer = 0
+let overlayId = 0
+
+function unregister() {
+	if (overlayId > 0) removeAmOverlay(overlayId)
+	overlayId = 0
+}
+
+function close() {
+	emit('close')
+	emit('update:open', false)
+	emit('openChange', false)
+}
+
+function measure() {
+	measureById(uid).then((rect : AmRect | null) => {
+		if (rect != null && rect.height > 0) height.value = rect.height
+	})
+}
+
+watch(
+	() : boolean => props.open,
+	(open : boolean) => {
+		clearTimeout(timer)
+		unregister()
+		if (open) {
+			overlayId = addAmOverlay(() => { close() })
+			index.value = clamp(props.current)
+			failed.value = []
+			height.value = uni.getWindowInfo().windowHeight
+			visible.value = true
+			// 先以透明的状态渲染一帧，再切到显示，过渡才会生效
+			timer = setTimeout(() => {
+				shown.value = true
+				measure()
+				timer = setTimeout(() => { emit('afterOpenChange', true) }, AM_DURATION_SLOW)
+			}, 20)
+		} else if (visible.value) {
+			shown.value = false
+			timer = setTimeout(() => {
+				visible.value = false
+				emit('afterOpenChange', false)
+			}, AM_DURATION_SLOW)
+		}
+	},
+	{ immediate: true }
+)
+
+watch(() : number => props.current, (value : number) => {
+	const next = clamp(value)
+	if (next != index.value) index.value = next
+})
+
+watch(() : number => props.images.length, () => {
+	failed.value = []
+	if (index.value >= props.images.length) index.value = 0
+})
+
+onUnmounted(() => {
+	clearTimeout(timer)
+	unregister()
+})
+
+function onChange(event : UniSwiperChangeEvent) {
+	const next = event.detail.current
+	if (next == index.value) return
+	index.value = next
+	emit('update:current', next)
+	emit('change', next)
+}
+
+function onError(page : number) {
+	if (failed.value.indexOf(page) < 0) failed.value = [...failed.value, page]
+}
+
+function isFailed(page : number) : boolean {
+	return failed.value.indexOf(page) >= 0
+}
+
+function onTap() {
+	if (props.closeOnClick) close()
+}
+
+function noop() {}
+
+const rootStyle = computed(() : string => 'z-index:' + props.zIndex + ';opacity:' + (shown.value ? 1 : 0) + ';' + amTransition('opacity', AM_DURATION_SLOW))
+const swiperStyle = computed(() : string => 'height:' + height.value + 'px;')
+const circular = computed(() : boolean => props.loop && total.value > 1)
+const indexText = computed(() : string => (index.value + 1) + ' / ' + total.value)
+const failedText = computed(() : string => locale().Image.loadFailed)
+</script>
+
+<template>
+	<view v-if="visible" :id="uid" :class="['am-image-preview', rootClass]" :style="rootStyle" @click="onTap">
+		<swiper
+			class="am-image-preview__swiper"
+			:style="swiperStyle"
+			:current="index"
+			:circular="circular"
+			:disable-touch="total <= 1"
+			:indicator-dots="false"
+			:duration="300"
+			@change="onChange"
+		>
+			<swiper-item v-for="(image, page) in images" :key="page">
+				<view class="am-image-preview__item">
+					<slot name="image" :src="image" :index="page">
+						<image v-if="!isFailed(page)" class="am-image-preview__img" :src="image" mode="aspectFit" @error="onError(page)" />
+						<view v-else class="am-image-preview__status">
+							<am-icon name="picture" :size="28" color="rgba(255, 255, 255, 0.65)" />
+							<text class="am-image-preview__status-text">{{ failedText }}</text>
+						</view>
+					</slot>
+				</view>
+			</swiper-item>
+		</swiper>
+		<view v-if="showIndex && total > 0" class="am-image-preview__index">
+			<slot name="index" :current="index" :total="total">
+				<text class="am-image-preview__index-text">{{ indexText }}</text>
+			</slot>
+		</view>
+		<view v-if="closable" class="am-image-preview__close" @click.stop="close">
+			<view class="am-image-preview__close-button">
+				<slot name="closeIcon">
+					<am-icon :name="closeIcon" :size="22" color="#ffffff" />
+				</slot>
+			</view>
+		</view>
+		<view class="am-image-preview__footer" @click.stop="noop">
+			<slot name="footer" :current="index" :total="total"></slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-image-preview { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background-color: #000000; }
+.am-image-preview__swiper { width: 100%; }
+.am-image-preview__item { width: 100%; height: 100%; align-items: center; justify-content: center; }
+.am-image-preview__img { width: 100%; height: 100%; }
+.am-image-preview__status { align-items: center; justify-content: center; }
+.am-image-preview__status-text { margin-top: 8px; font-size: var(--am-font-size, 14px); color: rgba(255, 255, 255, 0.65); }
+/* 页码：顶部居中，避开刘海（有原生导航栏的页面安全区域为 0） */
+.am-image-preview__index {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	align-items: center;
+	padding-top: var(--uni-safe-area-inset-top, 0px);
+}
+.am-image-preview__index-text { margin-top: 16px; font-size: var(--am-font-size, 14px); line-height: 22px; color: #ffffff; }
+.am-image-preview__close { position: absolute; right: 8px; top: 0; padding-top: var(--uni-safe-area-inset-top, 0px); }
+.am-image-preview__close-button { width: 40px; height: 40px; margin-top: 8px; align-items: center; justify-content: center; }
+.am-image-preview__footer { position: absolute; left: 0; right: 0; bottom: 0; padding-bottom: var(--uni-safe-area-inset-bottom, 0px); }
+</style>

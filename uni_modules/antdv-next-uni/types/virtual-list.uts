@@ -1,0 +1,16 @@
+// VirtualList 的类型（= antdv-next-mobile 的 virtual-list/interface.ts）
+
+/**
+ * scrollTo() 的目标（= VirtualListScrollToConfig）：index 与 key 给一个即可。
+ * 先用原生的 scroll-into-view 滚到该项的顶部，align / offset 在落定后再挪（微信小程序上不起作用）
+ */
+export type AmVirtualListScrollToConfig = {
+	index ?: number | null
+	key ?: any | null
+	/** 'start'（默认）| 'center' | 'end'（没有 'auto'） */
+	align ?: string | null
+	/** 该项前面多留出的距离（像素） */
+	offset ?: number | null
+	/** 'smooth' 为带动画 */
+	behavior ?: string | null
+}

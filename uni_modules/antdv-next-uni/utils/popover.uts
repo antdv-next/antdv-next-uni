@@ -1,0 +1,111 @@
+// 气泡（am-popover）的定位（= antdv-next-mobile 的 popover/position.ts）：按触发元素的位置、气泡的大小和窗口的大小，
+// 算出气泡的左上角、翻转之后的方位和箭头的位置。纯函数（写法同时是合法的 TS），可以直接在 node 下测试
+
+export type AmPopoverPosition = {
+	/** 气泡左上角（窗口坐标） */
+	left : number
+	top : number
+	/** 实际在哪一侧：top / bottom / left / right（放不下时翻到对面） */
+	side : string
+	/** 翻转之后的 placement */
+	placement : string
+	/** 箭头中心到气泡起始边的距离（上下方位是到左边，左右方位是到上边） */
+	arrowOffset : number
+}
+
+/** placement 在哪一侧：top / bottom / left / right */
+export function popoverSide(placement : string) : string {
+	if (placement.indexOf('bottom') == 0) return 'bottom'
+	if (placement.indexOf('left') == 0) return 'left'
+	if (placement.indexOf('right') == 0) return 'right'
+	return 'top'
+}
+
+/** 沿着边怎么对齐：start（Left / Top）、end（Right / Bottom）、center */
+export function popoverAlign(placement : string) : string {
+	const suffix = placement.substring(popoverSide(placement).length)
+	if (suffix == 'Left' || suffix == 'Top') return 'start'
+	if (suffix == 'Right' || suffix == 'Bottom') return 'end'
+	return 'center'
+}
+
+function composePlacement(side : string, align : string) : string {
+	if (align == 'center') return side
+	const vertical = side == 'top' || side == 'bottom'
+	if (vertical) return side + (align == 'start' ? 'Left' : 'Right')
+	return side + (align == 'start' ? 'Top' : 'Bottom')
+}
+
+function oppositeSide(side : string) : string {
+	if (side == 'top') return 'bottom'
+	if (side == 'bottom') return 'top'
+	return side == 'left' ? 'right' : 'left'
+}
+
+function clampBetween(value : number, min : number, max : number) : number {
+	return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+/**
+ * 气泡放在触发元素旁边的位置。
+ * @param triggerLeft / triggerTop / triggerWidth / triggerHeight 触发元素（窗口坐标）
+ * @param popupWidth / popupHeight 气泡的大小
+ * @param viewLeft / viewTop / viewWidth / viewHeight 可以放气泡的区域（窗口坐标）
+ * @param gap 气泡与触发元素的距离
+ * @param autoAdjust 放不下时翻到对面、沿着边挪进可视区域
+ */
+export function computePopoverPosition(
+	placement : string,
+	triggerLeft : number,
+	triggerTop : number,
+	triggerWidth : number,
+	triggerHeight : number,
+	popupWidth : number,
+	popupHeight : number,
+	viewLeft : number,
+	viewTop : number,
+	viewWidth : number,
+	viewHeight : number,
+	gap : number,
+	autoAdjust : boolean
+) : AmPopoverPosition {
+	const padding = 8
+	const arrowInset = 12
+	let side = popoverSide(placement)
+	const align = popoverAlign(placement)
+	const vertical = side == 'top' || side == 'bottom'
+	const viewRight = viewLeft + viewWidth
+	const viewBottom = viewTop + viewHeight
+
+	if (autoAdjust) {
+		const spaceTop = triggerTop - viewTop - padding
+		const spaceBottom = viewBottom - (triggerTop + triggerHeight) - padding
+		const spaceLeft = triggerLeft - viewLeft - padding
+		const spaceRight = viewRight - (triggerLeft + triggerWidth) - padding
+		const need = (vertical ? popupHeight : popupWidth) + gap
+		const own = side == 'top' ? spaceTop : (side == 'bottom' ? spaceBottom : (side == 'left' ? spaceLeft : spaceRight))
+		const other = side == 'top' ? spaceBottom : (side == 'bottom' ? spaceTop : (side == 'left' ? spaceRight : spaceLeft))
+		if (own < need && other > own) side = oppositeSide(side)
+	}
+
+	let left = 0
+	let top = 0
+	let arrowOffset = 0
+	if (vertical) {
+		top = side == 'top' ? triggerTop - popupHeight - gap : triggerTop + triggerHeight + gap
+		if (align == 'start') left = triggerLeft
+		else if (align == 'end') left = triggerLeft + triggerWidth - popupWidth
+		else left = triggerLeft + triggerWidth / 2 - popupWidth / 2
+		if (autoAdjust) left = clampBetween(left, viewLeft + padding, viewRight - popupWidth - padding)
+		arrowOffset = clampBetween(triggerLeft + triggerWidth / 2 - left, arrowInset, popupWidth - arrowInset)
+	} else {
+		left = side == 'left' ? triggerLeft - popupWidth - gap : triggerLeft + triggerWidth + gap
+		if (align == 'start') top = triggerTop
+		else if (align == 'end') top = triggerTop + triggerHeight - popupHeight
+		else top = triggerTop + triggerHeight / 2 - popupHeight / 2
+		if (autoAdjust) top = clampBetween(top, viewTop + padding, viewBottom - popupHeight - padding)
+		arrowOffset = clampBetween(triggerTop + triggerHeight / 2 - top, arrowInset, popupHeight - arrowInset)
+	}
+	const result : AmPopoverPosition = { left: left, top: top, side: side, placement: composePlacement(side, align), arrowOffset: arrowOffset }
+	return result
+}

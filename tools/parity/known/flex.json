@@ -1,6 +1,5 @@
 {
   "missingProps": {
-    "gap": "App 端没有 CSS 的 gap，也没有后代选择器，容器没法给插槽里的子元素加外边距；间距写在子元素自己的 margin 上",
     "component": "uvue 的根节点只能是 view，没有动态标签"
   }
 }

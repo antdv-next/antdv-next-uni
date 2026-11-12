@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "defaultOpen": "UTS 的布尔属性分不出“没传”：不绑定 open 时组件自己管开关",
+    "getPopupContainer": "uni-app x 没有 Teleport：气泡就地渲染为 fixed 节点，位置按量到的触发元素算"
+  }
+}

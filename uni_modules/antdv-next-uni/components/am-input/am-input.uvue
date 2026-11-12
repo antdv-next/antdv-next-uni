@@ -2,6 +2,7 @@
 import { useAmTheme } from '../../theme/theme.uts'
 import { useAmSize } from '../../utils/config.uts'
 import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
+import { useAmCompactItem } from '../../utils/compact.uts'
 
 // 输入框（= antdv-next-mobile 的 Input）：v-model:value、placeholder、type、allowClear、maxlength、showCount、
 // prefix / suffix、variant（outlined / filled / borderless / underlined）、status（error / warning）、size、
@@ -13,6 +14,9 @@ import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus,
 // - change / input 的参数是当前的值（字符串），不是事件对象；
 // - 没有 defaultValue（UTS 里分不出“没传”和空字符串），请用 v-model:value；
 // - maxlength 为 -1 表示不限；placeholder 的颜色在 UTS 中取主题（placeholder-style 不支持 CSS 变量）
+//
+// 在 <am-space-compact> 里（utils/compact.uts）：尺寸跟随组，默认 outlined（在无边框的表单里也是），
+// 内侧的圆角去掉、边框与前一项叠在一起，横向时占满剩余的宽度
 defineOptions({ name: 'AmInput' })
 
 const props = defineProps({
@@ -43,13 +47,14 @@ const props = defineProps({
 const emit = defineEmits(['update:value', 'change', 'input', 'focus', 'blur', 'pressEnter', 'clear'])
 
 const theme = useAmTheme()
-const sizeOf = useAmSize(() : string => props.size)
+const compact = useAmCompactItem()
+const sizeOf = useAmSize(() : string => props.size.length > 0 ? props.size : compact.size())
 const size = computed(() : string => sizeOf())
 const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
 const disabled = computed(() : boolean => disabledOf())
 
 // 表单约定：变体、校验状态跟随所在的 Form / FormItem；值变化、失焦时通知 FormItem 重新校验
-const variantOf = useAmFieldVariant(() : string => props.variant)
+const variantOf = useAmFieldVariant(() : string => props.variant.length == 0 && compact.inCompact() ? 'outlined' : props.variant)
 const variant = computed(() : string => variantOf())
 const statusOf = useAmFieldStatus(() : string => props.status)
 const status = computed(() : string => statusOf())
@@ -74,6 +79,15 @@ const classes = computed(() : string[] => {
 	if (disabled.value) list.push('am-input--disabled')
 	if (props.rootClass.length > 0) list.push(props.rootClass)
 	return list
+})
+
+/** 紧凑组合里的接缝（不在组里时为空）：聚焦、有校验状态时边框压在相邻项的上面 */
+const compactStyle = computed(() : string => {
+	if (!compact.inCompact()) return ''
+	let text = compact.seamStyle()
+	if (!compact.vertical()) text += compact.block() ? 'flex:1;' : 'flex:1;min-width:120px;'
+	if (focused.value || status.value.length > 0) text += 'z-index:1;'
+	return text
 })
 
 const controlClasses = computed(() : string[] => {
@@ -131,7 +145,7 @@ defineExpose({ focus, blur })
 </script>
 
 <template>
-	<view :class="classes">
+	<view :class="classes" :style="compactStyle">
 		<view v-if="prefix.length > 0" class="am-input__prefix">
 			<am-icon v-if="isIcon(prefix)" :name="prefix" :size="16" :color="iconColor" />
 			<text v-else class="am-input__affix">{{ prefix }}</text>

@@ -1,0 +1,7 @@
+// <am-floating-panel> 的类型（= antdv-next-mobile 的 floating-panel/interface.ts）
+
+/** heightChange 事件的第二个参数 */
+export type AmFloatingPanelChangeInfo = {
+	/** true：松手后吸附到某个高度（带动画）；false：跟着手指在动 */
+	animating : boolean
+}

@@ -1,0 +1,91 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmDisabled, useAmSize } from '../../utils/config.uts'
+import { useAmCompactItem } from '../../utils/compact.uts'
+
+// 紧凑组合里的附加块（= antdv-next-mobile 的 Space.Addon）：放在 <am-space-compact> 里，给输入框加前后缀文字
+// （“https://”、“元”）。variant（outlined 带边框与浅底色，默认；filled；borderless）、size、disabled 同名同义；
+// 插槽 default。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 文字用 `text` 属性：uvue 的样式不继承，默认插槽里的文字拿不到它的颜色与字号（插槽仍可放自定义内容，如图标）
+defineOptions({ name: 'AmSpaceAddon' })
+
+const props = defineProps({
+	variant: { type: String, default: 'outlined' },
+	size: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	text: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+const compact = useAmCompactItem()
+const sizeOf = useAmSize(() : string => props.size.length > 0 ? props.size : compact.size())
+const size = computed(() : string => sizeOf())
+const disabledOf = useAmDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-space-addon', 'am-space-addon--' + size.value, 'am-space-addon--' + props.variant]
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const style = computed(() : string => compact.seamStyle())
+// 禁用时的文字色（--am-color-text-disabled 不在主题变量里，取主题的四级文字色）
+const textStyle = computed(() : string => disabled.value ? 'color:' + theme().colorTextQuaternary + ';' : '')
+</script>
+
+<template>
+	<view :class="classes" :style="style">
+		<text v-if="text.length > 0" :class="['am-space-addon__text', 'am-space-addon__text--' + size]" :style="textStyle">{{ text }}</text>
+		<slot></slot>
+	</view>
+</template>
+
+<style>
+.am-space-addon {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	align-self: flex-start;
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--am-color-border, #d9d9d9);
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-space-addon--middle {
+	min-height: var(--am-control-height, 40px);
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-space-addon--small {
+	min-height: var(--am-control-height-sm, 30px);
+	padding-left: var(--am-padding-xs, 8px);
+	padding-right: var(--am-padding-xs, 8px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+}
+.am-space-addon--large {
+	min-height: var(--am-control-height-lg, 48px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-lg, 12px);
+	border-top-right-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-left-radius: var(--am-border-radius-lg, 12px);
+	border-bottom-right-radius: var(--am-border-radius-lg, 12px);
+}
+.am-space-addon--filled { border-color: transparent; }
+.am-space-addon--borderless { border-color: transparent; background-color: transparent; }
+.am-space-addon__text { white-space: nowrap; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-space-addon__text--middle { font-size: var(--am-font-size-lg, 16px); }
+.am-space-addon__text--small { font-size: var(--am-font-size, 14px); }
+.am-space-addon__text--large { font-size: var(--am-font-size-xl, 18px); }
+</style>

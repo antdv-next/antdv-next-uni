@@ -1,10 +1,13 @@
 <script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+
 // 弹性布局（= antdv-next-mobile 的 Flex）：vertical、orientation（horizontal / vertical）、wrap、justify、align、
-// flex（容器自己的 flex）同名同义；justify / align 是 CSS 的值（flex-start / center / space-between …）。
+// flex（容器自己的 flex）、gap（small 8 / middle 16 / large 24，或像素数）同名同义；
+// justify / align 是 CSS 的值（flex-start / center / space-between …）。
 //
 // 与 antdv-next-mobile 的差异（uni-app x 的限制）：
-// - 没有 `gap`：App 端没有 CSS 的 gap，也没有后代选择器，容器没法给插槽里的子元素加外边距
-//   （行内换行时还要用负外边距抵消，更做不到）。间距写在子元素自己的 margin 上；
+// - `gap` 用容器上的 CSS `gap`（HBuilderX 5.34 起 App 端可以编译），写在 :style 上；预设值取主题的
+//   paddingXS / padding / paddingLG，数字（或数字字符串）按像素，其他 CSS 长度原样写入；
 // - `wrap` 只有布尔值（true = wrap），没有 `component`（根节点只能是 view）；
 // - 不写 align 时子元素拉伸（uvue 的 view 默认 align-items: stretch，与 CSS 的 normal 表现相同）
 defineOptions({ name: 'AmFlex' })
@@ -16,7 +19,22 @@ const props = defineProps({
 	justify: { type: String, default: '' },
 	align: { type: String, default: '' },
 	flex: { type: String, default: '' },
+	gap: { type: [String, Number], default: '' },
 	rootClass: { type: String, default: '' }
+})
+
+const theme = useAmTheme()
+
+/** gap 的值（带单位）；没有写时为空 */
+const gapValue = computed(() : string => {
+	const gap = props.gap
+	if (typeof gap == 'number') return (gap as number) + 'px'
+	const text = gap as string
+	if (text.length == 0) return ''
+	if (text == 'small') return theme().paddingXS + 'px'
+	if (text == 'middle' || text == 'medium') return theme().padding + 'px'
+	if (text == 'large') return theme().paddingLG + 'px'
+	return /^\d+(\.\d+)?$/.test(text) ? text + 'px' : text
 })
 
 const style = computed(() : string => {
@@ -26,6 +44,7 @@ const style = computed(() : string => {
 	if (props.align.length > 0) text += 'align-items:' + props.align + ';'
 	if (props.wrap) text += 'flex-wrap:wrap;'
 	if (props.flex.length > 0) text += 'flex:' + props.flex + ';'
+	if (gapValue.value.length > 0) text += 'gap:' + gapValue.value + ';'
 	return text
 })
 </script>

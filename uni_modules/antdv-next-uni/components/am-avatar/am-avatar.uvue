@@ -1,5 +1,5 @@
 <script setup lang="uts">
-import { useAmTheme } from '../../theme/theme.uts'
+import { mixColor, useAmTheme } from '../../theme/theme.uts'
 import { useAmSize } from '../../utils/config.uts'
 
 // 头像（= antdv-next-mobile 的 Avatar）：src、icon、shape（circle / square）、size（small 28 / middle 40 / large 56 或像素）、
@@ -12,12 +12,16 @@ import { useAmSize } from '../../utils/config.uts'
 // - `size` 是字符串：像素写成 size="64"（UTS 的属性不能是 string | number 的联合类型）；
 // - 文字的宽度量不了，`gap` 按字数估算（中文算一个字宽，其他算 0.6 个）；
 // - 没有 srcSet、alt、draggable、crossOrigin（image 组件没有这些属性）
+//
+// 在 <am-avatar-group> 里：没写 size / shape 时用组的；向组登记自己，由此得到重叠（-12px 的起始外边距）、
+// 2px 容器色的描边（盒子各大 4px），排在 max.count 之后时不渲染
 defineOptions({ name: 'AmAvatar' })
 
 const props = defineProps({
 	src: { type: String, default: '' },
 	icon: { type: String, default: '' },
-	shape: { type: String, default: 'circle' },
+	/** circle / square；空为跟随所在的头像组，再没有则 circle */
+	shape: { type: String, default: '' },
 	size: { type: String, default: '' },
 	gap: { type: Number, default: 4 },
 	fit: { type: String, default: 'cover' },
@@ -30,12 +34,36 @@ const emit = defineEmits(['error'])
 
 const theme = useAmTheme()
 
+// ---------- 所在的头像组（不在组里时都是 null） ----------
+const groupRegister = inject<(() => number) | null>('amAvatarGroupRegister', null)
+const groupUnregister = inject<((id : number) => void) | null>('amAvatarGroupUnregister', null)
+const groupHidden = inject<((id : number) => boolean) | null>('amAvatarGroupHidden', null)
+const groupSize = inject<(() => string) | null>('amAvatarGroupSize', null)
+const groupShape = inject<(() => string) | null>('amAvatarGroupShape', null)
+const groupId = groupRegister != null ? groupRegister() : -1
+const inGroup = groupId >= 0
+onUnmounted(() => {
+	if (groupId >= 0 && groupUnregister != null) groupUnregister(groupId)
+})
+/** 排在组的 max.count 之后：不渲染 */
+const hidden = computed(() : boolean => groupId >= 0 && groupHidden != null ? groupHidden(groupId) : false)
+
+const mergedSize = computed(() : string => {
+	if (props.size.length > 0 || groupSize == null) return props.size
+	return groupSize()
+})
+const shape = computed(() : string => {
+	if (props.shape.length > 0) return props.shape
+	const group = groupShape != null ? groupShape() : ''
+	return group.length > 0 ? group : 'circle'
+})
+
 /** size 是数字（像素）时的值，否则为 0 */
 const customSize = computed(() : number => {
-	const n = parseFloat(props.size)
+	const n = parseFloat(mergedSize.value)
 	return isNaN(n) ? 0 : n
 })
-const sizeOf = useAmSize(() : string => customSize.value > 0 ? 'middle' : props.size)
+const sizeOf = useAmSize(() : string => customSize.value > 0 ? 'middle' : mergedSize.value)
 const size = computed(() : string => sizeOf())
 
 const failed = ref(false)
@@ -61,10 +89,17 @@ const iconColor = computed(() : string => theme().colorTextLightSolid)
 const style = computed(() : string => {
 	const current = theme()
 	let radius = pixels.value / 2
-	if (props.shape == 'square') {
+	if (shape.value == 'square') {
 		radius = current.borderRadius
 		if (customSize.value == 0 && size.value == 'small') radius = current.borderRadiusSM
 		if (customSize.value == 0 && size.value == 'large') radius = current.borderRadiusLG
+	}
+	if (inGroup) {
+		// 描边在盒子里面（2px 的边框），盒子大 4px，头像本身的大小不变
+		const box = pixels.value + 4
+		// 底色换成不透明的同一个灰：默认的底色是半透明的，压在前一个头像上会透出来
+		const background = props.src.length > 0 && !failed.value ? '' : 'background-color:' + mixColor(current.colorTextBase, 25, current.colorBgContainer) + ';'
+		return 'width:' + box + 'px;height:' + box + 'px;border-radius:' + (radius + 2) + 'px;margin-left:-12px;border-width:2px;border-style:solid;border-color:' + current.colorBgContainer + ';' + background
 	}
 	return 'width:' + pixels.value + 'px;height:' + pixels.value + 'px;border-radius:' + radius + 'px;'
 })
@@ -91,7 +126,7 @@ const mode = computed(() : string => FITS.get(props.fit) ?? 'aspectFill')
 </script>
 
 <template>
-	<view :class="['am-avatar', src.length > 0 && !failed ? 'am-avatar--image' : '', rootClass]" :style="style">
+	<view v-if="!hidden" :class="['am-avatar', src.length > 0 && !failed ? 'am-avatar--image' : '', rootClass]" :style="style">
 		<slot v-if="$slots['src'] != null" name="src"></slot>
 		<image v-else-if="src.length > 0 && !failed" class="am-avatar__image" :src="src" :mode="mode" @error="onError" />
 		<slot v-else-if="$slots['icon'] != null" name="icon"></slot>

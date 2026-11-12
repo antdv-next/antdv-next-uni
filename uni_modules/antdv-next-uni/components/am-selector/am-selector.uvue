@@ -1,0 +1,161 @@
+<script setup lang="uts">
+import { AmOption } from '../../types/index.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { useAmFieldChange, useAmFieldDisabled } from '../../utils/form-field.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+import { normalizeOptions } from '../../utils/option.uts'
+import { includesValue, sameValue, toArray } from '../../utils/value.uts'
+
+// 选择组（= antdv-next-mobile 的 Selector）：把选项平铺成一组方块，点击选中，适合选项不多的单选 / 多选。
+// options（label、description、value、disabled）、v-model:value（总是数组）、multiple、columns（每行几列；
+// 不写时各项按自己的宽度换行）、showCheckMark（选中项右下角的勾）、disabled、id 同名同义；
+// 事件 update:value、change（选中的值、{ items: 选中的选项 }）；插槽 label、description、checkMark，
+// 参数是 { option, index, checked, disabled }。单选时再点一次已选中的项会取消选中。它是表单字段（utils/form-field.uts）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 选项的 label / description 是文字（UTS 里不能把 VNode 放进数据），自定义内容用插槽；选项也可以直接写字符串 / 数字；
+// - 没有 defaultValue（UTS 里分不出“没传”和空数组），请用 v-model:value；没有 fieldNames；
+// - 没有 CSS grid：columns 用百分比宽度实现，每项外面包一层留出间距的格子；
+// - 右下角的三角是一个转了 45° 的方块被选项裁出来的（没有 clip-path）
+defineOptions({ name: 'AmSelector' })
+
+const props = defineProps({
+	options: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	value: { type: Array as PropType<any[]>, default: () : any[] => [] },
+	multiple: { type: Boolean, default: false },
+	/** 每行几列；0 为各项按自己的宽度换行 */
+	columns: { type: Number, default: 0 },
+	showCheckMark: { type: Boolean, default: true },
+	disabled: { type: Boolean, default: false },
+	id: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'change'])
+
+const theme = useAmTheme()
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const notifyChange = useAmFieldChange()
+
+const list = computed(() : AmOption[] => normalizeOptions(props.options, null))
+const values = computed(() : any[] => toArray(props.value))
+
+function isChecked(option : AmOption) : boolean {
+	return includesValue(values.value, option.value)
+}
+
+function isDisabled(option : AmOption) : boolean {
+	return disabled.value || option.disabled == true
+}
+
+function toggle(option : AmOption) {
+	if (isDisabled(option)) return
+	const checked = isChecked(option)
+	let next : any[] = []
+	if (props.multiple) {
+		if (checked) next = values.value.filter((item) : boolean => !sameValue(item, option.value))
+		else next = [...values.value, option.value]
+	} else if (!checked) {
+		next = [option.value]
+	}
+	// 选中的选项，按 value 的顺序
+	const items : AmOption[] = []
+	for (let i = 0; i < next.length; i++) {
+		const found = list.value.find((item) : boolean => sameValue(item.value, next[i]))
+		if (found != null) items.push(found)
+	}
+	emit('update:value', next)
+	const extra = { items: items } as UTSJSONObject
+	emit('change', next, extra)
+	notifyChange()
+}
+
+const cellStyle = computed(() : string => props.columns > 0 ? 'width:' + (100 / props.columns) + '%;' : '')
+
+// 选中态的颜色写在 :style 上：Android 上只切换类名时没有过渡
+function itemStyle(option : AmOption) : string {
+	return 'background-color:' + (isChecked(option) ? theme().colorPrimaryBg : theme().colorFillTertiary) + ';' + amTransition('background-color', AM_DURATION_MID)
+}
+
+function labelStyle(option : AmOption) : string {
+	return 'color:' + (isChecked(option) ? theme().colorPrimary : theme().colorText) + ';'
+}
+
+function descriptionStyle(option : AmOption) : string {
+	return isChecked(option) ? 'color:' + theme().colorPrimary + ';opacity:0.75;' : ''
+}
+
+function hasDescription(option : AmOption, slotted : boolean) : boolean {
+	return slotted || (option.description ?? '').length > 0
+}
+
+const markColor = computed(() : string => theme().colorTextLightSolid)
+</script>
+
+<template>
+	<view :id="id" :class="['am-selector', rootClass]">
+		<view class="am-selector__list">
+			<view v-for="(option, index) in list" :key="index" class="am-selector__cell" :style="cellStyle">
+				<view
+					:class="['am-selector__item', isDisabled(option) ? 'am-selector__item--disabled' : '']"
+					:style="itemStyle(option)"
+					:hover-class="isDisabled(option) ? 'none' : 'am-selector__item--active'"
+					@click="toggle(option)"
+				>
+					<slot name="label" :option="option" :index="index" :checked="isChecked(option)" :disabled="isDisabled(option)">
+						<text class="am-selector__label" :style="labelStyle(option)">{{ option.label }}</text>
+					</slot>
+					<slot v-if="hasDescription(option, $slots['description'] != null)" name="description" :option="option" :index="index" :checked="isChecked(option)" :disabled="isDisabled(option)">
+						<text class="am-selector__description" :style="descriptionStyle(option)">{{ option.description }}</text>
+					</slot>
+					<view v-if="showCheckMark && isChecked(option)" class="am-selector__mark">
+						<view class="am-selector__mark-bg"></view>
+						<view class="am-selector__mark-icon">
+							<slot name="checkMark" :option="option" :index="index" :checked="true" :disabled="isDisabled(option)">
+								<am-icon name="check" :size="8" :color="markColor" />
+							</slot>
+						</view>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<style>
+/* 格子四周各留半个间距（4px），列表用负外边距抵消，整体与根节点对齐 */
+.am-selector__list { flex-direction: row; flex-wrap: wrap; margin: -4px; }
+.am-selector__cell { padding: 4px; }
+.am-selector__item {
+	align-items: center;
+	justify-content: center;
+	min-height: var(--am-control-height, 40px);
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-left-radius: var(--am-border-radius-sm, 4px);
+	border-top-right-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-left-radius: var(--am-border-radius-sm, 4px);
+	border-bottom-right-radius: var(--am-border-radius-sm, 4px);
+	overflow: hidden;
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+.am-selector__item--active { opacity: 0.7; }
+.am-selector__item--disabled { opacity: 0.4; }
+.am-selector__label { font-size: var(--am-font-size, 14px); line-height: 22px; text-align: center; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-selector__description { font-size: var(--am-font-size-sm, 12px); line-height: 18px; text-align: center; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.am-selector__mark { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; }
+/* 中心在右下角、转 45° 的方块：留在选项里面的那一半就是直角边 18px 的三角 */
+.am-selector__mark-bg {
+	position: absolute;
+	right: -13px;
+	bottom: -13px;
+	width: 26px;
+	height: 26px;
+	background-color: var(--am-color-primary, #1677ff);
+	transform: rotate(45deg);
+}
+.am-selector__mark-icon { position: absolute; right: 1px; bottom: 1px; }
+</style>

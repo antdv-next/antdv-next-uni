@@ -1,0 +1,58 @@
+import { AmUploadFile } from '../types/upload.uts'
+
+// am-upload 用到的小工具
+
+/** beforeUpload 的结果为它时，文件不进列表（= antdv-next-mobile 的 Upload.LIST_IGNORE） */
+export const AM_UPLOAD_LIST_IGNORE = '__AM_UPLOAD_LIST_IGNORE__'
+
+let uploadSeed = 0
+
+/** 文件的 uid */
+export function amUploadUid() : string {
+	uploadSeed++
+	return 'am-upload-' + Date.now() + '-' + uploadSeed
+}
+
+/** 复制一个文件（带类型的对象不能展开，逐个字段写） */
+export function cloneAmUploadFile(file : AmUploadFile) : AmUploadFile {
+	const next : AmUploadFile = {
+		uid: file.uid,
+		name: file.name,
+		status: file.status,
+		url: file.url,
+		thumbUrl: file.thumbUrl,
+		percent: file.percent,
+		size: file.size,
+		type: file.type,
+		path: file.path,
+		response: file.response,
+		error: file.error
+	}
+	return next
+}
+
+/** 路径的最后一段作为文件名（App 端选出来的文件没有 name） */
+export function amUploadFileName(path : string) : string {
+	let text = path
+	const query = text.indexOf('?')
+	if (query >= 0) text = text.substring(0, query)
+	const slash = text.lastIndexOf('/')
+	return slash >= 0 ? text.substring(slash + 1) : text
+}
+
+const IMAGE_EXTENSIONS : string[] = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.heic', '.avif']
+
+/**
+ * 是不是按图片显示（= 移动端库的 isImageUrl）：type 是 image / image/*，或者地址的扩展名是图片；
+ * 没有 type 也没有扩展名的地址（blob:、带签名的链接）当作图片
+ */
+export function isAmUploadImage(file : AmUploadFile) : boolean {
+	const type = file.type ?? ''
+	if (type.length > 0) return type.indexOf('image') == 0
+	const source = file.thumbUrl ?? file.url ?? file.path ?? ''
+	if (source.length == 0) return false
+	const name = amUploadFileName(source).toLowerCase()
+	const dot = name.lastIndexOf('.')
+	if (dot < 0) return true
+	return IMAGE_EXTENSIONS.indexOf(name.substring(dot)) >= 0
+}

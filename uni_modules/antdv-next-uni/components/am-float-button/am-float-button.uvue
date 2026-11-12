@@ -16,6 +16,9 @@ import { AM_FLOAT_BUTTON_NO_BADGE, AM_FLOAT_BUTTON_NO_OFFSET, AmFloatButtonBadge
 // - 吸边、松手没有过渡（right / bottom 不能过渡）；
 // - 没有 href / target / htmlType / ariaLabel
 //
+// 在 <am-float-button-group> 里：不再固定在右下角，而是组里的一个 48×48 的普通节点（由组来摆放，
+// 按组的 placement 留出 12px 的间距），形状跟随组，不能拖动。
+//
 // 位置：外层是贴着底部安全区域的 0 尺寸锚点（没有 calc()，安全区域只能用 CSS 变量写在 bottom 上），
 // 按钮在锚点里按 right / bottom 绝对定位；拖动时改的就是这两个值
 defineOptions({ name: 'AmFloatButton' })
@@ -38,6 +41,22 @@ const props = defineProps({
 const emit = defineEmits(['click', 'update:offset', 'offsetChange'])
 
 const theme = useAmTheme()
+
+// 所在的悬浮按钮组（不在组里时为 null）：形状、菜单弹出的方向（决定间距留在哪一侧）
+const groupShape = inject<(() => string) | null>('amFloatButtonGroupShape', null)
+const groupPlacement = inject<(() => string) | null>('amFloatButtonGroupPlacement', null)
+const inGroup = groupShape != null
+const mergedShape = computed(() : string => groupShape != null ? groupShape() : props.shape)
+/** 组里的间距：留在朝向触发按钮的一侧 */
+const groupStyle = computed(() : string => {
+	if (!inGroup) return ''
+	const placement = groupPlacement != null ? groupPlacement() : 'top'
+	if (placement == 'bottom') return 'margin-top:12px;'
+	if (placement == 'left') return 'margin-right:12px;'
+	if (placement == 'right') return 'margin-left:12px;'
+	if (placement == 'none') return ''
+	return 'margin-bottom:12px;'
+})
 
 const SIZE = 48
 
@@ -84,7 +103,7 @@ watch(
 	{ immediate: true }
 )
 
-const style = computed(() : string => 'right:' + right.value + 'px;bottom:' + bottom.value + 'px;')
+const style = computed(() : string => inGroup ? 'left:0px;top:0px;' : 'right:' + right.value + 'px;bottom:' + bottom.value + 'px;')
 
 // ---------- 拖动 ----------
 let startX = 0
@@ -100,7 +119,7 @@ function clamp(value : number, max : number) : number {
 
 function onTouchStart(event : UniTouchEvent) {
 	moved = false
-	if (!props.draggable || event.touches.length == 0) return
+	if (!props.draggable || inGroup || event.touches.length == 0) return
 	startX = event.touches[0].clientX
 	startY = event.touches[0].clientY
 	startRight = right.value
@@ -108,7 +127,7 @@ function onTouchStart(event : UniTouchEvent) {
 }
 
 function onTouchMove(event : UniTouchEvent) {
-	if (!props.draggable || event.touches.length == 0) return
+	if (!props.draggable || inGroup || event.touches.length == 0) return
 	const dx = event.touches[0].clientX - startX
 	const dy = event.touches[0].clientY - startY
 	if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return
@@ -121,7 +140,7 @@ function onTouchMove(event : UniTouchEvent) {
 }
 
 function onTouchEnd() {
-	if (!props.draggable || !moved) return
+	if (!props.draggable || inGroup || !moved) return
 	const size = area()
 	if (props.magnetic == 'x') {
 		const farRight = size[0] - SIZE - props.gap
@@ -145,9 +164,9 @@ function onClick(event : UniPointerEvent) {
 </script>
 
 <template>
-	<view :class="['am-float-button__anchor', rootClass]">
+	<view :class="[inGroup ? 'am-float-button__group-item' : 'am-float-button__anchor', rootClass]" :style="groupStyle">
 		<view
-			:class="['am-float-button', 'am-float-button--' + type, 'am-float-button--' + shape]"
+			:class="['am-float-button', 'am-float-button--' + type, 'am-float-button--' + mergedShape]"
 			:style="style"
 			hover-class="am-float-button--active"
 			@click="onClick"
@@ -163,7 +182,7 @@ function onClick(event : UniPointerEvent) {
 			<slot></slot>
 			<view
 				v-if="badgeVisible"
-				:class="['am-float-button__badge', badgeDot ? 'am-float-button__badge--dot' : '', badgeDot && shape == 'circle' ? 'am-float-button__badge--dot-circle' : '']"
+				:class="['am-float-button__badge', badgeDot ? 'am-float-button__badge--dot' : '', badgeDot && mergedShape == 'circle' ? 'am-float-button__badge--dot-circle' : '']"
 				:style="badgeStyle"
 			>
 				<text v-if="!badgeDot" class="am-float-button__badge-text">{{ badgeText }}</text>
@@ -174,6 +193,8 @@ function onClick(event : UniPointerEvent) {
 
 <style>
 .am-float-button__anchor { position: fixed; right: 0; bottom: var(--uni-safe-area-inset-bottom, 0px); z-index: 99; overflow: visible; }
+/* 在 <am-float-button-group> 里：组里的一个普通节点，按钮贴着它的左上角 */
+.am-float-button__group-item { width: 48px; height: 48px; flex-shrink: 0; overflow: visible; }
 .am-float-button {
 	position: absolute;
 	width: 48px;

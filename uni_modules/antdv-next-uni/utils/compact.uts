@@ -1,0 +1,112 @@
+// 紧凑组合（<am-space-compact>）里的子项一侧的逻辑（= antdv-next-mobile 的 _base/compact.ts 的 useCompactItemContext）。
+// 移动端库靠后代选择器（.am-space-compact .am-compact-item:not(.am-compact-first-item)）画接缝；uvue 只有 class 选择器，
+// 容器也包不了插槽里的子元素，所以反过来：<am-space-compact> 用 provide 给出一个登记表，子项在 setup 里登记自己，
+// 再按“是不是第一个 / 最后一个”自己把接缝写在 :style 上（内侧的圆角去掉、相接的边框用 -1px 的外边距叠在一起）。
+//
+//   amCompactRegister    () => number           登记，返回编号（在 setup 里调用）
+//   amCompactUnregister  (id : number) => void  卸载时注销
+//   amCompactFirst       (id : number) => boolean
+//   amCompactLast        (id : number) => boolean
+//   amCompactVertical    () => boolean
+//   amCompactSize        () => string           组的尺寸（已合并 ConfigProvider）
+//   amCompactBlock       () => boolean
+//
+// 限制：登记的顺序就是 setup 的顺序。首次渲染时它等于模板里的顺序；之后用 v-if 插到中间的子项会排在最后，
+// 这时给整组换一个 key 让它重新登记。
+// 另一个限制：上下文会传到子项的弹出层里（移动端库在 Portal 处断开）。目前只有 <am-select show-search> 的弹层里有
+// 会登记的组件（搜索框），它打开后会被当成组里的最后一项；要断开需在 am-popup 里 provide 一个空的 amCompactRegister
+
+export type AmCompactItem = {
+	/** 是否在 <am-space-compact> 里 */
+	inCompact : () => boolean
+	isFirst : () => boolean
+	isLast : () => boolean
+	vertical : () => boolean
+	/** 组的尺寸；不在组里时为空字符串。优先级：组件自己的 size > 组的 size > ConfigProvider */
+	size : () => string
+	block : () => boolean
+	/** 相接的边框叠在一起：不是第一个时 margin-left（纵向为 margin-top）为 -1px；纵向时撑满宽度 */
+	marginStyle : () => string
+	/** 只有一个边框盒子的子项（按钮、输入框、选择器）：marginStyle + 把内侧的圆角写成 0（外侧的沿用类上的圆角） */
+	seamStyle : () => string
+	/**
+	 * 由几块拼成的子项（数字输入框的 − / 输入区 / +）里某一块的四个圆角：
+	 * leftEdge / rightEdge 表示这一块是不是子项最左 / 最右的一块，radius 是组的圆角（像素）
+	 */
+	radiusStyle : (leftEdge : boolean, rightEdge : boolean, radius : number) => string
+}
+
+/** 在子项的 setup 中调用（每个组件实例只调用一次：调用即登记） */
+export function useAmCompactItem() : AmCompactItem {
+	const register = inject<(() => number) | null>('amCompactRegister', null)
+	const unregister = inject<((id : number) => void) | null>('amCompactUnregister', null)
+	const firstOf = inject<((id : number) => boolean) | null>('amCompactFirst', null)
+	const lastOf = inject<((id : number) => boolean) | null>('amCompactLast', null)
+	const verticalOf = inject<(() => boolean) | null>('amCompactVertical', null)
+	const sizeOf = inject<(() => string) | null>('amCompactSize', null)
+	const blockOf = inject<(() => boolean) | null>('amCompactBlock', null)
+
+	const id = register != null ? register() : -1
+	if (id >= 0 && unregister != null) {
+		// 闭包里不会被收窄成非空，另存一个确定非空的
+		const off : (id : number) => void = unregister
+		onUnmounted(() => { off(id) })
+	}
+
+	const inCompact = () : boolean => id >= 0
+	const isFirst = () : boolean => id >= 0 && firstOf != null ? firstOf(id) : false
+	const isLast = () : boolean => id >= 0 && lastOf != null ? lastOf(id) : false
+	const vertical = () : boolean => id >= 0 && verticalOf != null ? verticalOf() : false
+	const size = () : string => id >= 0 && sizeOf != null ? sizeOf() : ''
+	const block = () : boolean => id >= 0 && blockOf != null ? blockOf() : false
+
+	const marginStyle = () : string => {
+		if (id < 0) return ''
+		if (vertical()) return 'align-self:stretch;' + (isFirst() ? '' : 'margin-top:-1px;')
+		return isFirst() ? '' : 'margin-left:-1px;'
+	}
+
+	const seamStyle = () : string => {
+		if (id < 0) return ''
+		let text = marginStyle()
+		const first = isFirst()
+		const last = isLast()
+		if (vertical()) {
+			if (!first) text += 'border-top-left-radius:0px;border-top-right-radius:0px;'
+			if (!last) text += 'border-bottom-left-radius:0px;border-bottom-right-radius:0px;'
+		} else {
+			if (!first) text += 'border-top-left-radius:0px;border-bottom-left-radius:0px;'
+			if (!last) text += 'border-top-right-radius:0px;border-bottom-right-radius:0px;'
+		}
+		return text
+	}
+
+	const radiusStyle = (leftEdge : boolean, rightEdge : boolean, radius : number) : string => {
+		if (id < 0) return ''
+		const first = isFirst()
+		const last = isLast()
+		let topLeft = leftEdge && first
+		let topRight = rightEdge && last
+		let bottomLeft = leftEdge && first
+		let bottomRight = rightEdge && last
+		if (vertical()) {
+			topRight = rightEdge && first
+			bottomLeft = leftEdge && last
+		}
+		return 'border-top-left-radius:' + (topLeft ? radius : 0) + 'px;border-top-right-radius:' + (topRight ? radius : 0) +
+			'px;border-bottom-left-radius:' + (bottomLeft ? radius : 0) + 'px;border-bottom-right-radius:' + (bottomRight ? radius : 0) + 'px;'
+	}
+
+	const item : AmCompactItem = {
+		inCompact: inCompact,
+		isFirst: isFirst,
+		isLast: isLast,
+		vertical: vertical,
+		size: size,
+		block: block,
+		marginStyle: marginStyle,
+		seamStyle: seamStyle,
+		radiusStyle: radiusStyle
+	}
+	return item
+}

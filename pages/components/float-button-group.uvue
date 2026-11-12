@@ -1,0 +1,76 @@
+<script setup lang="uts">
+import { AmFloatButtonBadge } from '@/uni_modules/antdv-next-uni/types/float-button.uts'
+
+const kinds : string[] = ['一直展开', '菜单（向上）', '菜单（向左）', '方形菜单', '受控']
+const kind = ref('菜单（向上）')
+const open = ref(false)
+const log = ref('')
+const badge : AmFloatButtonBadge = { count: 3 }
+
+function onPick(name : string) {
+	log.value = '点击了「' + name + '」'
+}
+
+function onOpenChange(value : boolean) {
+	log.value = 'openChange: ' + value
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">悬浮按钮组固定在页面右下角</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in kinds" :key="item" class="demo__item" size="small" :type="kind == item ? 'primary' : 'default'" :text="item" @click="kind = item" />
+			</view>
+			<text class="demo__text">{{ log }}</text>
+			<view v-if="kind == '受控'" class="demo__row">
+				<am-button class="demo__item" :text="open ? '收起（v-model:open）' : '展开（v-model:open）'" @click="open = !open" />
+			</view>
+		</view>
+
+		<am-float-button-group v-if="kind == '一直展开'">
+			<am-float-button icon="question" @click="onPick('帮助')" />
+			<am-float-button icon="service" @click="onPick('客服')" />
+			<am-back-top :visibility-height="0" />
+		</am-float-button-group>
+
+		<am-float-button-group v-if="kind == '菜单（向上）'" trigger="click" type="primary" icon="plus" @open-change="onOpenChange">
+			<am-float-button icon="edit" @click="onPick('写文章')" />
+			<am-float-button icon="camera" @click="onPick('拍照')" />
+			<am-float-button icon="message" :badge="badge" @click="onPick('消息')" />
+		</am-float-button-group>
+
+		<am-float-button-group v-if="kind == '菜单（向左）'" trigger="click" placement="left" icon="share" default-open>
+			<am-float-button icon="heart" @click="onPick('收藏')" />
+			<am-float-button icon="star" @click="onPick('评分')" />
+		</am-float-button-group>
+
+		<am-float-button-group v-if="kind == '方形菜单'" trigger="click" shape="square" icon="more" content="更多">
+			<am-float-button icon="setting" content="设置" @click="onPick('设置')" />
+			<am-float-button icon="bell" content="通知" @click="onPick('通知')" />
+		</am-float-button-group>
+
+		<am-float-button-group v-if="kind == '受控'" v-model:open="open" trigger="click" icon="appstore">
+			<am-float-button icon="cart" @click="onPick('购物车')" />
+			<am-float-button icon="user" @click="onPick('我的')" />
+		</am-float-button-group>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { padding-top: 8px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+</style>

@@ -1,0 +1,5 @@
+{
+  "missingProps": {
+    "lockScroll": "uni-app x 没有锁定页面滚动的接口；拖动面板时用 touchmove 的 preventDefault 阻止页面跟着滚"
+  }
+}

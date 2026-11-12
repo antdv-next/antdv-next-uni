@@ -1,0 +1,25 @@
+import { AmImagePreviewShowOptions } from '../types/image-preview.uts'
+
+// 图片预览的函数式用法（= antdv-next-mobile 的 ImagePreview.show()）：用系统的 uni.previewImage，
+// 带双指缩放、双击放大（<am-image-preview> 组件没有缩放）。界面是系统的：没有 closable、footer、自定义页码，
+// 也没有返回值（关闭用 closeAmImagePreview()，微信小程序不支持）。
+// `loop`、`showIndex` 只在 Android、iOS 上起作用
+
+export function previewAmImage(options : AmImagePreviewShowOptions) : void {
+	if (options.images.length == 0) return
+	let current = options.current ?? 0
+	if (current < 0 || current >= options.images.length) current = 0
+	const loop = options.loop ?? true
+	if (options.showIndex == false) {
+		uni.previewImage({ urls: options.images, current: current, loop: loop, indicator: 'none' })
+	} else {
+		uni.previewImage({ urls: options.images, current: current, loop: loop, indicator: 'number' })
+	}
+}
+
+/** 关闭系统的图片预览（Web、Android、iOS、鸿蒙；微信小程序没有这个接口） */
+export function closeAmImagePreview() : void {
+	// #ifndef MP
+	uni.closePreviewImage({})
+	// #endif
+}

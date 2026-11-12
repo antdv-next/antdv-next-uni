@@ -1,0 +1,62 @@
+<script setup lang="uts">
+const basic = ref(false)
+const white = ref(false)
+const colored = ref(false)
+const content = ref(false)
+const log = ref('')
+
+function onAfter(open : boolean) {
+	log.value = 'afterOpenChange: ' + open
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（点击遮罩关闭）</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button class="demo__item" text="默认遮罩" @click="basic = true" />
+				<am-button class="demo__item" text="白色遮罩" @click="white = true" />
+				<am-button class="demo__item" text="自定义颜色" @click="colored = true" />
+			</view>
+			<text class="demo__text">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">放内容（点击内容不会关闭）</text>
+		<view class="demo__card">
+			<am-button text="显示带内容的遮罩" @click="content = true" />
+		</view>
+		<view class="demo__footer"></view>
+
+		<am-mask v-model:open="basic" closable @after-open-change="onAfter" />
+		<am-mask v-model:open="white" closable color="white" />
+		<am-mask v-model:open="colored" closable color="rgba(22, 119, 255, 0.4)" />
+		<am-mask v-model:open="content" closable destroy-on-hidden>
+			<view class="demo__center">
+				<view class="demo__panel">
+					<text class="demo__text">这是遮罩里的内容</text>
+					<am-button class="demo__close" type="primary" text="关闭" @click="content = false" />
+				</view>
+			</view>
+		</am-mask>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { padding-top: 8px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__center { margin-top: 200px; align-items: center; }
+.demo__panel { width: 240px; padding: 24px; align-items: center; background-color: var(--am-color-bg-elevated, #ffffff); border-radius: 12px; }
+.demo__close { margin-top: 16px; }
+</style>

@@ -2,6 +2,7 @@
 import { useAmTheme } from '../../theme/theme.uts'
 import { useAmSize } from '../../utils/config.uts'
 import { useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
+import { useAmCompactItem } from '../../utils/compact.uts'
 
 // 选择类字段的触发区（= antdv-next-mobile 内部的 PickerTrigger，Picker / DatePicker / TimePicker / Select / Cascader 共用）：
 // label（已选的文字，空则显示 placeholder）、placeholder、open、disabled、allowClear、status、variant、size、suffixIcon
@@ -13,6 +14,9 @@ import { useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../u
 //
 // 表单约定：所有选择器的 disabled / status / variant / size 都只在这里合并上下文（下面的“字段状态”一段），
 // 接入表单（utils/form-field.uts）时只改这里；值变化的通知在 utils/picker-field.uts
+//
+// 在 <am-space-compact> 里（utils/compact.uts）：尺寸跟随组，默认 outlined（在无边框的表单里也是），
+// 内侧的圆角去掉、边框与前一项叠在一起，横向时占满剩余的宽度
 defineOptions({ name: 'AmPickerTrigger' })
 
 const props = defineProps({
@@ -34,13 +38,14 @@ const emit = defineEmits(['click', 'clear'])
 const theme = useAmTheme()
 
 // ---------- 字段状态：尺寸、禁用、状态、变体（表单上下文在这里合并） ----------
-const sizeOf = useAmSize(() : string => props.size)
+const compact = useAmCompactItem()
+const sizeOf = useAmSize(() : string => props.size.length > 0 ? props.size : compact.size())
 const size = computed(() : string => sizeOf())
 const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
 const disabled = computed(() : boolean => disabledOf())
 const statusOf = useAmFieldStatus(() : string => props.status)
 const status = computed(() : string => statusOf())
-const variantOf = useAmFieldVariant(() : string => props.variant)
+const variantOf = useAmFieldVariant(() : string => props.variant.length == 0 && compact.inCompact() ? 'outlined' : props.variant)
 const variant = computed(() : string => variantOf())
 // ---------- 字段状态结束 ----------
 
@@ -63,6 +68,15 @@ const classes = computed(() : string[] => {
 	return list
 })
 
+/** 紧凑组合里的接缝（不在组里时为空）：弹层打开、有校验状态时边框压在相邻项的上面 */
+const compactStyle = computed(() : string => {
+	if (!compact.inCompact()) return ''
+	let text = compact.seamStyle()
+	if (!compact.vertical()) text += compact.block() ? 'flex:1;' : 'flex:1;min-width:120px;'
+	if (props.open || status.value.length > 0) text += 'z-index:1;'
+	return text
+})
+
 const textClasses = computed(() : string[] => {
 	const list : string[] = ['am-picker-trigger__text', 'am-picker-trigger__text--' + size.value]
 	if (!hasValue.value) list.push('am-picker-trigger__text--placeholder')
@@ -80,7 +94,7 @@ function onClear(event : UniPointerEvent) {
 </script>
 
 <template>
-	<view :class="classes" @click="onClick">
+	<view :class="classes" :style="compactStyle" @click="onClick">
 		<view class="am-picker-trigger__content">
 			<slot>
 				<text :class="textClasses">{{ hasValue ? label : placeholder }}</text>

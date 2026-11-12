@@ -2,6 +2,7 @@
 import { useAmTheme } from '../../theme/theme.uts'
 import { useAmSize } from '../../utils/config.uts'
 import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus, useAmFieldVariant } from '../../utils/form-field.uts'
+import { useAmCompactItem } from '../../utils/compact.uts'
 
 // 数字输入框（= antdv-next-mobile 的 InputNumber）：v-model:value（数字，清空为 null）、min、max、step、precision、
 // disabled、readOnly、controls、mode（spinner：两侧 − / + 按钮，默认；input：普通的数字输入框）、changeOnBlur、
@@ -15,6 +16,9 @@ import { useAmFieldBlur, useAmFieldChange, useAmFieldDisabled, useAmFieldStatus,
 // - `controls` 只有布尔值，按钮的图标用 upIcon / downIcon 插槽换；prefix / suffix 是字符串（图标名或文字）；
 // - 没有 formatter / parser（函数属性）、longPress（按住连续加减）、keyboard、inputmode（min 小于 0 时用文本键盘，
 //   否则用带小数点的数字键盘）、defaultValue（用 v-model:value）、readonly（只保留 readOnly）
+//
+// 在 <am-space-compact> 里（utils/compact.uts）：高度与尺寸跟随组（spinner 不再矮一档），默认 outlined，
+// − / 输入区 / + 三块之间没有空隙、边框叠在一起（− / + 画上边框），只有整组最外侧的角是圆的；input 模式占满剩余的宽度
 defineOptions({ name: 'AmInputNumber' })
 
 const props = defineProps({
@@ -47,13 +51,14 @@ const props = defineProps({
 const emit = defineEmits(['update:value', 'change', 'input', 'step', 'pressEnter', 'focus', 'blur'])
 
 const theme = useAmTheme()
-const sizeOf = useAmSize(() : string => props.size)
+const compact = useAmCompactItem()
+const sizeOf = useAmSize(() : string => props.size.length > 0 ? props.size : compact.size())
 const size = computed(() : string => sizeOf())
 const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
 const disabled = computed(() : boolean => disabledOf())
 const statusOf = useAmFieldStatus(() : string => props.status)
 const status = computed(() : string => statusOf())
-const variantOf = useAmFieldVariant(() : string => props.variant)
+const variantOf = useAmFieldVariant(() : string => props.variant.length == 0 && compact.inCompact() ? 'outlined' : props.variant)
 const variant = computed(() : string => variantOf())
 const notifyChange = useAmFieldChange()
 const notifyBlur = useAmFieldBlur()
@@ -195,6 +200,35 @@ function actionColor(enabled : boolean) : string {
 	return enabled ? theme().colorPrimary : theme().colorTextQuaternary
 }
 
+// ---------- 紧凑组合（不在组里时下面的样式都是空字符串） ----------
+/** 组的高度与圆角（像素） */
+const compactHeight = computed(() : number => size.value == 'small' ? theme().controlHeightSM : (size.value == 'large' ? theme().controlHeightLG : theme().controlHeight))
+const compactRadius = computed(() : number => size.value == 'small' ? theme().borderRadiusSM : (size.value == 'large' ? theme().borderRadiusLG : theme().borderRadius))
+const hasActions = computed(() : boolean => spinner.value && props.controls)
+
+const compactStyle = computed(() : string => {
+	if (!compact.inCompact()) return ''
+	let text = compact.marginStyle() + 'height:' + compactHeight.value + 'px;'
+	if (!spinner.value && !compact.vertical()) text += compact.block() ? 'flex:1;' : 'flex:1;min-width:120px;'
+	return text
+})
+
+const compactWrapperStyle = computed(() : string => {
+	if (!compact.inCompact()) return ''
+	let text = compact.radiusStyle(!hasActions.value, !hasActions.value, compactRadius.value)
+	if (hasActions.value) text += 'margin-left:-1px;margin-right:-1px;'
+	if (spinner.value && compact.vertical()) text += 'flex:1;'
+	if (focused.value || status.value.length > 0) text += 'z-index:1;'
+	return text
+})
+
+/** − / + 按钮：与组等高的方块，画上边框；left 为 true 是 −（最左的一块） */
+function compactActionStyle(left : boolean) : string {
+	if (!compact.inCompact()) return ''
+	return 'width:' + compactHeight.value + 'px;height:' + compactHeight.value + 'px;border-width:1px;border-style:solid;border-color:' +
+		theme().colorBorder + ';' + compact.radiusStyle(left, !left, compactRadius.value)
+}
+
 /** 字符串是不是图标名（小写字母与连字符） */
 function isIcon(name : string) : boolean {
 	return /^[a-z]+(-[a-z]+)*$/.test(name)
@@ -202,10 +236,11 @@ function isIcon(name : string) : boolean {
 </script>
 
 <template>
-	<view :class="classes">
+	<view :class="classes" :style="compactStyle">
 		<view
 			v-if="spinner && controls"
 			:class="actionClasses(canDown)"
+			:style="compactActionStyle(true)"
 			:hover-class="canDown ? 'am-input-number__action--active' : 'none'"
 			@click="stepBy(-1)"
 		>
@@ -213,7 +248,7 @@ function isIcon(name : string) : boolean {
 				<am-icon name="minus" :size="actionIconSize" :color="actionColor(canDown)" />
 			</slot>
 		</view>
-		<view :class="wrapperClasses">
+		<view :class="wrapperClasses" :style="compactWrapperStyle">
 			<view v-if="prefix.length > 0" class="am-input-number__prefix">
 				<am-icon v-if="isIcon(prefix)" :name="prefix" :size="16" :color="affixColor" />
 				<text v-else class="am-input-number__affix">{{ prefix }}</text>
@@ -243,6 +278,7 @@ function isIcon(name : string) : boolean {
 		<view
 			v-if="spinner && controls"
 			:class="actionClasses(canUp)"
+			:style="compactActionStyle(false)"
 			:hover-class="canUp ? 'am-input-number__action--active' : 'none'"
 			@click="stepBy(1)"
 		>

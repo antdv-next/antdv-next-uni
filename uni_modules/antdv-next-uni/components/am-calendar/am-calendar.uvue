@@ -1,0 +1,677 @@
+<script setup lang="uts">
+import { AmCalendarMonthInfo } from '../../types/calendar.uts'
+import { formatAmLocale, useAmLocale } from '../../locale/locale.uts'
+import { useAmFieldDisabled } from '../../utils/form-field.uts'
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+import { useAmPickerField } from '../../utils/picker-field.uts'
+import {
+	AmCalendarCell,
+	AmCalendarMonth,
+	AmCalendarMonthView,
+	calAddMonths,
+	calComplete,
+	calFormat,
+	calMonths,
+	calParse,
+	calSameDays,
+	calSelect,
+	calText,
+	calToday,
+	calWeeks,
+	calWindow
+} from '../../utils/calendar.uts'
+
+// 日历（= antdv-next-mobile 的 Calendar）：上下滚动的月历，选一天、一段日期或多个日期。
+// v-model:value、selectionMode（single / range / multiple）、minDate / maxDate（默认今天 … 六个月后）、maxRange（range：最多几天；
+// multiple：最多几个）、showRangePrompt、rangePrompt、allowSameDay、weekStartsOn（0 周日 / 1 周一）、title、showTitle、showMark
+// （月份的大号水印）、showConfirm（false：选完就提交）、okText、rowHeight、virtual（只渲染可见区域附近的月份）、
+// poppable（true：底部弹层，v-model:open；false：就地显示）、trigger（显示一个输入框样子的触发区）、format（触发区显示的格式）、
+// placeholder、disabled、allowClear、status、variant、size、suffixIcon、zIndex、maskClosable、closable、destroyOnHidden 同名同义；
+// 事件 update:value、update:open、openChange、change（提交的值, 显示的文字）、select（点了某一天，尚未提交）、confirm、cancel、
+// clear、monthShow、overRange；插槽 title、footer（参数 confirm、disabled）；方法 scrollToDate(date) / reset() / toggle()。
+// 是表单字段：触发区的禁用 / 状态 / 变体在 am-picker-trigger 里合并表单上下文，值提交、弹层关闭时通知 FormItem（utils/picker-field.uts）。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - **值是 YYYY-MM-DD 字符串**（没有 dayjs，也就没有 valueFormat）：single 是一个字符串（空字符串为没选），range 是 [开始, 结束]，
+//   multiple 是字符串数组；minDate / maxDate、scrollToDate 的参数也是这个格式；format 只认 YYYY、MM、M、DD、D；
+// - 没有 disabledDate / formatter / cellRender（函数属性、渲染函数在 App 端受限）：范围用 minDate / maxDate；
+// - 没有 defaultValue / defaultOpen（UTS 里分不出“没传”）：不绑定 open 时组件自己管开关；没有 id；
+// - 自定义触发区不用默认插槽（插槽参数里放不了 toggle 函数）：不开 trigger，自己放按钮 + `v-model:open`；
+// - title、suffixIcon 是字符串（suffixIcon 为图标名）；reset() 没有参数（回到已提交的值）、toggle() 没有参数；
+// - 每周是一行、七格平分（flex: 1），不用百分比宽度；月份的高度是算出来的（标题 44px + 行数 × rowHeight）；
+// - 弹层的高度是窗口高度的 80%（算成像素）；就地显示时高度为 --am-calendar-height（默认 520px，在外层节点上设置这个变量可以改）
+defineOptions({ name: 'AmCalendar' })
+
+const props = defineProps({
+	/** single：YYYY-MM-DD 字符串；range：[开始, 结束]；multiple：字符串数组 */
+	value: { type: [String, Array] as PropType<any | null>, default: null },
+	selectionMode: { type: String, default: 'single' },
+	/** 最早可选的日期（YYYY-MM-DD），空为今天 */
+	minDate: { type: String, default: '' },
+	/** 最晚可选的日期（YYYY-MM-DD），空为六个月后 */
+	maxDate: { type: String, default: '' },
+	/** range：最多几天；multiple：最多几个；0 为不限 */
+	maxRange: { type: Number, default: 0 },
+	showRangePrompt: { type: Boolean, default: true },
+	/** 超出 maxRange 时的提示，空为语言包的 Calendar.rangePrompt */
+	rangePrompt: { type: String, default: '' },
+	allowSameDay: { type: Boolean, default: false },
+	weekStartsOn: { type: Number, default: 0 },
+	title: { type: String, default: '' },
+	showTitle: { type: Boolean, default: true },
+	showMark: { type: Boolean, default: true },
+	showConfirm: { type: Boolean, default: true },
+	okText: { type: String, default: '' },
+	rowHeight: { type: Number, default: 64 },
+	virtual: { type: Boolean, default: true },
+	poppable: { type: Boolean, default: true },
+	open: { type: Boolean, default: false },
+	trigger: { type: Boolean, default: false },
+	format: { type: String, default: 'YYYY-MM-DD' },
+	placeholder: { type: String, default: '' },
+	disabled: { type: Boolean, default: false },
+	allowClear: { type: Boolean, default: false },
+	status: { type: String, default: '' },
+	variant: { type: String, default: '' },
+	size: { type: String, default: '' },
+	suffixIcon: { type: String, default: '' },
+	zIndex: { type: Number, default: 1000 },
+	maskClosable: { type: Boolean, default: true },
+	closable: { type: Boolean, default: true },
+	destroyOnHidden: { type: Boolean, default: false },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:value', 'update:open', 'openChange', 'change', 'select', 'confirm', 'cancel', 'clear', 'monthShow', 'overRange'])
+
+/** 与样式里 .am-calendar__month-title 的高度一致：月份的位置是算出来的，不是量出来的 */
+const MONTH_TITLE_HEIGHT = 44
+/** 量到滚动区域的高度之前用它 */
+const FALLBACK_VIEW_HEIGHT = 480
+
+const locale = useAmLocale()
+const field = useAmPickerField()
+const disabledOf = useAmFieldDisabled(() : boolean => props.disabled)
+const disabled = computed(() : boolean => disabledOf())
+const uid = amUid('am-calendar')
+const today = calToday()
+
+// ---------- 值 ----------
+/** 已提交的值 → 天数（解析不了的丢掉） */
+const valueDays = computed(() : number[] => {
+	const list : number[] = []
+	const value = props.value
+	if (value == null) return list
+	if (typeof value == 'string') {
+		const day = calParse(value as string)
+		if (day >= 0) list.push(day)
+	} else if (Array.isArray(value)) {
+		const items = value as any[]
+		for (let i = 0; i < items.length; i++) {
+			const day = calParse('' + items[i])
+			if (day >= 0) list.push(day)
+		}
+	}
+	return list
+})
+
+/** 正在选的日期，确定时才提交 */
+const pending = ref<number[]>(valueDays.value)
+watch(() : string => valueDays.value.join(','), () => { pending.value = valueDays.value })
+
+const canConfirm = computed(() : boolean => calComplete(pending.value, props.selectionMode))
+
+function textsOf(days : number[], format : string) : string[] {
+	const list : string[] = []
+	for (let i = 0; i < days.length; i++) list.push(calFormat(days[i], format))
+	return list
+}
+
+/** 给外面的值：single 是字符串，其余是字符串数组 */
+function outputOf(days : number[]) : any {
+	if (props.selectionMode == 'single') return days.length > 0 ? calText(days[0]) : ''
+	return textsOf(days, 'YYYY-MM-DD')
+}
+
+const label = computed(() : string => {
+	const texts = textsOf(valueDays.value, props.format)
+	if (props.selectionMode == 'range') return texts.join(' ~ ')
+	return texts.join(locale().locale.indexOf('zh') == 0 ? '、' : ', ')
+})
+
+const titleText = computed(() : string => props.title.length > 0 ? props.title : locale().Calendar.title)
+const okLabel = computed(() : string => props.okText.length > 0 ? props.okText : locale().Calendar.confirm)
+const placeholderText = computed(() : string => props.placeholder.length > 0 ? props.placeholder : locale().Calendar.title)
+
+// ---------- 弹层的开关：绑定了 open 时跟着它，没绑定时自己管 ----------
+const opened = ref(props.open)
+watch(() : boolean => props.open, (open : boolean) => { opened.value = open })
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+// ---------- 月份：高度是算出来的，所以可以只渲染可见区域附近的几个月 ----------
+const minDay = computed(() : number => {
+	const day = calParse(props.minDate)
+	return day >= 0 ? day : today
+})
+const maxDay = computed(() : number => {
+	const day = calParse(props.maxDate)
+	const max = day >= 0 ? day : calAddMonths(today, 6)
+	return max < minDay.value ? minDay.value : max
+})
+
+const months = computed(() : AmCalendarMonth[] => {
+	return calMonths(minDay.value, maxDay.value, props.weekStartsOn == 1 ? 1 : 0, props.rowHeight, MONTH_TITLE_HEIGHT, locale().Calendar.monthFormat)
+})
+const totalHeight = computed(() : number => {
+	const list = months.value
+	if (list.length == 0) return 0
+	const last = list[list.length - 1]
+	return last.top + last.height
+})
+
+/** 滚动位置（不是响应式的：只在要渲染的月份变了的时候才更新 range） */
+let scrollY = 0
+let viewHeight = FALLBACK_VIEW_HEIGHT
+/** 要渲染的月份的下标 [start, end) */
+const range = ref<number[]>([0, 0])
+
+function updateRange() {
+	const list = months.value
+	const next = props.virtual ? calWindow(list, scrollY, viewHeight) : [0, list.length]
+	if (next[0] != range.value[0] || next[1] != range.value[1]) range.value = next
+}
+
+watch(() : string => months.value.length + ':' + totalHeight.value + ':' + props.virtual, () => { updateRange() }, { immediate: true })
+
+const offsetBefore = computed(() : number => {
+	const list = months.value
+	const start = range.value[0]
+	return start < list.length ? list[start].top : 0
+})
+const offsetAfter = computed(() : number => {
+	const list = months.value
+	const end = range.value[1]
+	if (end <= 0 || end > list.length) return 0
+	const last = list[end - 1]
+	return Math.max(totalHeight.value - last.top - last.height, 0)
+})
+
+const visibleMonths = computed(() : AmCalendarMonthView[] => {
+	const texts = locale().Calendar
+	const list = months.value
+	const result : AmCalendarMonthView[] = []
+	const end = Math.min(range.value[1], list.length)
+	for (let i = range.value[0]; i < end; i++) {
+		const view : AmCalendarMonthView = {
+			month: list[i],
+			weeks: calWeeks(list[i], pending.value, props.selectionMode, minDay.value, maxDay.value, today, texts.today, texts.start, texts.end, texts.startEnd)
+		}
+		result.push(view)
+	}
+	return result
+})
+
+const weekdays = computed(() : string[] => {
+	const names = locale().Calendar.weekdays
+	const first = props.weekStartsOn == 1 ? 1 : 0
+	const list : string[] = []
+	for (let i = 0; i < 7; i++) list.push(names[(i + first) % 7])
+	return list
+})
+
+// ---------- monthShow：新滚进渲染范围的月份 ----------
+let shownKeys : string[] = []
+watch(() : string => {
+	if (props.poppable && !opened.value) return ''
+	const keys : string[] = []
+	const list = visibleMonths.value
+	for (let i = 0; i < list.length; i++) keys.push(list[i].month.key)
+	return keys.join(',')
+}, (joined : string) => {
+	const keys = joined.length > 0 ? joined.split(',') : []
+	const list = months.value
+	for (let i = 0; i < keys.length; i++) {
+		if (shownKeys.indexOf(keys[i]) >= 0) continue
+		for (let j = 0; j < list.length; j++) {
+			if (list[j].key == keys[i]) {
+				const info : AmCalendarMonthInfo = { date: calText(list[j].first), title: list[j].title }
+				emit('monthShow', info)
+				break
+			}
+		}
+	}
+	shownKeys = keys
+}, { immediate: true })
+
+// ---------- 滚动 ----------
+/** 交给 scroll-view 的 scroll-top（同一个值再设一次不生效，所以交替加一点点） */
+const scrollTarget = ref(0)
+let nudge = false
+
+function onScroll(event : UniScrollEvent) {
+	scrollY = event.detail.scrollTop
+	updateRange()
+}
+
+function scrollToDay(day : number) {
+	const list = months.value
+	if (list.length == 0) return
+	let index = -1
+	const key = calText(day).substring(0, 7)
+	for (let i = 0; i < list.length; i++) {
+		if (list[i].key == key) {
+			index = i
+			break
+		}
+	}
+	const inside = index >= 0
+	if (index < 0) index = day < minDay.value ? 0 : list.length - 1
+	const month = list[index]
+	// 这一天在月份的后半段时，把它所在的那一行滚进来
+	const row = inside ? Math.floor((month.offset + day - month.first) / 7) : 0
+	const top = row > 2 ? month.top + MONTH_TITLE_HEIGHT + (row - 1) * props.rowHeight : month.top
+	scrollY = top
+	updateRange()
+	nudge = !nudge
+	scrollTarget.value = top + (nudge ? 0.01 : 0)
+}
+
+/** 滚到正在选的第一天；没有就滚到今天（今天不在范围内则滚到开头） */
+function scrollToCurrent() {
+	measureById(uid + '-body').then((rect : AmRect | null) => {
+		if (rect != null && rect.height > 0) viewHeight = rect.height
+		const days = pending.value
+		const target = days.length > 0 ? days[0] : (today < minDay.value || today > maxDay.value ? minDay.value : today)
+		scrollToDay(target)
+	})
+}
+
+let scrollTimer = 0
+function scheduleScroll() {
+	clearTimeout(scrollTimer)
+	// 等弹层的内容渲染出来（scroll-view 才在）
+	scrollTimer = setTimeout(() => { scrollToCurrent() }, 60)
+}
+
+watch(() : boolean => opened.value, (open : boolean) => {
+	if (!props.poppable) return
+	if (open) {
+		pending.value = valueDays.value
+		scheduleScroll()
+	} else {
+		field.blur()
+	}
+})
+
+onMounted(() => {
+	if (!props.poppable || opened.value) scheduleScroll()
+})
+
+// ---------- 提示（超出 maxRange） ----------
+const tip = ref('')
+let tipTimer = 0
+
+function promptOverRange() {
+	emit('overRange')
+	if (!props.showRangePrompt || props.maxRange <= 0) return
+	tip.value = props.rangePrompt.length > 0 ? props.rangePrompt : formatAmLocale(locale().Calendar.rangePrompt, 'maxRange', '' + props.maxRange)
+	clearTimeout(tipTimer)
+	tipTimer = setTimeout(() => { tip.value = '' }, 2000)
+}
+
+onUnmounted(() => {
+	clearTimeout(tipTimer)
+	clearTimeout(scrollTimer)
+})
+
+// ---------- 选择 ----------
+function update(days : number[]) {
+	const next = outputOf(days)
+	const texts = textsOf(days, props.format)
+	emit('update:value', next)
+	if (props.selectionMode == 'single') emit('change', next, texts.length > 0 ? texts[0] : '')
+	else emit('change', next, texts)
+	field.change()
+}
+
+function onConfirm() {
+	if (!canConfirm.value || disabled.value) return
+	const days = pending.value
+	if (!calSameDays(days, valueDays.value)) update(days)
+	emit('confirm', outputOf(days))
+	if (props.poppable) setOpen(false)
+}
+
+function onDayClick(cell : AmCalendarCell) {
+	if (disabled.value || cell.day <= 0 || cell.type == 'disabled') return
+	const result = calSelect(pending.value, cell.day, props.selectionMode, props.maxRange, props.allowSameDay)
+	if (result.overRange) promptOverRange()
+	if (!result.changed) return
+	pending.value = result.days
+	emit('select', outputOf(result.days))
+	if (!props.showConfirm && calComplete(result.days, props.selectionMode)) onConfirm()
+}
+
+function onCancel() {
+	emit('cancel')
+	setOpen(false)
+}
+
+function onPopupOpen(open : boolean) {
+	if (!open) onCancel()
+}
+
+function onTrigger() {
+	setOpen(!opened.value)
+}
+
+function onClear() {
+	const empty : number[] = []
+	pending.value = empty
+	update(empty)
+	emit('clear')
+}
+
+defineExpose({
+	/** 把某一天所在的月份滚进来：YYYY-MM-DD */
+	scrollToDate: (date : string) => {
+		const day = calParse(date)
+		if (day >= 0) scrollToDay(day)
+	},
+	/** 放弃正在选的日期，回到已提交的值，并滚到那里 */
+	reset: () => {
+		pending.value = valueDays.value
+		scheduleScroll()
+	},
+	/** 开 / 关弹层 */
+	toggle: () => { setOpen(!opened.value) }
+})
+
+// ---------- 样式 ----------
+// 弹层占窗口高度的 80%（百分比高度不可靠，算成像素）
+const popupHeight = Math.round(uni.getWindowInfo().windowHeight * 0.8)
+
+const weekStyle = computed(() : string => 'height:' + props.rowHeight + 'px;')
+
+function monthStyle(month : AmCalendarMonth) : string {
+	return 'height:' + month.height + 'px;'
+}
+
+function innerClass(cell : AmCalendarCell) : string[] {
+	const list : string[] = ['am-calendar__day-inner']
+	if (cell.type.length > 0) list.push('am-calendar__day-inner--' + cell.type)
+	return list
+}
+
+function isSolid(cell : AmCalendarCell) : boolean {
+	return cell.type == 'selected' || cell.type == 'start' || cell.type == 'end' || cell.type == 'start-end'
+}
+
+function textClass(cell : AmCalendarCell) : string[] {
+	const list : string[] = ['am-calendar__day-text']
+	if (isSolid(cell)) list.push('am-calendar__day-text--solid')
+	else if (cell.type == 'disabled') list.push('am-calendar__day-text--disabled')
+	else if (cell.type == 'middle' || cell.today) list.push('am-calendar__day-text--primary')
+	return list
+}
+
+function infoClass(cell : AmCalendarCell, place : string) : string[] {
+	const list : string[] = ['am-calendar__info', 'am-calendar__info--' + place]
+	if (isSolid(cell)) list.push('am-calendar__info--solid')
+	else if (cell.type == 'disabled') list.push('am-calendar__info--disabled')
+	else if (cell.type == 'middle' || cell.today) list.push('am-calendar__info--primary')
+	return list
+}
+
+function hoverClass(cell : AmCalendarCell) : string {
+	return cell.type.length == 0 && !disabled.value ? 'am-calendar__day-inner--active' : 'none'
+}
+</script>
+
+<template>
+	<am-picker-trigger
+		v-if="poppable && trigger"
+		:label="label"
+		:placeholder="placeholderText"
+		:open="opened"
+		:disabled="disabled"
+		:allow-clear="allowClear"
+		:status="status"
+		:variant="variant"
+		:size="size"
+		:suffix-icon="suffixIcon"
+		@click="onTrigger"
+		@clear="onClear"
+	/>
+	<!-- 两种摆法的面板内容相同：弹层里的（撑满弹层）与就地显示的（固定高度）。没有动态组件，所以写了两遍 -->
+	<am-popup
+		v-if="poppable"
+		:open="opened"
+		placement="bottom"
+		round
+		:closable="closable"
+		:z-index="zIndex"
+		:mask-closable="maskClosable"
+		:destroy-on-hidden="destroyOnHidden"
+		:height="popupHeight"
+		:root-class="rootClass"
+		@update:open="onPopupOpen"
+	>
+		<view :class="['am-calendar', 'am-calendar--popup']">
+			<view class="am-calendar__header">
+				<view v-if="showTitle" class="am-calendar__title">
+					<slot name="title">
+						<text class="am-calendar__title-text">{{ titleText }}</text>
+					</slot>
+				</view>
+				<view class="am-calendar__weekdays">
+					<text v-for="(name, index) in weekdays" :key="index" class="am-calendar__weekday">{{ name }}</text>
+				</view>
+			</view>
+			<scroll-view :id="uid + '-body'" class="am-calendar__body" direction="vertical" :scroll-top="scrollTarget" @scroll="onScroll">
+				<view :style="'height:' + offsetBefore + 'px;'"></view>
+				<view v-for="view in visibleMonths" :key="view.month.key" class="am-calendar__month" :style="monthStyle(view.month)">
+					<view class="am-calendar__month-title">
+						<text class="am-calendar__month-text">{{ view.month.title }}</text>
+					</view>
+					<view class="am-calendar__days">
+						<view v-if="showMark" class="am-calendar__mark">
+							<text class="am-calendar__mark-text">{{ view.month.month }}</text>
+						</view>
+						<view v-for="(week, weekIndex) in view.weeks" :key="weekIndex" class="am-calendar__week" :style="weekStyle">
+							<view v-for="(cell, cellIndex) in week" :key="cellIndex" class="am-calendar__day" @click="onDayClick(cell)">
+								<view v-if="cell.day > 0" :class="innerClass(cell)" :hover-class="hoverClass(cell)" :hover-start-time="0" :hover-stay-time="60">
+									<text v-if="cell.top.length > 0" :class="infoClass(cell, 'top')">{{ cell.top }}</text>
+									<text :class="textClass(cell)">{{ cell.text }}</text>
+									<text v-if="cell.bottom.length > 0" :class="infoClass(cell, 'bottom')">{{ cell.bottom }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+				</view>
+				<view :style="'height:' + offsetAfter + 'px;'"></view>
+			</scroll-view>
+			<view v-if="tip.length > 0" class="am-calendar__tip">
+				<view class="am-calendar__tip-box">
+					<text class="am-calendar__tip-text">{{ tip }}</text>
+				</view>
+			</view>
+			<view v-if="showConfirm || $slots['footer'] != null" class="am-calendar__footer">
+				<slot name="footer" :confirm="onConfirm" :disabled="!canConfirm">
+					<am-button type="primary" block shape="round" :disabled="!canConfirm || disabled" :text="okLabel" @click="onConfirm" />
+				</slot>
+			</view>
+		</view>
+	</am-popup>
+	<view v-else :class="['am-calendar', 'am-calendar--inline', rootClass]">
+		<view class="am-calendar__header">
+			<view v-if="showTitle" class="am-calendar__title">
+				<slot name="title">
+					<text class="am-calendar__title-text">{{ titleText }}</text>
+				</slot>
+			</view>
+			<view class="am-calendar__weekdays">
+				<text v-for="(name, index) in weekdays" :key="index" class="am-calendar__weekday">{{ name }}</text>
+			</view>
+		</view>
+		<scroll-view :id="uid + '-body'" class="am-calendar__body" direction="vertical" :scroll-top="scrollTarget" @scroll="onScroll">
+			<view :style="'height:' + offsetBefore + 'px;'"></view>
+			<view v-for="view in visibleMonths" :key="view.month.key" class="am-calendar__month" :style="monthStyle(view.month)">
+				<view class="am-calendar__month-title">
+					<text class="am-calendar__month-text">{{ view.month.title }}</text>
+				</view>
+				<view class="am-calendar__days">
+					<view v-if="showMark" class="am-calendar__mark">
+						<text class="am-calendar__mark-text">{{ view.month.month }}</text>
+					</view>
+					<view v-for="(week, weekIndex) in view.weeks" :key="weekIndex" class="am-calendar__week" :style="weekStyle">
+						<view v-for="(cell, cellIndex) in week" :key="cellIndex" class="am-calendar__day" @click="onDayClick(cell)">
+							<view v-if="cell.day > 0" :class="innerClass(cell)" :hover-class="hoverClass(cell)" :hover-start-time="0" :hover-stay-time="60">
+								<text v-if="cell.top.length > 0" :class="infoClass(cell, 'top')">{{ cell.top }}</text>
+								<text :class="textClass(cell)">{{ cell.text }}</text>
+								<text v-if="cell.bottom.length > 0" :class="infoClass(cell, 'bottom')">{{ cell.bottom }}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+			</view>
+			<view :style="'height:' + offsetAfter + 'px;'"></view>
+		</scroll-view>
+		<view v-if="tip.length > 0" class="am-calendar__tip">
+			<view class="am-calendar__tip-box">
+				<text class="am-calendar__tip-text">{{ tip }}</text>
+			</view>
+		</view>
+		<view v-if="showConfirm || $slots['footer'] != null" class="am-calendar__footer">
+			<slot name="footer" :confirm="onConfirm" :disabled="!canConfirm">
+				<am-button type="primary" block shape="round" :disabled="!canConfirm || disabled" :text="okLabel" @click="onConfirm" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-calendar { background-color: var(--am-color-bg-container, #ffffff); }
+.am-calendar--popup { flex: 1; background-color: transparent; }
+.am-calendar--inline { height: var(--am-calendar-height, 520px); }
+
+.am-calendar__header {
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+.am-calendar__title { height: 48px; flex-direction: row; align-items: center; justify-content: center; }
+.am-calendar__title-text { font-size: var(--am-font-size-lg, 16px); font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-calendar__weekdays { flex-direction: row; padding-left: var(--am-padding-xs, 8px); padding-right: var(--am-padding-xs, 8px); }
+.am-calendar__weekday {
+	flex: 1;
+	padding-top: var(--am-padding-xxs, 4px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	font-size: var(--am-font-size-sm, 12px);
+	line-height: 18px;
+	text-align: center;
+	color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65));
+}
+
+.am-calendar__body { flex: 1; }
+.am-calendar__month { padding-left: var(--am-padding-xs, 8px); padding-right: var(--am-padding-xs, 8px); }
+/* 高度与 MONTH_TITLE_HEIGHT 一致 */
+.am-calendar__month-title { height: 44px; flex-direction: row; align-items: center; justify-content: center; }
+.am-calendar__month-text { font-size: var(--am-font-size, 14px); font-weight: bold; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+/* 月份的水印：先画，日期盖在它上面 */
+.am-calendar__mark { position: absolute; left: 0; right: 0; top: 0; bottom: 0; flex-direction: row; align-items: center; justify-content: center; }
+.am-calendar__mark-text { font-size: 160px; line-height: 160px; font-weight: bold; white-space: nowrap; color: var(--am-color-fill-secondary, rgba(0, 0, 0, 0.06)); }
+
+/* 一周一行、七格平分 */
+.am-calendar__week { flex-direction: row; }
+.am-calendar__day { flex: 1; padding-top: 2px; padding-bottom: 2px; }
+.am-calendar__day-inner { flex: 1; align-items: center; justify-content: center; }
+.am-calendar__day-inner--active {
+	background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-calendar__day-inner--selected {
+	margin-left: 2px;
+	margin-right: 2px;
+	background-color: var(--am-color-primary, #1677ff);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-calendar__day-inner--start-end {
+	margin-left: 2px;
+	margin-right: 2px;
+	background-color: var(--am-color-primary, #1677ff);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-calendar__day-inner--start {
+	background-color: var(--am-color-primary, #1677ff);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+}
+.am-calendar__day-inner--end {
+	background-color: var(--am-color-primary, #1677ff);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-calendar__day-inner--middle { background-color: var(--am-color-primary-bg, #ecf4ff); }
+
+.am-calendar__day-text { font-size: var(--am-font-size-lg, 16px); line-height: 20px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-calendar__day-text--primary { color: var(--am-color-primary, #1677ff); }
+.am-calendar__day-text--solid { color: var(--am-color-text-light-solid, #ffffff); }
+.am-calendar__day-text--disabled { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+/* 上下的小字：绝对定位的文字要写 nowrap */
+.am-calendar__info {
+	position: absolute;
+	left: 0;
+	right: 0;
+	font-size: 10px;
+	line-height: 14px;
+	text-align: center;
+	white-space: nowrap;
+	color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45));
+}
+.am-calendar__info--top { top: 4px; }
+.am-calendar__info--bottom { bottom: 4px; }
+.am-calendar__info--primary { color: var(--am-color-primary, #1677ff); }
+.am-calendar__info--solid { color: var(--am-color-text-light-solid, #ffffff); }
+.am-calendar__info--disabled { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+
+/* 提示：一条横贯的透明行，里面的气泡居中 */
+.am-calendar__tip { position: absolute; left: 0; right: 0; top: 45%; flex-direction: row; justify-content: center; }
+.am-calendar__tip-box {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	background-color: var(--am-color-bg-spotlight, #262626);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-calendar__tip-text { font-size: var(--am-font-size, 14px); color: var(--am-color-text-light-solid, #ffffff); }
+
+.am-calendar__footer {
+	padding-top: var(--am-padding-xs, 8px);
+	padding-bottom: var(--am-padding-xs, 8px);
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: var(--am-color-split, rgba(0, 0, 0, 0.06));
+}
+</style>

@@ -1,0 +1,154 @@
+<script setup lang="uts">
+import { AmSideBarItem } from '../../types/side-bar.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { AM_DURATION_MID, amTransition } from '../../utils/motion.uts'
+
+// 侧边导航（= antdv-next-mobile 的 SideBar）：分类页左侧的竖向导航，右侧放对应的内容。
+// items（key、title、badge、disabled）、v-model:activeKey、defaultActiveKey 同名同义；事件 update:activeKey、change；
+// 插槽 title，参数是 { item, index, active }。选中项是容器色并带一条主色的竖线，它上下两项朝它的那个角是圆的。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - key 是字符串；空字符串表示“没传”（这时用 defaultActiveKey，再没有就是第一项）；
+// - 项的 title 是文字（UTS 里不能把 VNode 放进数据），自定义内容用 title 插槽；项没有 class / style；
+// - 根节点是 scroll-view：宽 104px，高度由父元素决定（放在定高的横向容器里，或用 rootClass 写高度），
+//   没有 height: 100%；
+// - 徽标自己画（同 am-badge 的样子），不限制最大值
+defineOptions({ name: 'AmSideBar' })
+
+const props = defineProps({
+	items: { type: Array as PropType<AmSideBarItem[]>, default: () : AmSideBarItem[] => [] },
+	activeKey: { type: String, default: '' },
+	defaultActiveKey: { type: String, default: '' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:activeKey', 'change'])
+
+const theme = useAmTheme()
+
+/** 非受控时的 key */
+const inner = ref(props.defaultActiveKey)
+const current = computed(() : string => {
+	if (props.activeKey.length > 0) return props.activeKey
+	if (inner.value.length > 0) return inner.value
+	return props.items.length > 0 ? props.items[0].key : ''
+})
+const activeIndex = computed(() : number => props.items.findIndex((item) : boolean => item.key == current.value))
+
+function onItem(item : AmSideBarItem, index : number) {
+	if (item.disabled == true || index == activeIndex.value) return
+	inner.value = item.key
+	emit('update:activeKey', item.key)
+	emit('change', item.key)
+}
+
+// 每一项外面一层是容器色，里面一层是布局色：选中项里面一层变透明露出容器色，
+// 相邻两项里面一层朝它的角是圆的，露出的也是容器色。要过渡的背景色写在 :style 上
+function itemStyle(index : number) : string {
+	const active = index == activeIndex.value
+	return 'background-color:' + (active ? theme().colorBgContainer : theme().colorBgLayout) + ';' + amTransition('background-color', AM_DURATION_MID)
+}
+
+function itemClasses(item : AmSideBarItem, index : number) : string[] {
+	const list : string[] = ['am-side-bar__item']
+	const active = activeIndex.value
+	if (active > -1 && index == active - 1) list.push('am-side-bar__item--prev')
+	if (active > -1 && index == active + 1) list.push('am-side-bar__item--next')
+	return list
+}
+
+function titleClasses(item : AmSideBarItem, index : number) : string[] {
+	const list : string[] = ['am-side-bar__title-text']
+	if (item.disabled == true) list.push('am-side-bar__title-text--disabled')
+	else if (index == activeIndex.value) list.push('am-side-bar__title-text--active')
+	return list
+}
+
+/** 徽标是不是小红点（badge 为 true） */
+function isDot(item : AmSideBarItem) : boolean {
+	const badge = item.badge
+	return badge != null && typeof badge == 'boolean' && (badge as boolean)
+}
+
+/** 徽标上的文字；空字符串表示没有文字徽标 */
+function badgeText(item : AmSideBarItem) : string {
+	const badge = item.badge
+	if (badge == null) return ''
+	if (typeof badge == 'number') return (badge as number) == 0 ? '' : '' + badge
+	if (typeof badge == 'string') return badge as string
+	return ''
+}
+</script>
+
+<template>
+	<scroll-view :class="['am-side-bar', rootClass]" direction="vertical" :show-scrollbar="false">
+		<view v-for="(item, index) in items" :key="item.key" class="am-side-bar__cell" @click="onItem(item, index)">
+			<view :class="itemClasses(item, index)" :style="itemStyle(index)">
+				<view v-if="index == activeIndex" class="am-side-bar__indicator"></view>
+				<view class="am-side-bar__title">
+					<slot name="title" :item="item" :index="index" :active="index == activeIndex">
+						<text :class="titleClasses(item, index)">{{ item.title }}</text>
+					</slot>
+					<view v-if="isDot(item)" class="am-side-bar__badge am-side-bar__badge--dot"></view>
+					<view v-else-if="badgeText(item).length > 0" class="am-side-bar__badge">
+						<text class="am-side-bar__badge-text">{{ badgeText(item) }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+		<!-- 最后一项选中时，它下面这一小块的右上角也是圆的 -->
+		<view class="am-side-bar__cell">
+			<view :class="['am-side-bar__rest', activeIndex > -1 && activeIndex == items.length - 1 ? 'am-side-bar__item--next' : '']"></view>
+		</view>
+	</scroll-view>
+</template>
+
+<style>
+.am-side-bar { width: 104px; background-color: var(--am-color-bg-layout, #f5f5f5); }
+.am-side-bar__cell { background-color: var(--am-color-bg-container, #ffffff); }
+.am-side-bar__item {
+	flex-direction: row;
+	align-items: center;
+	padding-top: 14px;
+	padding-bottom: 14px;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	background-color: var(--am-color-bg-layout, #f5f5f5);
+}
+.am-side-bar__item--prev { border-bottom-right-radius: var(--am-border-radius, 8px); }
+.am-side-bar__item--next { border-top-right-radius: var(--am-border-radius, 8px); }
+.am-side-bar__rest { height: 8px; background-color: var(--am-color-bg-layout, #f5f5f5); }
+.am-side-bar__indicator {
+	position: absolute;
+	left: 0;
+	top: 50%;
+	width: 3px;
+	height: 16px;
+	margin-top: -8px;
+	border-top-right-radius: 3px;
+	border-bottom-right-radius: 3px;
+	background-color: var(--am-color-primary, #1677ff);
+}
+/* 徽标伸出标题的右上角 */
+.am-side-bar__title { flex-direction: row; flex-shrink: 1; overflow: visible; }
+.am-side-bar__title-text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-side-bar__title-text--active { color: var(--am-color-primary, #1677ff); font-weight: 500; }
+.am-side-bar__title-text--disabled { color: var(--am-color-text-quaternary, rgba(0, 0, 0, 0.25)); }
+.am-side-bar__badge {
+	position: absolute;
+	top: 0;
+	left: 100%;
+	z-index: 1;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	border-radius: 8px;
+	background-color: var(--am-color-error, #ff4d4f);
+	transform: translateX(-2px) translateY(-50%);
+}
+.am-side-bar__badge--dot { min-width: 8px; width: 8px; height: 8px; padding: 0; border-radius: 4px; transform: translateX(0) translateY(-25%); }
+.am-side-bar__badge-text { white-space: nowrap; font-size: 10px; line-height: 12px; font-weight: 500; color: var(--am-color-text-light-solid, #ffffff); }
+</style>

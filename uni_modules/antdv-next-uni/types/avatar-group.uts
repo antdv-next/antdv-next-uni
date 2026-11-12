@@ -1,0 +1,9 @@
+// <am-avatar-group> 的类型（= antdv-next-mobile 的 AvatarGroupMax）
+
+export type AmAvatarGroupMax = {
+	/** 最多显示几个头像，其余的折叠成 “+N” */
+	count ?: number | null
+}
+
+/** `max` 的默认值：不限 */
+export const AM_AVATAR_GROUP_NO_MAX : AmAvatarGroupMax = {}

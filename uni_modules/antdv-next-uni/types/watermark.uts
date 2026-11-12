@@ -1,0 +1,16 @@
+// Watermark 的类型（= antdv-next-mobile 的 watermark/interface.ts）
+
+/** 文字的样式（= WatermarkFont）。没有 fontFamily / textAlign：多行文字总是居中 */
+export type AmWatermarkFont = {
+	/** 颜色，默认跟随主题的 colorFill */
+	color ?: string | null
+	/** 字号（像素），默认 16 */
+	fontSize ?: number | null
+	/** 'normal' | 'bold' 或 100 ~ 900 的字符串 */
+	fontWeight ?: string | null
+	/** 'normal' | 'italic' */
+	fontStyle ?: string | null
+}
+
+/** `font` 的默认值：全部用默认样式 */
+export const AM_WATERMARK_DEFAULT_FONT : AmWatermarkFont = {}

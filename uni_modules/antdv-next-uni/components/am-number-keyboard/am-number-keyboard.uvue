@@ -1,0 +1,414 @@
+<script setup lang="uts">
+import { AmNumberKeyboardKey } from '../../types/number-keyboard.uts'
+import { useAmLocale } from '../../locale/locale.uts'
+import { useAmTheme } from '../../theme/theme.uts'
+import { addAmOverlay, removeAmOverlay } from '../../utils/overlay.uts'
+
+// 数字键盘（= antdv-next-mobile 的 NumberKeyboard）：从屏幕底部滑出来的数字键盘，没有遮罩，页面照常可以点。
+// v-model:open、v-model:value（已输入的字符串）、maxlength、title、theme（default / custom：右侧多一列“删除 + 大的确定”）、
+// extraKey、randomKeyOrder、showDeleteKey、closeButtonText、confirmText、safeArea、poppable、zIndex 同名同义；
+// 事件 update:open、openChange、update:value、input（按了数字 / 额外的键）、delete、confirm、close、blur；
+// 插槽 title、delete（删除键的内容）、extraKey（default 主题左下角的键）。按住删除键会连续删除。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - 不基于 am-popup：它的根节点铺满屏幕，去掉遮罩后仍然挡住页面的点击；这里是一块贴在底部的 fixed 面板，
+//   过渡（transform，300ms）与弹出层相同，同样登记到弹出层栈（Android 的返回键先收起键盘）；
+// - 没有 hideOnClickOutside：App 端没有“触摸组件以外的区域”的全局事件。blur 事件在键盘被返回键收起时发出；
+//   点页面其他地方要收起键盘时，页面自己把 open 改成 false；
+// - extraKey 只能是一个字符串（custom 主题也只有一个额外的键，0 占两列）；maxlength 为 -1 表示不限；
+// - title 是字符串，自定义内容用 title 插槽；默认的删除图标是画出来的（图标字体里没有退格键）；
+// - 没有 defaultOpen / defaultValue（UTS 里分不出“没传”）；`poppable` 为 false 时一直显示（open 不起作用）；
+// - 没有 getContainer（没有 Teleport：键盘放在页面根节点下）
+defineOptions({ name: 'AmNumberKeyboard' })
+
+const props = defineProps({
+	open: { type: Boolean, default: false },
+	value: { type: String, default: '' },
+	/** 最多输入几个字符，-1 为不限 */
+	maxlength: { type: Number, default: -1 },
+	title: { type: String, default: '' },
+	theme: { type: String, default: 'default' },
+	/** 额外的键（如 '.'、'X'）：default 主题在左下角，custom 主题在 0 的右边 */
+	extraKey: { type: String, default: '' },
+	randomKeyOrder: { type: Boolean, default: false },
+	showDeleteKey: { type: Boolean, default: true },
+	/** 头部右侧关闭按钮的文字（default 主题），空为不显示 */
+	closeButtonText: { type: String, default: '' },
+	/** 确定键的文字（custom 主题），空为语言包的 NumberKeyboard.done */
+	confirmText: { type: String, default: '' },
+	safeArea: { type: Boolean, default: true },
+	/** true：贴在屏幕底部；false：就地显示在页面里 */
+	poppable: { type: Boolean, default: true },
+	zIndex: { type: Number, default: 1000 },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['update:open', 'openChange', 'update:value', 'input', 'delete', 'confirm', 'close', 'blur'])
+
+const locale = useAmLocale()
+// 不能叫 theme：模板里的 theme 要取到属性（default / custom）
+const amTheme = useAmTheme()
+const iconColor = computed(() : string => amTheme().colorText)
+
+// ---------- 开关 ----------
+/** 键盘的开关：绑定了 open 时跟着它，没绑定时自己管 */
+const opened = ref(props.open)
+/** 已输入的内容：绑定了 value 时跟着它 */
+const inner = ref(props.value)
+
+watch(() : boolean => props.open, (open : boolean) => { opened.value = open })
+watch(() : string => props.value, (value : string) => { inner.value = value })
+
+function setOpen(open : boolean) {
+	if (open == opened.value) return
+	opened.value = open
+	emit('update:open', open)
+	emit('openChange', open)
+}
+
+function setValue(value : string) {
+	inner.value = value
+	emit('update:value', value)
+}
+
+// 打开时先渲染再滑上来，关闭时先滑下去、等过渡结束再隐藏（同 am-popup）
+const rendered = ref(!props.poppable)
+const visible = ref(!props.poppable)
+const shown = ref(!props.poppable)
+let timer = 0
+let overlayId = 0
+
+function unregister() {
+	if (overlayId > 0) removeAmOverlay(overlayId)
+	overlayId = 0
+}
+
+// ---------- 键 ----------
+const ORDERED : string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+
+function shuffle(list : string[]) : string[] {
+	const result = list.slice(0)
+	for (let i = result.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1))
+		const swap = result[i]
+		result[i] = result[j]
+		result[j] = swap
+	}
+	return result
+}
+
+const digits = ref<string[]>(props.randomKeyOrder ? shuffle(ORDERED) : ORDERED)
+
+watch(() : boolean => props.randomKeyOrder, (random : boolean) => {
+	digits.value = random ? shuffle(ORDERED) : ORDERED
+})
+
+watch(() : boolean => opened.value && props.poppable, (open : boolean) => {
+	clearTimeout(timer)
+	unregister()
+	if (!props.poppable) {
+		rendered.value = true
+		visible.value = true
+		shown.value = true
+		return
+	}
+	if (open) {
+		// 返回键收起键盘：相当于在键盘以外的地方“失焦”
+		overlayId = addAmOverlay(() => {
+			emit('blur')
+			setOpen(false)
+		})
+		if (props.randomKeyOrder) digits.value = shuffle(ORDERED)
+		rendered.value = true
+		visible.value = true
+		timer = setTimeout(() => { shown.value = true }, 20)
+	} else if (visible.value) {
+		shown.value = false
+		timer = setTimeout(() => { visible.value = false }, 300)
+	}
+}, { immediate: true })
+
+function keyOf(text : string, type : string, span : number) : AmNumberKeyboardKey {
+	const key : AmNumberKeyboardKey = { text: text, type: type, span: span }
+	return key
+}
+
+/** 数字区：4 行，每行 3 列 */
+const rows = computed(() : AmNumberKeyboardKey[][] => {
+	const list : AmNumberKeyboardKey[][] = []
+	const numbers = digits.value
+	for (let r = 0; r < 3; r++) {
+		const row : AmNumberKeyboardKey[] = []
+		for (let c = 0; c < 3; c++) row.push(keyOf(numbers[r * 3 + c], 'digit', 1))
+		list.push(row)
+	}
+	const last : AmNumberKeyboardKey[] = []
+	const extra = props.extraKey
+	if (props.theme == 'custom') {
+		if (extra.length == 0) last.push(keyOf('0', 'digit', 3))
+		else {
+			last.push(keyOf('0', 'digit', 2))
+			last.push(keyOf(extra, 'extra', 1))
+		}
+	} else {
+		last.push(keyOf(extra, extra.length > 0 ? 'extra' : 'blank', 1))
+		last.push(keyOf('0', 'digit', 1))
+		last.push(keyOf('', props.showDeleteKey ? 'delete' : 'blank', 1))
+	}
+	list.push(last)
+	return list
+})
+
+const confirmLabel = computed(() : string => props.confirmText.length > 0 ? props.confirmText : locale().NumberKeyboard.done)
+const deleteLabel = computed(() : string => locale().NumberKeyboard.delete)
+
+// ---------- 按键 ----------
+function onClose() {
+	emit('close')
+	setOpen(false)
+}
+
+function removeLast() {
+	emit('delete')
+	const value = inner.value
+	if (value.length > 0) setValue(value.substring(0, value.length - 1))
+}
+
+function press(key : AmNumberKeyboardKey) {
+	if (key.type == 'blank') return
+	if (key.type == 'delete') {
+		removeLast()
+		return
+	}
+	if (key.type == 'confirm') {
+		emit('confirm')
+		onClose()
+		return
+	}
+	if (key.text.length == 0) return
+	if (props.maxlength >= 0 && inner.value.length >= props.maxlength) return
+	emit('input', key.text)
+	setValue(inner.value + key.text)
+}
+
+// 按住删除键：500ms 后每 100ms 删一个
+let repeatTimer = 0
+let repeated = false
+
+function stopRepeat() {
+	clearTimeout(repeatTimer)
+	repeatTimer = 0
+}
+
+function repeatDelete() {
+	repeated = true
+	removeLast()
+	repeatTimer = setTimeout(() => { repeatDelete() }, 100)
+}
+
+function onDeleteStart() {
+	repeated = false
+	stopRepeat()
+	repeatTimer = setTimeout(() => { repeatDelete() }, 500)
+}
+
+function onDeleteEnd() {
+	stopRepeat()
+}
+
+function onDeleteClick() {
+	// 连续删除过了：松手时的这一下点击不再删
+	if (repeated) {
+		repeated = false
+		return
+	}
+	removeLast()
+}
+
+function onConfirm() {
+	emit('confirm')
+	onClose()
+}
+
+onUnmounted(() => {
+	clearTimeout(timer)
+	stopRepeat()
+	unregister()
+})
+
+// ---------- 结构 ----------
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-number-keyboard']
+	if (props.poppable) list.push('am-number-keyboard--fixed')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+
+const rootStyle = computed(() : string => {
+	if (!props.poppable) return ''
+	return 'z-index:' + props.zIndex + ';transform:translateY(' + (shown.value ? '0' : '100%') + ');'
+})
+
+function keyClass(key : AmNumberKeyboardKey) : string[] {
+	return ['am-number-keyboard__key', 'am-number-keyboard__key--grid', 'am-number-keyboard__key--' + key.type]
+}
+
+function hoverClass(key : AmNumberKeyboardKey) : string {
+	return key.type == 'blank' ? 'none' : 'am-number-keyboard__key--active'
+}
+</script>
+
+<template>
+	<view v-if="rendered" v-show="visible" :class="classes" :style="rootStyle">
+		<view v-if="title.length > 0 || $slots['title'] != null || (theme == 'default' && closeButtonText.length > 0)" class="am-number-keyboard__header">
+			<slot name="title">
+				<text class="am-number-keyboard__title">{{ title }}</text>
+			</slot>
+			<view v-if="theme == 'default' && closeButtonText.length > 0" class="am-number-keyboard__close" hover-class="am-number-keyboard__close--active" @click="onClose">
+				<text class="am-number-keyboard__close-text">{{ closeButtonText }}</text>
+			</view>
+		</view>
+		<view class="am-number-keyboard__body">
+			<view class="am-number-keyboard__keys">
+				<view v-for="(row, rowIndex) in rows" :key="rowIndex" class="am-number-keyboard__row">
+					<view v-for="(key, index) in row" :key="index" class="am-number-keyboard__cell" :style="'flex:' + key.span + ';'">
+						<view
+							v-if="key.type == 'delete'"
+							:class="keyClass(key)"
+							hover-class="am-number-keyboard__key--active"
+							:hover-start-time="0"
+							:hover-stay-time="60"
+							@touchstart="onDeleteStart"
+							@touchend="onDeleteEnd"
+							@touchcancel="onDeleteEnd"
+							@click="onDeleteClick"
+						>
+							<slot name="delete">
+								<view class="am-number-keyboard__backspace">
+									<am-icon name="close" :size="12" :color="iconColor" />
+								</view>
+							</slot>
+						</view>
+						<view v-else-if="key.type == 'blank' && $slots['extraKey'] != null && index == 0" class="am-number-keyboard__key am-number-keyboard__key--grid am-number-keyboard__key--extra" hover-class="am-number-keyboard__key--active" :hover-start-time="0" :hover-stay-time="60">
+							<slot name="extraKey"></slot>
+						</view>
+						<view v-else :class="keyClass(key)" :hover-class="hoverClass(key)" :hover-start-time="0" :hover-stay-time="60" @click="press(key)">
+							<text class="am-number-keyboard__text">{{ key.text }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+			<view v-if="theme == 'custom'" class="am-number-keyboard__sidebar">
+				<view v-if="showDeleteKey" class="am-number-keyboard__cell am-number-keyboard__cell--side">
+					<view
+						class="am-number-keyboard__key am-number-keyboard__key--large"
+						hover-class="am-number-keyboard__key--active"
+						:hover-start-time="0"
+						:hover-stay-time="60"
+						@touchstart="onDeleteStart"
+						@touchend="onDeleteEnd"
+						@touchcancel="onDeleteEnd"
+						@click="onDeleteClick"
+					>
+						<slot name="delete">
+							<text class="am-number-keyboard__delete-text">{{ deleteLabel }}</text>
+						</slot>
+					</view>
+				</view>
+				<view class="am-number-keyboard__cell am-number-keyboard__cell--side">
+					<view
+						class="am-number-keyboard__key am-number-keyboard__key--large am-number-keyboard__key--confirm"
+						hover-class="am-number-keyboard__key--confirm-active"
+						:hover-start-time="0"
+						:hover-stay-time="60"
+						@click="onConfirm"
+					>
+						<text class="am-number-keyboard__confirm-text">{{ confirmLabel }}</text>
+					</view>
+				</view>
+			</view>
+		</view>
+		<view v-if="safeArea && poppable" class="am-number-keyboard__safe-area"></view>
+	</view>
+</template>
+
+<style>
+.am-number-keyboard { background-color: var(--am-color-bg-layout, #f5f5f5); }
+.am-number-keyboard--fixed {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	transition-property: transform;
+	transition-duration: 300ms;
+	transition-timing-function: cubic-bezier(0.08, 0.82, 0.17, 1);
+}
+.am-number-keyboard__header {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	height: 40px;
+	padding-top: 6px;
+}
+.am-number-keyboard__title {
+	font-size: var(--am-font-size-lg, 16px);
+	color: var(--am-color-text-secondary, rgba(0, 0, 0, 0.65));
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.am-number-keyboard__close {
+	position: absolute;
+	top: 6px;
+	right: 0;
+	bottom: 0;
+	flex-direction: row;
+	align-items: center;
+	padding-left: var(--am-padding, 16px);
+	padding-right: var(--am-padding, 16px);
+}
+.am-number-keyboard__close--active { opacity: 0.7; }
+.am-number-keyboard__close-text { font-size: var(--am-font-size, 14px); color: var(--am-color-primary, #1677ff); white-space: nowrap; }
+
+/* 键之间 6px：每个键外面包一格，格子四周各留 3px（没有 gap，占多列的键也正好对齐） */
+.am-number-keyboard__body { flex-direction: row; padding: 3px; }
+.am-number-keyboard__keys { flex: 3; }
+.am-number-keyboard__row { flex-direction: row; }
+.am-number-keyboard__cell { padding: 3px; }
+.am-number-keyboard__sidebar { flex: 1; }
+.am-number-keyboard__cell--side { flex: 1; }
+.am-number-keyboard__key {
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-number-keyboard__key--grid { height: 48px; }
+.am-number-keyboard__key--large { flex: 1; }
+.am-number-keyboard__key--blank { background-color: transparent; }
+.am-number-keyboard__key--active { background-color: var(--am-color-fill, rgba(0, 0, 0, 0.15)); }
+.am-number-keyboard__key--confirm { background-color: var(--am-color-primary, #1677ff); }
+.am-number-keyboard__key--confirm-active { background-color: var(--am-color-primary-active, #1365d9); }
+.am-number-keyboard__text { font-size: 24px; line-height: 29px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-number-keyboard__delete-text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.am-number-keyboard__confirm-text { font-size: var(--am-font-size-lg, 16px); color: var(--am-color-text-light-solid, #ffffff); }
+/* 退格键：左边尖一点的圆角框 + 叉 */
+.am-number-keyboard__backspace {
+	width: 30px;
+	height: 20px;
+	align-items: center;
+	justify-content: center;
+	border-width: 2px;
+	border-style: solid;
+	border-color: var(--am-color-text, rgba(0, 0, 0, 0.88));
+	border-top-left-radius: 10px;
+	border-bottom-left-radius: 10px;
+	border-top-right-radius: 4px;
+	border-bottom-right-radius: 4px;
+}
+.am-number-keyboard__safe-area { height: var(--uni-safe-area-inset-bottom, 0px); }
+</style>

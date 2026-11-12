@@ -1,0 +1,64 @@
+// Upload 的类型（= antdv-next-mobile 的 upload/interface.ts）
+
+/**
+ * 列表里的一个文件（= UploadFile）。
+ * 与移动端库的差异：没有 originFileObj（uni-app x 选出来的是本地路径，不是 File 对象），本地路径在 `path`；
+ * status 为空表示被 beforeUpload 拦下、只留在列表里没有上传
+ */
+export type AmUploadFile = {
+	uid : string
+	name : string
+	/** 'uploading' | 'done' | 'error' | 'removed'；空为没有上传 */
+	status ?: string | null
+	/** 文件的地址：缩略图与预览都用它（刚选出来的文件是本地的临时路径） */
+	url ?: string | null
+	thumbUrl ?: string | null
+	/** 上传进度 0 ~ 100 */
+	percent ?: number | null
+	/** 字节数 */
+	size ?: number | null
+	/** 'image' | 'video'，或 Web 上的 MIME（image/png） */
+	type ?: string | null
+	/** 选出来的本地文件路径（上传用）；回显的已上传文件没有 */
+	path ?: string | null
+	/** 服务器的响应：JSON 解析成功时是对象，否则是原文 */
+	response ?: any | null
+	error ?: any | null
+}
+
+/** change 事件的参数（= UploadChangeParam） */
+export type AmUploadChangeParam = {
+	file : AmUploadFile
+	fileList : AmUploadFile[]
+}
+
+/**
+ * 上传前的钩子（= UploadProps.beforeUpload）：返回 Promise。结果为 false（或 reject）时文件留在列表里但不上传，
+ * 为 AM_UPLOAD_LIST_IGNORE 时不进列表，其余照常上传。
+ * 与移动端库的差异：必须返回 Promise（UTS 的函数类型只能有一种返回类型）；不能返回另一个文件来替换
+ */
+export type AmUploadBeforeUpload = (file : AmUploadFile, fileList : AmUploadFile[]) => Promise<any | null>
+
+/** 删除前的钩子（= UploadProps.beforeRemove）：结果为 false（或 reject）时不删除 */
+export type AmUploadBeforeRemove = (file : AmUploadFile) => Promise<boolean>
+
+/** customRequest 的参数（= UploadRequestOption）：自己发请求，用三个回调把进度与结果告诉组件 */
+export type AmUploadRequestOption = {
+	action : string
+	/** 文件字段名（= name 属性） */
+	filename : string
+	/** 本地文件路径 */
+	filePath : string
+	file : AmUploadFile
+	data : UTSJSONObject
+	headers : UTSJSONObject
+	onProgress : (percent : number) => void
+	onSuccess : (response : any | null) => void
+	onError : (error : any | null) => void
+}
+
+/** 自定义上传（= UploadProps.customRequest）。与移动端库的差异：没有返回值（不能 abort），也没有 defaultRequest */
+export type AmUploadCustomRequest = (options : AmUploadRequestOption) => void
+
+/** 文件是不是按图片显示（= UploadProps.isImageUrl） */
+export type AmUploadIsImageUrl = (file : AmUploadFile) => boolean

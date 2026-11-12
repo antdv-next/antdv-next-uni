@@ -1,0 +1,11 @@
+// am-side-bar 的 items（= antdv-next-mobile 的 SideBarItem）。
+// title 是文字（UTS 里不能把 VNode 放进数据），自定义内容用插槽 title
+
+export type AmSideBarItem = {
+	/** 唯一标识（字符串） */
+	key : string
+	title ?: string | null
+	/** 徽标：数字或文字；true 为小红点；0、空字符串、false 不显示 */
+	badge ?: any | null
+	disabled ?: boolean | null
+}

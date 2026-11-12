@@ -1,0 +1,10 @@
+{
+  "missingProps": {
+    "defaultFileList": "UTS 里分不出“没传”和空数组，非受控用法请用 v-model:fileList",
+    "method": "上传用 uni.uploadFile，只能 POST（multipart/form-data）",
+    "withCredentials": "uni.uploadFile 没有这个选项（App 端没有跨域与 cookie 的概念）",
+    "listType": "只有 picture-card：选文件用 uni.chooseImage / chooseVideo，Web 以外没有通用的文件选择，文字列表用不上",
+    "previewFile": "选出来的是本地路径，图片直接用它当缩略图；uvue 里也没有 File / Blob 可以交给它",
+    "iconRender": "渲染函数无法表达（UTS 里不能把节点放进数据）；非图片文件显示文件图标与文件名"
+  }
+}

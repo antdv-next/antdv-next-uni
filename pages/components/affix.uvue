@@ -1,0 +1,90 @@
+<script setup lang="uts">
+// 固钉：这一页是页面自己滚动（组件监听页面的滚动）。往下滚：第一条钉在顶部，第二条钉在离顶部 56px 处；
+// 最下面的操作栏一开始就钉在底部，滚到它原来的位置时回到文档流
+const rows : number[] = []
+for (let i = 0; i < 12; i++) rows.push(i + 1)
+
+const topLog = ref('没有钉住')
+const bottomLog = ref('')
+const affix = ref<AmAffixComponentPublicInstance | null>(null)
+const expanded = ref(false)
+
+function onTopChange(affixed : boolean) {
+	topLog.value = affixed ? '钉住了' : '没有钉住'
+}
+
+function onBottomChange(affixed : boolean) {
+	bottomLog.value = affixed ? '（钉在底部）' : '（回到原位）'
+}
+
+function toggle() {
+	expanded.value = !expanded.value
+	// 上方的内容高度变了：重新量位置
+	setTimeout(() => { affix.value?.updatePosition() }, 50)
+}
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法：滚出屏幕时钉在顶部（offsetTop 默认 0）</text>
+		<am-affix @change="onTopChange">
+			<view class="demo__bar">
+				<text class="demo__bar-text">钉在顶部的栏：{{ topLog }}</text>
+			</view>
+		</am-affix>
+
+		<view class="demo__card">
+			<text class="demo__text">往下滚动页面。固钉在原来的位置留一个同样高的占位，下面的内容不会跳。</text>
+			<view class="demo__action"><am-button size="small" :text="expanded ? '收起这一块' : '展开这一块（然后 updatePosition）'" @click="toggle" /></view>
+			<view v-if="expanded" class="demo__extra"><text class="demo__text">多出来的内容，把下面的固钉往下推了 120px。</text></view>
+		</view>
+
+		<text class="demo__title">离顶部 56px 时钉住（offsetTop）</text>
+		<am-affix ref="affix" :offset-top="56">
+			<view class="demo__chip-row">
+				<view class="demo__chip"><text class="demo__chip-text">offsetTop = 56</text></view>
+			</view>
+		</am-affix>
+
+		<view v-for="row in rows" :key="row" class="demo__card demo__card--gap">
+			<text class="demo__text">第 {{ row }} 段内容，用来把页面撑高。</text>
+		</view>
+
+		<text class="demo__title">钉在底部（offsetBottom）</text>
+		<am-affix :offset-bottom="0" @change="onBottomChange">
+			<view class="demo__bar demo__bar--bottom">
+				<text class="demo__bar-text">底部的操作栏{{ bottomLog }}</text>
+				<am-button size="small" type="primary" text="提交" />
+			</view>
+		</am-affix>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__card--gap { margin-top: 12px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__action { margin-top: 12px; flex-direction: row; }
+.demo__extra { height: 120px; margin-top: 12px; justify-content: center; }
+.demo__bar {
+	height: 44px;
+	padding: 0 16px;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	background-color: var(--am-color-primary, #1677ff);
+}
+.demo__bar--bottom { height: 56px; background-color: var(--am-color-bg-elevated, #ffffff); }
+.demo__bar-text { font-size: 14px; color: var(--am-color-text-light-solid, #ffffff); }
+.demo__chip-row { flex-direction: row; padding: 0 12px; }
+.demo__chip { padding: 6px 12px; border-radius: 16px; background-color: var(--am-color-success, #52c41a); }
+.demo__chip-text { font-size: 13px; color: #ffffff; }
+.demo__footer { height: 200px; }
+</style>

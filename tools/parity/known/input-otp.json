@@ -1,0 +1,6 @@
+{
+  "missingProps": {
+    "defaultValue": "UTS 里分不出“没传”和空字符串，非受控用法请用 v-model:value",
+    "formatter": "UTS 的函数属性在 App 端受限；需要过滤字符时在 update:value 里自己处理"
+  }
+}

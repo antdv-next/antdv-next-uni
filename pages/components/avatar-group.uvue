@@ -1,0 +1,78 @@
+<script setup lang="uts">
+import { AmAvatarGroupMax } from '@/uni_modules/antdv-next-uni/types/avatar-group.uts'
+
+const names : string[] = ['张', '李', '王', '赵', '钱', '孙']
+const max3 : AmAvatarGroupMax = { count: 3 }
+const max2 : AmAvatarGroupMax = { count: 2 }
+const sizes : string[] = ['small', 'middle', 'large', '48']
+const size = ref('middle')
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法</text>
+		<view class="demo__card">
+			<am-avatar-group>
+				<am-avatar src="/static/logo.png" />
+				<am-avatar text="张" />
+				<am-avatar icon="user" />
+				<am-avatar text="U" />
+			</am-avatar-group>
+		</view>
+
+		<text class="demo__title">最多显示几个（max.count），其余折叠成 +N</text>
+		<view class="demo__card">
+			<am-avatar-group :max="max3">
+				<am-avatar v-for="name in names" :key="name" :text="name" />
+			</am-avatar-group>
+			<text class="demo__hint">只渲染了 2 个头像、总数另外给（total = 128）</text>
+			<am-avatar-group :max="max2" :total="128">
+				<am-avatar text="张" />
+				<am-avatar text="李" />
+			</am-avatar-group>
+		</view>
+
+		<text class="demo__title">尺寸与形状（组里的头像都跟随）</text>
+		<view class="demo__card">
+			<view class="demo__row">
+				<am-button v-for="item in sizes" :key="item" class="demo__item" size="small" :type="size == item ? 'primary' : 'default'" :text="item" @click="size = item" />
+			</view>
+			<am-avatar-group :size="size" :max="max3">
+				<am-avatar v-for="name in names" :key="name" :text="name" />
+			</am-avatar-group>
+			<view class="demo__gap"></view>
+			<am-avatar-group :size="size" shape="square" :max="max3">
+				<am-avatar v-for="name in names" :key="name" :text="name" />
+			</am-avatar-group>
+		</view>
+
+		<text class="demo__title">自定义 +N（overflow 插槽）</text>
+		<view class="demo__card">
+			<am-avatar-group :max="max2">
+				<am-avatar v-for="name in names" :key="name" :text="name" />
+				<template #overflow="{ count }">
+					<text class="demo__more">余{{ count }}</text>
+				</template>
+			</am-avatar-group>
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+	overflow: visible;
+}
+.demo__row { flex-direction: row; flex-wrap: wrap; align-items: center; overflow: visible; }
+.demo__item { margin-right: 12px; margin-bottom: 10px; }
+.demo__text { font-size: 14px; line-height: 22px; color: var(--am-color-text, rgba(0, 0, 0, 0.88)); }
+.demo__hint { padding-top: 8px; font-size: 12px; line-height: 18px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__footer { height: 40px; }
+.demo__gap { height: 16px; }
+.demo__more { font-size: 12px; color: var(--am-color-primary, #1677ff); }
+</style>

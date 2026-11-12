@@ -1,0 +1,256 @@
+<script setup lang="uts">
+import { useAmTheme } from '../../theme/theme.uts'
+import { amUid, AmRect, measureById } from '../../utils/motion.uts'
+
+// 通告栏（= antdv-next-mobile 的 NoticeBar）：页面顶部的一行提示，文字放不下时横向滚动。
+// content、color（default / info / success / warning / error，默认 warning）、icon、extra、closable、closeIcon、
+// wrap（换行显示，不滚动）、scrollable（true 总是滚动，false 不滚动；不写时放不下才滚动）、delay（开始滚动前的等待，毫秒）、
+// speed（像素 / 秒）、shape（rectangular / neutral / rounded）、bordered（true 四边、'block' 只有上下、false 没有）
+// 同名同义；事件 close、click、replay（每滚完一轮）；方法 reset()（重新量宽度并从头滚动）；
+// 插槽 default（内容）、icon、extra、closeIcon。
+//
+// 与 antdv-next-mobile 的差异（uni-app x 的限制）：
+// - content / extra 是文字，icon / closeIcon 是图标名（<am-icon> 的 name）；icon 为空用默认图标（bell：图标字体里
+//   没有 sound），写 'none' 不显示；自定义内容用同名插槽；
+// - scrollable 没有“未设置”：默认值是字符串 'auto'；
+// - 没有 @keyframes 也不依赖 transitionend：滚动是 transform: translateX 的过渡，时长按量到的宽度算出来，
+//   一轮结束用定时器接下一轮（第一轮从原位滚出左边，之后每轮从右边进来）；
+// - 会滚动的文字在等待（delay）期间没有省略号（文字放在绝对定位的轨道里才量得到完整的宽度）；
+//   scrollable 为 false 时放不下的文字显示省略号
+defineOptions({ name: 'AmNoticeBar' })
+
+const props = defineProps({
+	content: { type: String, default: '' },
+	color: { type: String, default: 'warning' },
+	icon: { type: String, default: '' },
+	extra: { type: String, default: '' },
+	closable: { type: Boolean, default: false },
+	closeIcon: { type: String, default: 'close' },
+	wrap: { type: Boolean, default: false },
+	scrollable: { type: [Boolean, String], default: 'auto' },
+	delay: { type: Number, default: 2000 },
+	speed: { type: Number, default: 50 },
+	shape: { type: String, default: 'rectangular' },
+	bordered: { type: [Boolean, String], default: 'block' },
+	rootClass: { type: String, default: '' }
+})
+
+const emit = defineEmits(['close', 'click', 'replay'])
+
+const theme = useAmTheme()
+const uid = amUid('am-notice-bar')
+
+const visible = ref(true)
+
+/** 'auto' / 'true' / 'false' */
+const scrollMode = computed(() : string => {
+	const value = props.scrollable
+	if (typeof value == 'string') return value as string
+	return value == false ? 'false' : 'true'
+})
+/** 'true' / 'block' / 'false' */
+const borderMode = computed(() : string => {
+	const value = props.bordered
+	if (typeof value == 'string') return value as string
+	return value == false ? 'false' : 'true'
+})
+/** 文字放在可以滚动的轨道里（不换行，且没有关掉滚动） */
+const marquee = computed(() : boolean => !props.wrap && scrollMode.value != 'false')
+
+// ---------- 滚动 ----------
+/** 轨道的平移（像素）与这次平移的过渡时长（毫秒，0 为直接跳过去） */
+const offset = ref(0)
+const duration = ref(0)
+let wrapWidth = 0
+let contentWidth = 0
+let timer = 0
+/** 每次 reset 加一：量宽度是异步的，回来时不是最新的一次就作废 */
+let token = 0
+
+const trackStyle = computed(() : string => {
+	return 'transform:translateX(' + offset.value + 'px);transition-property:transform;transition-duration:' + duration.value + 'ms;transition-timing-function:linear;'
+})
+
+function stop() {
+	token++
+	clearTimeout(timer)
+	offset.value = 0
+	duration.value = 0
+}
+
+/** 从 from 的位置滚到完全滚出左边；结束后发出 replay，下一轮从右边进来 */
+function run(from : number) {
+	// 先不带过渡地跳到起点，下一帧再开始滚
+	offset.value = from
+	duration.value = 0
+	timer = setTimeout(() => {
+		const time = Math.round((Math.abs(from) + contentWidth) / props.speed * 1000)
+		offset.value = 0 - contentWidth
+		duration.value = time
+		timer = setTimeout(() => {
+			emit('replay')
+			run(wrapWidth)
+		}, time + 30)
+	}, 50)
+}
+
+function reset() {
+	stop()
+	if (!visible.value || !marquee.value || props.speed <= 0) return
+	const current = token
+	measureById(uid + '-wrap').then((wrap : AmRect | null) => {
+		if (wrap == null || current != token) return
+		const outer : AmRect = wrap
+		measureById(uid + '-track').then((track : AmRect | null) => {
+			if (track == null || current != token) return
+			wrapWidth = outer.width
+			contentWidth = track.width
+			if (contentWidth <= 0) return
+			if (scrollMode.value == 'true' || contentWidth > wrapWidth) {
+				timer = setTimeout(() => { run(0) }, Math.max(props.delay, 0))
+			}
+		})
+	})
+}
+
+let resetTimer = 0
+/** 等内容渲染出来再量 */
+function scheduleReset() {
+	clearTimeout(resetTimer)
+	resetTimer = setTimeout(() => { reset() }, 60)
+}
+
+onMounted(() => { scheduleReset() })
+// 页面重新显示时从头开始（离开期间定时器与过渡可能已经对不上）
+onPageShow(() => { scheduleReset() })
+onUnmounted(() => {
+	clearTimeout(resetTimer)
+	stop()
+})
+
+watch(
+	() : string => props.content + '|' + (props.wrap ? '1' : '0') + scrollMode.value + '|' + props.speed + '|' + props.delay,
+	() => { scheduleReset() }
+)
+
+function onClose(event : UniPointerEvent) {
+	event.stopPropagation()
+	visible.value = false
+	clearTimeout(resetTimer)
+	stop()
+	emit('close', event)
+}
+
+function onClick(event : UniPointerEvent) {
+	emit('click', event)
+}
+
+defineExpose({
+	/** 重新量宽度并从头开始滚动（用默认插槽放内容、内容变化之后调用） */
+	reset: () => { scheduleReset() }
+})
+
+// ---------- 外观 ----------
+const iconName = computed(() : string => props.icon.length > 0 ? props.icon : 'bell')
+
+/** 文字、图标的颜色（图标的颜色只能用属性传） */
+const contentColor = computed(() : string => {
+	const current = theme()
+	if (props.color == 'default') return current.colorText
+	if (props.color == 'info') return current.colorInfo
+	if (props.color == 'success') return current.colorSuccessActive
+	if (props.color == 'error') return current.colorError
+	return current.colorWarningActive
+})
+const textStyle = computed(() : string => 'color:' + contentColor.value + ';')
+
+const classes = computed(() : string[] => {
+	const list : string[] = ['am-notice-bar', 'am-notice-bar--' + props.color, 'am-notice-bar--' + props.shape]
+	list.push(props.wrap ? 'am-notice-bar--wrap' : 'am-notice-bar--single')
+	// 带圆角的形状没有“只有上下”的边框
+	if (borderMode.value == 'true' || (borderMode.value == 'block' && props.shape != 'rectangular')) list.push('am-notice-bar--bordered')
+	else if (borderMode.value == 'block') list.push('am-notice-bar--bordered-block')
+	if (props.rootClass.length > 0) list.push(props.rootClass)
+	return list
+})
+</script>
+
+<template>
+	<view v-if="visible" :class="classes" @click="onClick">
+		<view v-if="icon != 'none'" :class="['am-notice-bar__icon', wrap ? 'am-notice-bar__icon--wrap' : '']">
+			<slot name="icon">
+				<am-icon :name="iconName" :size="16" :color="contentColor" />
+			</slot>
+		</view>
+		<view v-if="marquee" :id="uid + '-wrap'" class="am-notice-bar__wrapper">
+			<view :id="uid + '-track'" class="am-notice-bar__track" :style="trackStyle">
+				<slot>
+					<text class="am-notice-bar__text am-notice-bar__text--nowrap" :style="textStyle">{{ content }}</text>
+				</slot>
+			</view>
+		</view>
+		<view v-else class="am-notice-bar__static">
+			<slot>
+				<text :class="['am-notice-bar__text', wrap ? '' : 'am-notice-bar__text--ellipsis']" :style="textStyle">{{ content }}</text>
+			</slot>
+		</view>
+		<view class="am-notice-bar__extra">
+			<slot name="extra">
+				<text v-if="extra.length > 0" class="am-notice-bar__text am-notice-bar__text--nowrap" :style="textStyle">{{ extra }}</text>
+			</slot>
+		</view>
+		<view v-if="closable" :class="['am-notice-bar__close', wrap ? 'am-notice-bar__icon--wrap' : '']" hover-class="am-notice-bar__close--active" @click="onClose">
+			<slot name="closeIcon">
+				<am-icon :name="closeIcon" :size="12" :color="contentColor" />
+			</slot>
+		</view>
+	</view>
+</template>
+
+<style>
+.am-notice-bar {
+	flex-direction: row;
+	align-items: center;
+	padding-left: var(--am-padding-sm, 12px);
+	padding-right: var(--am-padding-sm, 12px);
+	border-style: solid;
+	border-width: 0;
+	border-color: var(--am-color-warning-border, #fdda95);
+	background-color: var(--am-color-warning-bg, #fff7e8);
+}
+.am-notice-bar--single { height: var(--am-control-height, 40px); }
+/* 换行时高度跟着内容走（App 端的 min-height 不含内边距，这里不写） */
+.am-notice-bar--wrap { padding-top: var(--am-padding-xs, 8px); padding-bottom: var(--am-padding-xs, 8px); }
+
+/* ---------- 颜色 ---------- */
+.am-notice-bar--default { border-color: var(--am-color-border, #d9d9d9); background-color: var(--am-color-fill-tertiary, rgba(0, 0, 0, 0.04)); }
+.am-notice-bar--info { border-color: var(--am-color-info-border, #96c2ff); background-color: var(--am-color-info-bg, #ecf4ff); }
+.am-notice-bar--success { border-color: var(--am-color-success-border, #b1e498); background-color: var(--am-color-success-bg, #eef9e8); }
+.am-notice-bar--error { border-color: var(--am-color-error-border, #ffafb0); background-color: var(--am-color-error-bg, #fff1f1); }
+
+/* ---------- 边框与形状 ---------- */
+.am-notice-bar--bordered { border-width: 1px; }
+.am-notice-bar--bordered-block { border-top-width: 1px; border-bottom-width: 1px; }
+.am-notice-bar--neutral {
+	border-top-left-radius: var(--am-border-radius, 8px);
+	border-top-right-radius: var(--am-border-radius, 8px);
+	border-bottom-left-radius: var(--am-border-radius, 8px);
+	border-bottom-right-radius: var(--am-border-radius, 8px);
+}
+.am-notice-bar--rounded { border-radius: 999px; }
+
+/* ---------- 内部 ---------- */
+.am-notice-bar__icon { flex-direction: row; align-items: center; margin-right: 8px; }
+/* 换行时图标、关闭按钮与第一行文字对齐 */
+.am-notice-bar__icon--wrap { align-self: flex-start; height: 22px; }
+.am-notice-bar__wrapper { flex: 1; height: 22px; overflow: hidden; }
+/* 绝对定位、不写 right：宽度就是内容的完整宽度，量它得到要滚动的距离 */
+.am-notice-bar__track { position: absolute; left: 0; top: 0; flex-direction: row; align-items: center; height: 22px; }
+.am-notice-bar__static { flex: 1; }
+.am-notice-bar__text { font-size: var(--am-font-size, 14px); line-height: 22px; color: var(--am-color-warning-active, #d59311); }
+.am-notice-bar__text--nowrap { white-space: nowrap; }
+.am-notice-bar__text--ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.am-notice-bar__extra { flex-direction: row; align-items: center; margin-left: 8px; }
+.am-notice-bar__close { flex-direction: row; align-items: center; justify-content: center; padding: 6px; margin-right: -6px; opacity: 0.75; }
+.am-notice-bar__close--active { opacity: 1; }
+</style>

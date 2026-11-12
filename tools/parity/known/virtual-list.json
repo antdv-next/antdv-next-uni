@@ -1,0 +1,9 @@
+{
+  "missingProps": {
+    "overscan": "基于内置的 list-view（原生的复用回收列表），多渲染多少项由原生决定",
+    "component": "列表的节点固定是 list-view / list-item"
+  },
+  "missingEmits": {
+    "visibleChange": "渲染了哪些项由原生的 list-view 决定，uvue 里拿不到"
+  }
+}

@@ -1,0 +1,168 @@
+<script setup lang="uts">
+import { AmUploadBeforeUpload, AmUploadChangeParam, AmUploadCustomRequest, AmUploadFile, AmUploadRequestOption } from '@/uni_modules/antdv-next-uni/types/upload.uts'
+import { AM_UPLOAD_LIST_IGNORE } from '@/uni_modules/antdv-next-uni/utils/upload.uts'
+
+// 上传：这一页没有 action（不连网络）——选出来的文件只是收进列表；“模拟上传”用 customRequest 自己报进度
+function preset(count : number) : AmUploadFile[] {
+	const list : AmUploadFile[] = []
+	for (let i = 0; i < count; i++) {
+		const file : AmUploadFile = { uid: 'preset-' + i, name: 'logo-' + i + '.png', status: 'done', url: '/static/logo.png' }
+		list.push(file)
+	}
+	return list
+}
+
+const basic = ref<AmUploadFile[]>(preset(1))
+const multiple = ref<AmUploadFile[]>([])
+const single = ref<AmUploadFile[]>(preset(1))
+const limited = ref<AmUploadFile[]>([])
+const guarded = ref<AmUploadFile[]>([])
+const uploading = ref<AmUploadFile[]>([])
+const three = ref<AmUploadFile[]>(preset(2))
+const custom = ref<AmUploadFile[]>([])
+const readonly = ref<AmUploadFile[]>(preset(2))
+const camera = ref<AmUploadFile[]>([])
+const video = ref<AmUploadFile[]>([])
+const log = ref('')
+const exceedLog = ref('')
+const requestLog = ref('')
+
+function onChange(info : AmUploadChangeParam) {
+	log.value = info.file.name + '：' + (info.file.status ?? '未上传') + '，共 ' + info.fileList.length + ' 个'
+}
+
+function onPreview(file : AmUploadFile) {
+	log.value = '预览 ' + file.name
+}
+
+function onRemove(file : AmUploadFile) {
+	log.value = '删除了 ' + file.name
+}
+
+function onExceed(files : AmUploadFile[], reason : string) {
+	exceedLog.value = files.length + ' 个文件没有加入：' + (reason == 'maxSize' ? '超过 100KB' : '超过数量')
+}
+
+// 偶数次选的留在列表里不上传（false），第 3 的倍数次选的不进列表
+let picks = 0
+const beforeUpload : AmUploadBeforeUpload = (_file : AmUploadFile, _files : AmUploadFile[]) : Promise<any | null> => {
+	picks++
+	if (picks % 3 == 0) return Promise.resolve(AM_UPLOAD_LIST_IGNORE)
+	return Promise.resolve(picks % 2 == 1)
+}
+
+// 模拟上传：每 300ms 进度加 20；第奇数个文件失败一次（点它重试）
+let requests = 0
+const fakeRequest : AmUploadCustomRequest = (options : AmUploadRequestOption) => {
+	requests++
+	const failing = requests % 2 == 1
+	let percent = 0
+	requestLog.value = '开始上传 ' + options.file.name
+	function step() {
+		percent += 20
+		if (failing && percent >= 60) {
+			options.onError('模拟的失败')
+			requestLog.value = options.file.name + ' 上传失败，点它重试'
+			return
+		}
+		if (percent >= 100) {
+			options.onSuccess({ url: options.filePath } as UTSJSONObject)
+			requestLog.value = options.file.name + ' 上传成功'
+			return
+		}
+		options.onProgress(percent)
+		setTimeout(() => { step() }, 300)
+	}
+	setTimeout(() => { step() }, 300)
+}
+
+const upload = ref<AmUploadComponentPublicInstance | null>(null)
+const singleUpload = ref<AmUploadComponentPublicInstance | null>(null)
+</script>
+
+<template>
+	<am-config-provider>
+		<text class="demo__title">基础用法（没有 action：文件只是收进列表）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="basic" @change="onChange" @preview="onPreview" @remove="onRemove" />
+			<text class="demo__hint">{{ log }}</text>
+		</view>
+
+		<text class="demo__title">多选，最多 6 个（multiple、maxCount）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="multiple" multiple :max-count="6" @exceed="onExceed" />
+			<text class="demo__hint">已选 {{ multiple.length }} / 6。{{ exceedLog }}</text>
+		</view>
+
+		<text class="demo__title">只要一个：新选的替换当前的（maxCount 为 1）</text>
+		<view class="demo__card">
+			<am-upload ref="singleUpload" v-model:file-list="single" :max-count="1" />
+			<text class="demo__hint">到了数量“+”就隐藏；删掉再选，或调用 chooseFile() 直接换一张</text>
+			<view class="demo__action">
+				<am-button size="small" text="换一张" @click="singleUpload?.chooseFile()" />
+			</view>
+		</view>
+
+		<text class="demo__title">限制大小（maxSize：100KB）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="limited" multiple :max-size="102400" @exceed="onExceed" />
+			<text class="demo__hint">{{ exceedLog }}</text>
+		</view>
+
+		<text class="demo__title">模拟上传（customRequest）：进度、失败后点它重试</text>
+		<view class="demo__card">
+			<am-upload ref="upload" v-model:file-list="uploading" :custom-request="fakeRequest" />
+			<text class="demo__hint">{{ requestLog }}</text>
+			<view class="demo__action">
+				<am-button size="small" text="chooseFile()" @click="upload?.chooseFile()" />
+			</view>
+		</view>
+
+		<text class="demo__title">上传前的钩子（beforeUpload）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="guarded" :before-upload="beforeUpload" />
+			<text class="demo__hint">第 1、5 次选的收进列表，第 2、4 次选的留下但标为未上传，第 3、6 次选的不进列表</text>
+		</view>
+
+		<text class="demo__title">每行 3 格（columns）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="three" :columns="3" multiple />
+		</view>
+
+		<text class="demo__title">自定义“+”那一格（默认插槽）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="custom">
+				<am-icon name="camera" :size="24" color="#1677ff" />
+				<text class="demo__trigger-text">拍照 / 相册</text>
+			</am-upload>
+		</view>
+
+		<text class="demo__title">只开相机（capture）、选视频（accept）</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="camera" capture />
+			<view class="demo__gap"></view>
+			<am-upload v-model:file-list="video" accept="video/*" :max-count="1" />
+		</view>
+
+		<text class="demo__title">禁用</text>
+		<view class="demo__card">
+			<am-upload v-model:file-list="readonly" disabled />
+		</view>
+		<view class="demo__footer"></view>
+	</am-config-provider>
+</template>
+
+<style>
+.demo__title { padding: 20px 16px 10px 16px; font-size: 14px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__card {
+	margin: 0 12px;
+	padding: 16px;
+	background-color: var(--am-color-bg-container, #ffffff);
+	border-radius: 12px;
+}
+.demo__hint { margin-top: 8px; font-size: 12px; color: var(--am-color-text-tertiary, rgba(0, 0, 0, 0.45)); }
+.demo__action { margin-top: 12px; flex-direction: row; }
+.demo__gap { height: 12px; }
+.demo__trigger-text { margin-top: 4px; font-size: 12px; color: var(--am-color-primary, #1677ff); }
+.demo__footer { height: 40px; }
+</style>
