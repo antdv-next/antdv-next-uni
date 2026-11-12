@@ -107,19 +107,43 @@ function topLevelKeys(body) {
   return keys
 }
 
+/** 接口的全部字段：自己的 + `extends` 的（只找同一个文件里的父接口） */
+function interfaceKeys(source, name, seen = new Set()) {
+  if (seen.has(name))
+    return []
+  seen.add(name)
+  const body = interfaceBody(source, name)
+  if (body === null)
+    return []
+  const keys = []
+  const heritage = new RegExp(`interface\\s+${name}\\s+extends\\s+([^{]+)\\{`).exec(source)
+  if (heritage) {
+    for (const base of heritage[1].split(',')) {
+      const baseName = base.trim().replace(/<.*$/, '')
+      for (const key of interfaceKeys(source, baseName, seen)) {
+        if (!keys.includes(key))
+          keys.push(key)
+      }
+    }
+  }
+  for (const key of topLevelKeys(body)) {
+    if (!keys.includes(key))
+      keys.push(key)
+  }
+  return keys
+}
+
 function readMobile(component) {
   const [dir, prefix, file = 'interface.ts'] = locations[component] ?? [component, pascal(component)]
   const path = join(mobileSrc, dir, file)
   if (!existsSync(path))
     return null
   const source = readFileSync(path, 'utf8')
-  const propsBody = interfaceBody(source, `${prefix}Props`)
-  if (propsBody === null)
+  if (interfaceBody(source, `${prefix}Props`) === null)
     return null
-  const emitsBody = interfaceBody(source, `${prefix}Emits`)
   return {
-    props: topLevelKeys(propsBody),
-    emits: emitsBody === null ? [] : topLevelKeys(emitsBody),
+    props: interfaceKeys(source, `${prefix}Props`),
+    emits: interfaceKeys(source, `${prefix}Emits`),
   }
 }
 
