@@ -1,0 +1,119 @@
+<div align="center">
+  <img src="./static/logo.png" width="72" alt="logo" />
+  <h1>Antdv Next Uni</h1>
+  <p><a href="https://doc.dcloud.net.cn/uni-app-x/">uni-app x</a> 组件库，与 <a href="https://github.com/antdv-next/antdv-next-mobile">antdv-next-mobile</a> 同名、同属性、同主题。</p>
+  <p><a href="./README.md">English</a> · 中文</p>
+</div>
+
+一套 uvue + UTS 代码，会用 antdv-next 或 antdv-next-mobile 就会用它：
+
+```vue
+<am-config-provider :theme="{ algorithm: 'dark', token: { colorPrimary: '#00b96b' } }">
+  <am-button type="primary" block text="打开" @click="open = true" />
+  <am-popup v-model:open="open" round closable>
+    <!-- ... -->
+  </am-popup>
+</am-config-provider>
+```
+
+## 特性
+
+- **与 antdv-next-mobile 对齐**：同样的 `am-` 标签、属性、事件和 `v-model:open` / `v-model:value`；差异逐条登记并由脚本自动核对。
+- **同一套主题 token**：token 与 antdv-next 同名，CSS 变量同为 `--am-*`；亮色 / 暗色 / 紧凑算法可以组合，支持全局与局部主题。
+- **原生渲染**：全部用 uvue + UTS 编写，开启 vapor 模式，App 端不走 WebView。
+- **94 个组件**：表单、选择器、弹层、手势、虚拟列表、日历、上传等。
+- **国际化**：内置 `zhCN`、`enUS`。
+- **函数式调用**：`amMessage` / `amToast`、`confirmAmModal`。
+
+## 平台
+
+| Web | Android | iOS | 鸿蒙 | 微信小程序 |
+| --- | --- | --- | --- | --- |
+| 编译通过 | 编译通过，未实机运行 | 编译通过，模拟器上运行过 | 未验证 | 未验证 |
+
+目前是早期阶段（0.1.0）：多数组件的交互（弹层、手势、选择器）还没有在真机或模拟器上逐个点过。
+
+## 安装
+
+需要 HBuilderX 5.0 以上，只支持 uni-app x 项目（不支持 uni-app）。
+
+1. 把 `uni_modules/antdv-next-uni` 复制到项目的 `uni_modules` 下，或从 [Releases](https://github.com/antdv-next/antdv-next-uni/releases) 下载压缩包解压到那里。
+2. `pages.json` 加 easycom 规则：
+
+   ```json
+   { "easycom": { "custom": { "^am-(.*)": "@/uni_modules/antdv-next-uni/components/am-$1/am-$1.uvue" } } }
+   ```
+
+3. `App.uvue` 的 `onLaunch` 里加载图标字体：`loadAmIcons()`（`@/uni_modules/antdv-next-uni/utils/icons.uts`）。
+4. **每个页面的根节点用 `<am-config-provider>`**（App 端没有 `:root`，主题变量写在它上面）。
+
+## 主题与语言
+
+```ts
+import { setAmTheme } from '@/uni_modules/antdv-next-uni/theme/theme.uts'
+import { enUS, setAmLocale } from '@/uni_modules/antdv-next-uni/locale/locale.uts'
+
+// 全局主题：所有页面一起变
+setAmTheme({ algorithm: ['dark', 'compact'], token: { colorPrimary: '#00b96b', borderRadius: 12 } })
+// 全局语言
+setAmLocale(enUS)
+```
+
+局部主题给 `<am-config-provider :theme>` 传同样结构的配置。
+
+## 组件
+
+`uni_modules/antdv-next-uni/components` 下 94 个组件目录，示例应用 74 个页面。
+
+| 分组 | 示例页（每页对应同名的 `am-*` 组件及其子组件） |
+| --- | --- |
+| 通用 | BackTop、Button、ConfigProvider、FloatButton、FloatButtonGroup、Typography |
+| 布局 | Divider、Flex、Grid、SafeArea、Space |
+| 导航 | Dropdown、IndexBar、NavBar、Pagination、Segmented、SideBar、Steps、TabBar、Tabs |
+| 数据录入 | Calendar、Cascader、Checkbox、DatePicker、Form、Input、InputNumber、InputOTP、NumberKeyboard、Picker、PickerView、Radio、Rate、Select、Selector、Slider、Switch、TimePicker、Upload |
+| 数据展示 | Avatar、AvatarGroup、Badge、Card、Carousel、Collapse、Descriptions、Empty、Image、ImagePreview、List、Result、Statistic、Tag、Timeline、VirtualList、Watermark |
+| 反馈 | ActionSheet、Alert、Drawer、Mask、Modal、NoticeBar、Popover、Popup、Progress、Skeleton、Spin、message / Toast |
+| 手势与其他 | Affix、FloatingPanel、InfiniteScroll、PullToRefresh、SwipeAction |
+
+antdv-next-mobile 首批 70 个组件目录都有对应实现（Message / Toast 是 `utils/message.uts` 里的函数，Grid 对应
+`am-row` / `am-col`，Typography 拆成 `am-typography-text` / `-title` / `-paragraph`）。移动端之后新增的
+ActionBar、Barrage、CollapseTransition、Draggable、Highlight、LoadingBar、RollingText、ShareSheet、ShimmerText、
+Signature 尚未实现。
+
+uni 端特有：`am-icon`、`am-loading`、`am-picker-popup`、`am-picker-trigger`、`am-typography-base`、`am-space-item`。
+
+## 与 antdv-next-mobile 的差异
+
+接口尽量一致，差异都来自 uni-app x 的限制，例如：
+
+- 文字属性化：`<am-button text="提交" />`（uvue 的样式不继承，插槽里的文字拿不到按钮的颜色）。
+- 渲染类属性是字符串（图标名或文字）加同名插槽，不是节点。
+- 没有 Teleport：弹出层放在页面根节点下；没有 `getContainer`。
+- 没有 `classes` / `styles`，根节点用 `rootClass`。
+- App 端 CSS `gap` 不生效：`am-space` / `am-flex` 的子元素要包一层 `am-space-item`，由它提供间距。
+
+完整的差异清单在 [tools/parity/known/](./tools/parity/known/)，由 `node tools/parity/check.mjs` 自动核对。
+
+## 文档
+
+- [指南](./docs/README.md)：快速上手、主题、国际化、与 antdv-next-mobile 的差异
+- [组件](./docs/components/README.md)：每个组件的属性、事件、插槽、方法（由 `tools/docs/gen.mjs` 从源码生成）
+- 示例：本仓库根目录就是示例应用，用 HBuilderX 打开即可运行；首页可以搜索组件、切换暗色与语言
+
+## 开发
+
+需要 HBuilderX 5.x（uni-app x 只能由它编译）。命令与约定见 [AGENTS.md](./AGENTS.md)。
+
+```bash
+node tools/lint.mjs            # 静态检查：目录、页面注册、App 端不生效的 gap、版本号
+node tools/parity/check.mjs    # 与 antdv-next-mobile 的属性 / 事件对齐
+node tools/docs/gen.mjs        # 重新生成 docs/components（--check 只检查是否最新）
+node tools/release.mjs 0.2.0   # 改版本号、跑检查、打出 dist/antdv-next-uni-0.2.0.zip
+```
+
+发版：先在 `uni_modules/antdv-next-uni/changelog.md` 写好新版本一节，运行 `tools/release.mjs <版本>`，三端编译通过后
+提交并推送 `v<版本>` 的 tag，CI 会建 GitHub Release 并附上压缩包；DCloud 插件市场需要在 HBuilderX 里手动发布。
+
+## License
+
+[MIT](./LICENSE)

@@ -191,7 +191,7 @@ previewAmImage({ images: images, current: 1 })
 - Grid 对应 `am-row` / `am-col`；Typography 拆成 `am-typography-text` / `am-typography-title` / `am-typography-paragraph`；
 - uni 端特有的组件：`am-icon`（字体图标，App 端没有内联 SVG）、`am-loading`（App 端没有 `@keyframes`，用内置的 loading）、
   `am-space-item`、以及内部共用的 `am-picker-popup`、`am-picker-trigger`、`am-typography-base`；
-- 移动端库里尚未实现的组件见仓库 [README](../../README.md) 的“状态”一节。
+- 移动端库里尚未实现的组件见仓库 [README](../../README.zh-CN.md) 的“组件”一节。
 
 ## 为什么：uni-app x 的限制
 

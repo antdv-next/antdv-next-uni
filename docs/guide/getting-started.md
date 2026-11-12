@@ -6,7 +6,7 @@
   uni-app x 只能由 HBuilderX 编译。
 - 只支持 **uni-app x**（uvue + UTS）项目，不支持 uni-app（Vue 2 / Vue 3）项目。
 
-平台的验证情况见仓库 [README](../../README.md) 的“状态”一节：Web、iOS、Android 三端编译通过，鸿蒙与微信小程序尚未验证。
+平台的验证情况见仓库 [README](../../README.zh-CN.md) 的“平台”一节：Web、iOS、Android 三端编译通过，鸿蒙与微信小程序尚未验证。
 
 ## 安装
 
