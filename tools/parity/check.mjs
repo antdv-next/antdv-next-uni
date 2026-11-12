@@ -56,6 +56,15 @@ const locations = {
   'input-search': ['input', 'InputSearch'],
   'input-password': ['input', 'InputPassword'],
   'input-otp': ['input', 'InputOTP'],
+  'typography-text': ['typography', 'TypographyText'],
+  'typography-title': ['typography', 'TypographyTitle'],
+  'typography-paragraph': ['typography', 'TypographyParagraph'],
+  'statistic-timer': ['statistic', 'StatisticTimer'],
+  'float-button-group': ['float-button', 'FloatButtonGroup'],
+  'back-top': ['float-button', 'BackTop'],
+  'date-picker-view': ['date-picker', 'DatePickerView'],
+  'cascader-view': ['cascader', 'CascaderView'],
+  'image-preview-group': ['image', 'ImagePreviewGroup'],
 }
 
 /** 取出 `interface Name ... { ... }` 花括号里的内容（处理嵌套） */
